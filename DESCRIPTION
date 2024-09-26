@@ -15,5 +15,6 @@ Imports:
     brm,
     mvnfast,
     numDeriv,
-    stats
+    stats,
+    cli
 Config/testthat/edition: 3

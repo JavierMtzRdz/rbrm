@@ -161,7 +161,8 @@ rbrm <- function(va, vb, y, x, alpha.start = NULL, beta.start = NULL,
             (y[x == 0]) * log(p0[x == 0])) -
             sum((1 - y[x == 1]) * log(1 - p1[x == 1]) +
                 (y[x == 1]) * log(p1[x == 1]))))) {
-            stop("NaN values encountered in unpenalized.nllh. Please check the input matrices.")
+            # stop("NaN values encountered in unpenalized.nllh. Please check the input matrices.")
+          cli::cli_alert_danger("NaN values encountered in unpenalized.nllh. Please check the input matrices.")
         }
         unpenalized.nllh <- (-sum((1 - y[x == 0]) * log(1 - p0[x == 0]) +
             (y[x == 0]) * log(p0[x == 0])) -
