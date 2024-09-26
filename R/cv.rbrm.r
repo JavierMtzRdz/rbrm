@@ -57,6 +57,8 @@ cv_rbrm <- function(va, vb, x, y, lambda = NULL, n_lambdas = 50, nfolds = 3, ...
   
   model_history <- array(0, dim = c(ncol(va) * 2, n_lambdas, nfolds))
   
+    cli::cli_progress_bar("Processing", total = nfolds*n_lambdas)
+    
   cv_results <- lapply(1:nfolds, function(fold) {
     # print(paste("Processing fold", fold, "of", nfolds, sep = " "))
     cli::cli_alert_info(paste0("Processing fold ", fold, " of ", nfolds))
@@ -73,12 +75,14 @@ cv_rbrm <- function(va, vb, x, y, lambda = NULL, n_lambdas = 50, nfolds = 3, ...
     x_test <- x[test_idx]
     y_test <- y[test_idx]
     
-    fold_models <- lapply(c(1:length(lambda_grid)), function(x) {
+    fold_models <- lapply(1:length(lambda_grid),
+                          function(x) {
       current_lambda <- lambda_grid[x]
       # cat("Processing lambda:", current_lambda, "\n")
-      cli::cli_alert(paste0("Processing lambda: ", current_lambda, "\n"))
+      cli::cli_alert(paste0("Processing lambda: ", round(current_lambda, 5)))
       fit <- rbrm(va_train, vb_train, x_train, y_train, lambda = current_lambda, ...)
       model_history[, x, fold] <- fit$point.est
+      cli::cli_progress_update(.envir = parent.frame(4))
       return(fit)
     })
     

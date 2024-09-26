@@ -19,11 +19,12 @@ soft_thres <- function(x, lambda) {
 #' 
 #' Computes the negative log-likelihood for the alpha coefficients.
 #' 
+#' @param alpha Coefficients.
 #' @return The negative log-likelihood for the given alpha.
 #' @examples
 #' #alpha <- c(1, 2, 3)
 #' #nllh.alpha(alpha)
-nllh.alpha <- function(alpha) {
+nllh.alpha <- function(alpha, beta, va, vb, x, y) {
   logrr <- (va %*% alpha)
   logop <- (vb %*% beta)
   p0 <- brm::getProbRR(logrr, logop)[, 1]
@@ -45,11 +46,12 @@ nllh.alpha <- function(alpha) {
 #' 
 #' Computes the negative log-likelihood for the beta coefficients.
 #' 
+#' @param beta Coefficients.
 #' @return The negative log-likelihood for the given beta.
 #' @examples
 #' #beta <- c(1, 2, 3)
 #' #nllh.beta(beta)
-nllh.beta <- function(beta) {
+nllh.beta <- function(beta, alpha, va, vb, x, y) {
   logrr <- (va %*% alpha)
   logop <- (vb %*% beta)
   p0 <- brm::getProbRR(logrr, logop)[, 1]
@@ -76,8 +78,10 @@ nllh.beta <- function(beta) {
 #' @param t_old A numeric value for the previous t parameter in FISTA.
 #' @param last_alpha A numeric vector representing the alpha coefficients from the previous iteration.
 #' @return A list with the updated alpha, t, and y_alpha values.
-proximal.gd.alpha.fista <- function(alpha, step_size, lambda, t_old, last_alpha) {
-  gradient <- numDeriv::grad(nllh.alpha, alpha, method = "simple")
+proximal.gd.alpha.fista <- function(alpha, step_size, lambda, t_old, last_alpha,
+                                    intercept,
+                                    beta, va, vb, x, y) {
+  gradient <- numDeriv::grad(function(.x){nllh.alpha(.x, beta, va, vb, x, y)}, alpha, method = "simple")
   gradient[is.na(gradient)] <- 0
   input <- alpha - step_size * gradient
   alpha_new <- soft_thres(input, lambda * step_size)
@@ -102,8 +106,10 @@ proximal.gd.alpha.fista <- function(alpha, step_size, lambda, t_old, last_alpha)
 #' @param t_old A numeric value for the previous t parameter in FISTA.
 #' @param last_beta A numeric vector representing the beta coefficients from the previous iteration.
 #' @return A list with the updated beta, t, and y_beta values.
-proximal.gd.beta.fista <- function(beta, step_size, lambda, t_old, last_beta) {
-  gradient <- numDeriv::grad(nllh.beta, beta, method = "simple")
+proximal.gd.beta.fista <- function(beta, step_size, lambda, t_old, last_beta,
+                                   intercept,
+                                   alpha, va, vb, x, y) {
+  gradient <- numDeriv::grad(function(.x) {nllh.beta(.x, alpha, va, vb, x, y)}, beta, method = "simple")
   gradient[is.na(gradient)] <- 0
   input <- beta - step_size * gradient
   beta_new <- soft_thres(input, lambda * step_size)
@@ -126,9 +132,10 @@ proximal.gd.beta.fista <- function(beta, step_size, lambda, t_old, last_beta) {
 #' @param pars A numeric vector of the concatenated alpha and beta coefficients.
 #' @return The penalized negative log-likelihood.
 #' @examples
-#' pars <- c(alpha = 1, beta = 2)
-#' penalized.neg.log.likelihood(pars)
-penalized.neg.log.likelihood <- function(pars) {
+#' #pars <- c(alpha = 1, beta = 2)
+#' #penalized.neg.log.likelihood(pars)
+penalized.neg.log.likelihood <- function(pars, pa, pb, intercept, lambda,
+                                         alpha, beta, va, vb, x, y) {
   alpha <- pars[1:pa]
   beta <- pars[(pa + 1):(pa + pb)]
   logrr <- (va %*% alpha)
@@ -195,6 +202,11 @@ rbrm <- function(va, vb, y, x, alpha.start = NULL, beta.start = NULL,
                  max.step = 3000, thres = 1e-04, lambda = 0,
                  lr.alpha = 0.06, lr.beta = 0.02,
                  intercept = TRUE, early_stopping_rounds = 10) {
+  # 
+  # va <- v; vb <- v; alpha.start = NULL; beta.start = NULL;
+  # max.step = 3000; thres = 1e-04; lambda = 0;
+  # lr.alpha = 0.06; lr.beta = 0.02;
+  # intercept = TRUE; early_stopping_rounds = 10
 
     if (is.null(vb)) {
         vb <- va
@@ -236,20 +248,27 @@ rbrm <- function(va, vb, y, x, alpha.start = NULL, beta.start = NULL,
         step <- step + 1
         # FISTA update for alpha
         last_alpha <- alpha
-        res_alpha <- proximal.gd.alpha.fista(y_alpha, step_size_alpha, lambda, t_alpha, last_alpha)
+        res_alpha <- proximal.gd.alpha.fista(y_alpha, step_size_alpha, 
+                                             lambda, t_alpha, last_alpha,
+                                             intercept,
+                                             beta, va, vb, x, y)
         alpha_new <- res_alpha$alpha_new
         t_alpha <- res_alpha$t_alpha
         y_alpha <- res_alpha$y_alpha
 
         # FISTA update for beta
         last_beta <- beta
-        res_beta <- proximal.gd.beta.fista(y_beta, step_size_beta, lambda, t_beta, last_beta)
+        res_beta <- proximal.gd.beta.fista(y_beta, step_size_beta, 
+                                           lambda, t_beta, last_beta,
+                                           intercept,
+                                           alpha, va, vb, x, y)
         beta_new <- res_beta$beta_new
         t_beta <- res_beta$t_beta
         y_beta <- res_beta$y_beta
 
-        grad_alpha <- numDeriv::grad(nllh.alpha, y_alpha, method = "simple")
-        grad_beta <- numDeriv::grad(nllh.beta, y_beta, method = "simple")
+        grad_alpha <- numDeriv::grad(function(.x) {nllh.alpha(.x, beta, va, vb, x, y)}, y_alpha, method = "simple")
+        grad_beta <- numDeriv::grad(function(.x) {nllh.beta(.x, alpha, va, vb, x, y)}, y_beta, method = "simple")
+        
         if ((max(abs(grad_alpha)) < thres) & (max(abs(grad_beta)) < thres)) {
             break
         }
@@ -260,7 +279,9 @@ rbrm <- function(va, vb, y, x, alpha.start = NULL, beta.start = NULL,
     }
     opt <- list(
         point.est = c(alpha, beta), convergence = (step < max.step),
-        value = penalized.neg.log.likelihood(c(alpha, beta)),
+        value = penalized.neg.log.likelihood(c(alpha, beta), 
+                                             pa, pb, intercept, lambda,
+                                             alpha, beta, va, vb, x, y),
         step = step
     )
 
