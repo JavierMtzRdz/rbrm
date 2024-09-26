@@ -1,3 +1,162 @@
+#' Soft Thresholding Operator
+#' 
+#' Applies the soft thresholding operator to the input.
+#' 
+#' @param x A numeric vector to apply the soft threshold.
+#' @param lambda A positive numeric value representing the threshold parameter.
+#' @return A numeric vector where the soft thresholding has been applied.
+#' @examples
+#' #soft_thres(c(3, -1.5, 0.2), 0.5)
+soft_thres <- function(x, lambda) {
+  sx <- abs(x) - lambda
+  sx[sx < 0] <- 0
+  return(sx * sign(x))
+}
+
+
+
+#' Negative Log-Likelihood for Alpha
+#' 
+#' Computes the negative log-likelihood for the alpha coefficients.
+#' 
+#' @return The negative log-likelihood for the given alpha.
+#' @examples
+#' #alpha <- c(1, 2, 3)
+#' #nllh.alpha(alpha)
+nllh.alpha <- function(alpha) {
+  logrr <- (va %*% alpha)
+  logop <- (vb %*% beta)
+  p0 <- brm::getProbRR(logrr, logop)[, 1]
+  p1 <- brm::getProbRR(logrr, logop)[, 2]
+  
+  # Clipping probabilities
+  p0 <- pmin(pmax(p0, 1e-15), 1 - 1e-15)
+  p1 <- pmin(pmax(p1, 1e-15), 1 - 1e-15)
+  
+  return(-sum((1 - y[x == 0]) * log(1 - p0[x == 0]) + (y[x == 0]) * log(p0[x == 0])) -
+           sum((1 - y[x == 1]) * log(1 - p1[x == 1]) + (y[x == 1]) * log(p1[x == 1])))
+}
+
+
+
+
+
+#' Negative Log-Likelihood for Beta
+#' 
+#' Computes the negative log-likelihood for the beta coefficients.
+#' 
+#' @return The negative log-likelihood for the given beta.
+#' @examples
+#' #beta <- c(1, 2, 3)
+#' #nllh.beta(beta)
+nllh.beta <- function(beta) {
+  logrr <- (va %*% alpha)
+  logop <- (vb %*% beta)
+  p0 <- brm::getProbRR(logrr, logop)[, 1]
+  p1 <- brm::getProbRR(logrr, logop)[, 2]
+  
+  # Clipping probabilities
+  p0 <- pmin(pmax(p0, 1e-15), 1 - 1e-15)
+  p1 <- pmin(pmax(p1, 1e-15), 1 - 1e-15)
+  
+  return(-sum((1 - y[x == 0]) * log1p(-p0[x == 0]) + (y[x == 0]) * log(p0[x == 0])) -
+           sum((1 - y[x == 1]) * log1p(-p1[x == 1]) + (y[x == 1]) * log(p1[x == 1])))
+}
+
+
+
+
+#' FISTA Proximal Gradient Descent for Alpha
+#' 
+#' Applies the FISTA algorithm for optimizing alpha with proximal gradient descent.
+#' 
+#' @param alpha A numeric vector of alpha coefficients.
+#' @param step_size A numeric value for the step size.
+#' @param lambda A numeric value for the L1 regularization parameter.
+#' @param t_old A numeric value for the previous t parameter in FISTA.
+#' @param last_alpha A numeric vector representing the alpha coefficients from the previous iteration.
+#' @return A list with the updated alpha, t, and y_alpha values.
+proximal.gd.alpha.fista <- function(alpha, step_size, lambda, t_old, last_alpha) {
+  gradient <- numDeriv::grad(nllh.alpha, alpha, method = "simple")
+  gradient[is.na(gradient)] <- 0
+  input <- alpha - step_size * gradient
+  alpha_new <- soft_thres(input, lambda * step_size)
+  if (intercept == TRUE) {
+    alpha_new[1] <- input[1]
+  }
+  t_new <- (1 + sqrt(1 + 4 * t_old^2)) / 2
+  y_alpha_new <- alpha_new + (t_old - 1) / t_new * (alpha_new - last_alpha)
+  return(list(alpha_new = alpha_new, t_alpha = t_new, y_alpha = y_alpha_new))
+}
+
+
+
+
+#' FISTA Proximal Gradient Descent for Beta
+#' 
+#' Applies the FISTA algorithm for optimizing beta with proximal gradient descent.
+#' 
+#' @param beta A numeric vector of beta coefficients.
+#' @param step_size A numeric value for the step size.
+#' @param lambda A numeric value for the L1 regularization parameter.
+#' @param t_old A numeric value for the previous t parameter in FISTA.
+#' @param last_beta A numeric vector representing the beta coefficients from the previous iteration.
+#' @return A list with the updated beta, t, and y_beta values.
+proximal.gd.beta.fista <- function(beta, step_size, lambda, t_old, last_beta) {
+  gradient <- numDeriv::grad(nllh.beta, beta, method = "simple")
+  gradient[is.na(gradient)] <- 0
+  input <- beta - step_size * gradient
+  beta_new <- soft_thres(input, lambda * step_size)
+  if (intercept == TRUE) {
+    beta_new[1] <- input[1]
+  }
+  t_new <- (1 + sqrt(1 + 4 * t_old^2)) / 2
+  y_beta_new <- beta_new + (t_old - 1) / t_new * (beta_new - last_beta)
+  return(list(beta_new = beta_new, t_beta = t_new, y_beta = y_beta_new))
+}
+
+
+
+
+
+#' Penalized Negative Log-Likelihood
+#' 
+#' Computes the penalized negative log-likelihood for alpha and beta.
+#' 
+#' @param pars A numeric vector of the concatenated alpha and beta coefficients.
+#' @return The penalized negative log-likelihood.
+#' @examples
+#' pars <- c(alpha = 1, beta = 2)
+#' penalized.neg.log.likelihood(pars)
+penalized.neg.log.likelihood <- function(pars) {
+  alpha <- pars[1:pa]
+  beta <- pars[(pa + 1):(pa + pb)]
+  logrr <- (va %*% alpha)
+  logop <- (vb %*% beta)
+  p0 <- brm::getProbRR(logrr, logop)[, 1]
+  p1 <- brm::getProbRR(logrr, logop)[, 2]
+  
+  # Clipping probabilities
+  p0 <- pmin(pmax(p0, 1e-15), 1 - 1e-15)
+  p1 <- pmin(pmax(p1, 1e-15), 1 - 1e-15)
+  
+  unpenalized.nllh <- (-sum((1 - y[x == 0]) * log(1 - p0[x == 0]) + (y[x == 0]) * log(p0[x == 0])) -
+                         sum((1 - y[x == 1]) * log(1 - p1[x == 1]) + (y[x == 1]) * log(p1[x == 1])))
+  
+  # Applying the penalty term
+  if (intercept == TRUE) {
+    penalty <- lambda * (sum(abs(alpha[-1])) + sum(abs(beta[-1]))) # Exclude intercept
+  } else {
+    penalty <- lambda * (sum(abs(alpha)) + sum(abs(beta)))
+  }
+  return(unpenalized.nllh + penalty)
+}
+
+
+
+
+
+
 #' Regularized Binary Regression Model (RBRM)
 #'
 #' Performs a regularized binary regression model (RBRM) using FISTA proximal gradient descent. 
@@ -36,11 +195,6 @@ rbrm <- function(va, vb, y, x, alpha.start = NULL, beta.start = NULL,
                  max.step = 3000, thres = 1e-04, lambda = 0,
                  lr.alpha = 0.06, lr.beta = 0.02,
                  intercept = TRUE, early_stopping_rounds = 10) {
-    soft_thres <- function(x, lambda) {
-        sx <- abs(x) - lambda
-        sx[sx < 0] <- 0
-        return(sx * sign(x))
-    }
 
     if (is.null(vb)) {
         vb <- va
@@ -59,121 +213,6 @@ rbrm <- function(va, vb, y, x, alpha.start = NULL, beta.start = NULL,
     }
     if (is.null(beta.start)) {
         beta.start <- c(rep(0.01, pb))
-    }
-
-    nllh.alpha <- function(alpha) {
-        logrr <- (va %*% alpha)
-        logop <- (vb %*% beta)
-
-        p0 <- brm::getProbRR(logrr, logop)[, 1]
-        p1 <- brm::getProbRR(logrr, logop)[, 2]
-
-        p0[p0 == 1] <- 1 - 1e-15
-        p0[p0 <= 0] <- 1e-15
-
-        p1[p1 == 1] <- 1 - 1e-15
-        p1[p1 <= 0] <- 1e-15
-
-
-        if (any(is.nan(log1p(-p1[x == 1])))) {
-            p1[which(is.nan(log1p(-p1[x == 1])))] <- 1 - 1e-15
-        }
-        if (any(is.nan(log1p(-p0[x == 0])))) {
-            p1[which(is.nan(log1p(-p0[x == 0])))] <- 1 - 1e-15
-        }
-
-        return(-sum((1 - y[x == 0]) * log(1 - p0[x == 0]) +
-            (y[x == 0]) * log(p0[x == 0])) -
-            sum((1 - y[x == 1]) * log(1 - p1[x == 1]) +
-                (y[x == 1]) * log(p1[x == 1])))
-    }
-
-    nllh.beta <- function(beta) {
-        logrr <- (va %*% alpha)
-        logop <- (vb %*% beta)
-
-        p0 <- brm::getProbRR(logrr, logop)[, 1]
-        p1 <- brm::getProbRR(logrr, logop)[, 2]
-
-        p0[p0 == 1] <- 1 - 1e-15
-        p0[p0 <= 0] <- 1e-15
-
-        p1[p1 == 1] <- 1 - 1e-15
-        p1[p1 <= 0] <- 1e-15
-
-        if (any(is.nan(log1p(-p1[x == 1])))) {
-            p1[which(is.nan(log1p(-p1[x == 1])))] <- 1 - 1e-15
-        }
-        if (any(is.nan(log1p(-p0[x == 0])))) {
-            p1[which(is.nan(log1p(-p0[x == 0])))] <- 1 - 1e-15
-        }
-
-        return(-sum((1 - y[x == 0]) * log1p(-p0[x == 0]) +
-            (y[x == 0]) * log(p0[x == 0])) -
-            sum((1 - y[x == 1]) * log1p(-p1[x == 1]) +
-                (y[x == 1]) * log(p1[x == 1])))
-    }
-
-    ## FISTA proximal gradient descent functions
-    proximal.gd.alpha.fista <- function(alpha, step_size, lambda, t_old, last_alpha) {
-        gradient <- numDeriv::grad(nllh.alpha, alpha, method = "simple")
-        gradient[is.na(gradient)] <- 0
-        input <- alpha - step_size * gradient
-        alpha_new <- soft_thres(input, lambda * step_size)
-        if (intercept == TRUE) {
-            alpha_new[1] <- input[1]
-        }
-        t_new <- (1 + sqrt(1 + 4 * t_old^2)) / 2
-        y_alpha_new <- alpha_new + (t_old - 1) / t_new * (alpha_new - last_alpha)
-        return(list(alpha_new = alpha_new, t_alpha = t_new, y_alpha = y_alpha_new))
-    }
-
-    proximal.gd.beta.fista <- function(beta, step_size, lambda, t_old, last_beta) {
-        gradient <- numDeriv::grad(nllh.beta, beta, method = "simple")
-        gradient[is.na(gradient)] <- 0
-        input <- beta - step_size * gradient
-        beta_new <- soft_thres(input, lambda * step_size)
-        if (intercept == TRUE) {
-            beta_new[1] <- input[1]
-        }
-        t_new <- (1 + sqrt(1 + 4 * t_old^2)) / 2
-        y_beta_new <- beta_new + (t_old - 1) / t_new * (beta_new - last_beta)
-        return(list(beta_new = beta_new, t_beta = t_new, y_beta = y_beta_new))
-    }
-
-    penalized.neg.log.likelihood <- function(pars) {
-        alpha <- pars[1:pa]
-        beta <- pars[(pa + 1):(pa + pb)]
-
-        logrr <- (va %*% alpha)
-        logop <- (vb %*% beta)
-
-        p0 <- brm::getProbRR(logrr, logop)[, 1]
-        p1 <- brm::getProbRR(logrr, logop)[, 2]
-
-        p0[p0 == 1] <- 1 - 1e-15
-        p0[p0 <= 0] <- 1e-15
-
-        p1[p1 == 1] <- 1 - 1e-15
-        p1[p1 <= 0] <- 1e-15
-
-        if (any(is.nan(-sum((1 - y[x == 0]) * log(1 - p0[x == 0]) +
-            (y[x == 0]) * log(p0[x == 0])) -
-            sum((1 - y[x == 1]) * log(1 - p1[x == 1]) +
-                (y[x == 1]) * log(p1[x == 1]))))) {
-            # stop("NaN values encountered in unpenalized.nllh. Please check the input matrices.")
-          cli::cli_alert_danger("NaN values encountered in unpenalized.nllh. Please check the input matrices.")
-        }
-        unpenalized.nllh <- (-sum((1 - y[x == 0]) * log(1 - p0[x == 0]) +
-            (y[x == 0]) * log(p0[x == 0])) -
-            sum((1 - y[x == 1]) * log(1 - p1[x == 1]) +
-                (y[x == 1]) * log(p1[x == 1])))
-        if (intercept == TRUE) {
-            penalty <- lambda * (sum(abs(alpha[-1])) + sum(abs(beta[-1]))) # penalty does not apply to the intercept coefficient
-        } else {
-            penalty <- lambda * (sum(abs(alpha)) + sum(abs(beta)))
-        }
-        return(unpenalized.nllh + penalty)
     }
 
     ## Optimization
