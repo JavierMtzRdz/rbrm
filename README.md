@@ -1,13 +1,28 @@
 
-## ☕ Regularized Binary Regression Model for Relative Risk
+<!-- README.md is generated from README.Rmd. Please edit that file -->
 
-🎯 We develop an algorithm that extends on the
+## Regularized Binary Regression Model for Relative Risk
+
+Package version of
+[ChloeYou/regularized-RR-regression](https://github.com/ChloeYou/regularized-RR-regression).
+It develops an algorithm that extends on the
 [`rbrm`](https://github.com/mclements/brm) package to estimate relative
 risk.
 
 📖 The original model is based on the [regularized binary regression
 model](https://arxiv.org/abs/1510.02430) (rbrm) paper by Thomas S.
 Richardson, James M. Robins, Linbo Wang.
+
+#### Installation
+
+You can install the development version from
+[GitHub](https://github.com/JavierMtzRdz/rbrm) with
+
+``` r
+remotes::install_github("JavierMtzRdz/rbrm")
+# Or
+devtools::install_github("JavierMtzRdz/rbrm")   
+```
 
 #### 📂 This repository contains the following files
 
