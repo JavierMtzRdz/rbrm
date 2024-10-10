@@ -94,3 +94,46 @@ proximal_operator <- function(x, lambda) {
 same <- function(x, y, tolerance = .Machine$double.eps^0.5) {
   abs(x - y) < tolerance
 }
+
+#' LogSumExp
+#'
+#' Compute log(sum(exp(x))) in a numerically-stable fashion
+#'
+#' @param x numeric, usually a vector
+#'
+#' @return numeric, single number
+#' @examples
+#' logsumexp(c(-1e5,-1e12))
+#' # compare to log(sum(exp(c(-1e5,-1e12))))
+#' log(sum(exp(c(-1e5,-1e12))))
+#' @export
+logsumexp <- function(x){
+  if(!is.numeric(x)) stop('x should be numeric, not ', class(x)[1])
+  x_max <- max(x)
+  result <- x_max + log(sum(exp(x-x_max)))
+  return(result)
+}
+
+
+#' log1p
+#'
+#' Compute log(1+x) in a numerically-stable fashion
+#'
+#' @param x numeric
+#'
+#' @return numeric, same size as x
+#' @examples
+#' Log1p(1e-20)
+#' # compare to naive approach:
+#' log(1+1e-20)
+#' @export
+Log1p <- function(x){
+  if(!is.numeric(x)) stop('x should be numeric, not ', class(x)[1])
+  y <- 1+x
+  z <- y-1
+  idx <- (z==0) # where is z==0 (ie numerical underflow)
+  out <- rep(0,length(x))
+  out[idx] <- x[idx] # if underflow, x itself is a good approximation
+  out[!idx] <- x[!idx]*log(y[!idx])/z[!idx] # o.w., log(y)/z ~ log(1+x)/x
+  return(out)
+}

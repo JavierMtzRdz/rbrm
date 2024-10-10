@@ -60,5 +60,7 @@ generate_data <- function(pa, pb, n, n_test, alpha, beta, gamma) {
     pA.true.test[x.test == 1] <- p0p1.true.test[x.test == 1, 2] # replace with # P(Y=1|X=1)
     y.test <- stats::rbinom(n_test, 1, pA.true.test) # P(Y=1|X)
 
-    return(list(v.train, x.train, y.train, v.test, x.test, y.test))
+    return(list(v.train = v.train, x.train = x.train, 
+                y.train = y.train, v.test = v.test, 
+                x.test = x.test, y.test = y.test))
 }
