@@ -7,8 +7,8 @@
 rbrm.original(
   va,
   vb,
-  y,
   x,
+  y,
   alpha.start = NULL,
   beta.start = NULL,
   max.step = 3000,
@@ -25,9 +25,9 @@ rbrm.original(
 
 \item{vb}{A matrix of independent variables (without an intercept) for beta. If NULL, va is used.}
 
-\item{y}{A vector of binary outcomes (0/1).}
-
 \item{x}{A vector indicating the group assignment (1 or 0) for each observation.}
+
+\item{y}{A vector of binary outcomes (0/1).}
 
 \item{alpha.start}{Initial values for alpha coefficients. Defaults to a zero vector.}
 

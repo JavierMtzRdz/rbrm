@@ -10,9 +10,10 @@ cv_rbrm(
   x,
   y,
   lambda = NULL,
-  n_lambdas = 5,
+  n_lambdas = 20,
   nfolds = 3,
   implt = rbrm,
+  prob_fun = brm::getProbRR,
   ...
 )
 }

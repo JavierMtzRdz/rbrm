@@ -15,7 +15,8 @@ proximal.gd.beta.fista(
   va,
   vb,
   x,
-  y
+  y,
+  prob_fun = brm::getProbRR
 )
 }
 \arguments{
