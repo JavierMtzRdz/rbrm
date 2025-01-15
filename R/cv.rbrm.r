@@ -37,8 +37,9 @@
 #' @export
 cv_rbrm <- function(va, vb, x, y, lambda = NULL, 
                     n_lambdas = 20, nfolds = 3, 
-                    implt = rbrm,
-                    prob_fun = brm::getProbRR, ...) {
+                    implt = rbrm, 
+                    prob_fun = NULL,
+                    ...) {
   # nfolds need to be at least 2
   if (nfolds < 2) {
     # stop("nfolds must be at least 2")
@@ -76,14 +77,22 @@ cv_rbrm <- function(va, vb, x, y, lambda = NULL,
     y_train <- y[train_idx]
     
     fold_models <- lapply(1:length(lambda_grid),
-                          function(x) {
-      current_lambda <- lambda_grid[x]
+                          function(i) {
+      current_lambda <- lambda_grid[i]
       # cat("Processing lambda:", current_lambda, "\n")
-      cli::cli_alert(paste0("Processing lambda: ", round(current_lambda, 5)))
-      fit <- implt(va_train, vb_train, x_train, y_train, lambda = current_lambda,
-                   ...)
+      # cli::cli_alert(paste0("Processing lambda: ", round(current_lambda, 5)))
+      
+      if (is.null(prob_fun)) {
+        fit <- implt(va = va_train, vb = vb_train,
+                     x = x_train, y = y_train, lambda = current_lambda,
+                     ...)
+      } else {
+        fit <- implt(va = va_train, vb = vb_train,
+                     x = x_train, y = y_train, lambda = current_lambda,
+                     prob_fun = prob_fun, ...)
+      }
       # cli::cli_progress_update(.envir = parent.frame(4))
-      cli::cli_alert(paste0("Finish lambda: {round(current_lambda, 5)} | Time: {fit$time}"))
+      cli::cli_alert(paste0("Lambda {round(current_lambda, 5)} | Time: {fit$time}"))
       return(fit)
     })
       return(
@@ -106,14 +115,25 @@ cv_rbrm <- function(va, vb, x, y, lambda = NULL,
 
         logrr <- va_test %*% alpha
         logop <- vb_test %*% beta
-
+        
+        if (is.null(prob_fun) & 
+            identical(implt, rbrm.experimental)) prob_fun <- getProbRR.org
+        if (is.null(prob_fun) &
+            identical(implt, rbrm.experimental2)) prob_fun <- getProbRR.alt
+        if (is.null(prob_fun) &
+            identical(implt, rbrm)) prob_fun <- brm::getProbRR
+        
         ps <- prob_fun(logrr, logop)
 
         p0 <- ps[, 1]
         p1 <- ps[, 2]
-
-        p0 <- pmin(pmax(p0, 1e-15), 1 - 1e-15)
-        p1 <- pmin(pmax(p1, 1e-15), 1 - 1e-15)
+        
+        # if (#!identical(implt, rbrm.experimental2)
+        #     T
+        #     ) {
+        # p0 <- pmin(pmax(p0, 1e-15), 1 - 1e-15)
+        # p1 <- pmin(pmax(p1, 1e-15), 1 - 1e-15)
+        # }
 
         fitted.prob <- c(p0[x_test == 0], p1[x_test == 1])
 
@@ -122,7 +142,8 @@ cv_rbrm <- function(va, vb, x, y, lambda = NULL,
         y_hat <- round(fitted.prob)
 
       return(
-        (-2/length(true.y))*(sum(log(fitted.prob[true.y == 1]))+sum(log1p(-fitted.prob[true.y == 0])))
+        (-2/length(true.y))*(sum(log(fitted.prob[true.y == 1]))+
+                               sum(log1p(-fitted.prob[true.y == 0])))
       )
     })
       
@@ -134,7 +155,19 @@ cv_rbrm <- function(va, vb, x, y, lambda = NULL,
   
   best_lambda_idx <- which.min(cv_mean_deviance)
   
-  best_fit <- implt(va, vb, x, y, lambda = lambda_grid[best_lambda_idx], ...)
+  
+  if (is.null(prob_fun)) {
+    best_fit <- implt(va = va, vb = vb,
+                 x = x, y = y, 
+                 lambda = lambda_grid[best_lambda_idx],
+                 ...)
+  } else {
+    best_fit <- implt(va = va, vb = vb,
+                 x = x, y = y, 
+                 lambda = lambda_grid[best_lambda_idx],
+                 prob_fun = prob_fun, ...)
+  }
+  
   
   obj <- list(
     lambda = lambda_grid[best_lambda_idx],
@@ -260,7 +293,7 @@ cv_rbrm_original <- function(va, vb, x, y, lambda = NULL, n_lambdas = 50, nfolds
   best_lambda_idx <- which.min(cv_mean_deviance)
   best_fit <- rbrm.original(va, vb, x, y, lambda = lambda_grid[best_lambda_idx], ...)
   
-  list(
+  lst <- list(
     lambda = lambda_grid[best_lambda_idx],
     alpha = best_fit$point.est[1:ncol(va)],
     beta = best_fit$point.est[(ncol(va) + 1):(ncol(va) + ncol(vb))],
@@ -272,4 +305,7 @@ cv_rbrm_original <- function(va, vb, x, y, lambda = NULL, n_lambdas = 50, nfolds
     model_history = model_history,
     lambda_grid = lambda_grid
   )
+  
+  
+  return(structure(lst, class = c("cv_rbrm")))
 }
