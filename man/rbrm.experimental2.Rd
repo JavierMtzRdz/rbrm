@@ -20,7 +20,8 @@ rbrm.experimental2(
   early_stopping_rounds = 10,
   min_ss = 1e-13,
   tol_ch = 0.001,
-  prob_fun = getProbRR.alt
+  prob_fun = getProbRR.alt,
+  opt_fun = proximal.gd.fista
 )
 }
 \arguments{

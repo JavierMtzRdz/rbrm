@@ -13,7 +13,7 @@ penalized_nllh(
   y,
   lambda,
   intercept,
-  prob_fun = brm::getProbRR
+  prob_fun = getProbRR.org
 )
 }
 \arguments{

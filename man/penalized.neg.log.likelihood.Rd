@@ -16,7 +16,7 @@ penalized.neg.log.likelihood(
   vb,
   x,
   y,
-  prob_fun = brm::getProbRR
+  prob_fun = getProbRR.org
 )
 }
 \arguments{

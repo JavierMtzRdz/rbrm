@@ -13,7 +13,7 @@ cv_rbrm(
   n_lambdas = 20,
   nfolds = 3,
   implt = rbrm,
-  prob_fun = brm::getProbRR,
+  prob_fun = NULL,
   ...
 )
 }

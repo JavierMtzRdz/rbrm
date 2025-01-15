@@ -19,7 +19,9 @@ rbrm.experimental(
   intercept = TRUE,
   early_stopping_rounds = 10,
   min_ss = 1e-13,
-  tol_ch = 0.001
+  tol_ch = 1e-05,
+  prob_fun = getProbRR.org,
+  opt_fun = proximal.gd.asfista
 )
 }
 \arguments{

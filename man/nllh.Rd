@@ -4,7 +4,7 @@
 \alias{nllh}
 \title{Negative Log-Likelihood for Alpha}
 \usage{
-nllh(alpha, beta, va, vb, x, y, prob_fun = brm::getProbRR)
+nllh(alpha, beta, va, vb, x, y, prob_fun = getProbRR.org)
 }
 \arguments{
 \item{alpha}{Coefficients.}

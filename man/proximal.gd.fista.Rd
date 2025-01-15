@@ -17,7 +17,7 @@ proximal.gd.fista(
   vb,
   x,
   y,
-  prob_fun = brm::getProbRR
+  prob_fun = getProbRR.org
 )
 }
 \arguments{
