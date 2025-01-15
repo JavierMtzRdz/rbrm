@@ -21,5 +21,9 @@ Imports:
     mvnfast,
     numDeriv,
     stats,
-    cli
+    cli,
+    dplyr (>= 1.0.0),
+    tidyr (>= 1.0.0),
+    ggplot2,
+    magrittr
 Config/testthat/edition: 3
