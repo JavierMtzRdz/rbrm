@@ -1,4 +1,45 @@
-getProbRR = function(logrr, logop = NA) {
+#' Compute Probabilities for Robinson's Relative Risk Model specification
+#'
+#' This function computes the probabilities \( p_0 \) and \( p_1 \) for a binary outcome 
+#' under an alternative specification of the relative risk regression model.
+#'
+#' @param logrr A numeric vector or matrix representing the log-relative risk. If `logrr` is 
+#'   a vector of length 2, the first element is interpreted as the log-relative risk 
+#'   and the second as the log-odds product. If `logrr` is a matrix with two columns, 
+#'   the first column is treated as the log-relative risk and the second as the log-odds product.
+#' @param logop A numeric value or vector representing the log-odds product. If `logop` 
+#'   is `NA` and `logrr` is a vector of length 2, `logop` is extracted from the second element of `logrr`.
+#'
+#' @return A matrix with two columns:
+#' \describe{
+#'   \item{\code{p0}}{The probability of the binary outcome when the treatment \( X = 0 \).}
+#'   \item{\code{p1}}{The probability of the binary outcome when the treatment \( X = 1 \).}
+#' }
+#'
+#' @details The probabilities are computed using the following formulas:
+#' \deqn{p_0 = \frac{-\left(1 + \exp(\text{logop}) \cdot (1 + \exp(\text{logrr}))\right) 
+#'   + \sqrt{\left(1 + \exp(\text{logop}) \cdot (1 + \exp(\text{logrr}))\right)^2 
+#'   - 4 \cdot \exp(\text{logrr} + 2 \cdot \text{logop})}}{2 \cdot \exp(\text{logrr} + \text{logop})}}
+#'
+#' \deqn{p_1 = \exp(\text{logrr}) \cdot p_0}
+#'
+#' The function supports flexible input formats and adjusts automatically when the input is 
+#' a matrix or vector of appropriate dimensions.
+#'
+#' @examples
+#' # Example with log-relative risk and log-odds product as separate inputs
+#' getProbRR.alt(logrr = 0.5, logop = 0.3)
+#'
+#' # Example with log-relative risk and log-odds product as a vector
+#' getProbRR.alt(logrr = c(0.5, 0.3), logop = NA)
+#'
+#' # Example with log-relative risk and log-odds product as a matrix
+#' logrr_matrix <- matrix(c(0.5, 0.3, 0.7, 0.4), ncol = 2)
+#' getProbRR.alt(logrr = logrr_matrix)
+#'
+#' @export
+getProbRR.org = function(logrr, logop = NA,
+                         clipping = T) {
   if(is.matrix(logrr) && ncol(logrr) == 2){
     logop = logrr[,2]
     logrr = logrr[,1]
@@ -32,6 +73,14 @@ getProbRR = function(logrr, logop = NA) {
                               pmin(exp(logrr), 1))),
                ## not on the boundary logop = 0
                exp(logrr) * p0)
+  
+  
+  if (clipping) {
+    p0 <- pmin(pmax(p0, 1e-15), 1 - 1e-15)
+    p1 <- pmin(pmax(p1, 1e-15), 1 - 1e-15)
+  }
+  
+  
   cbind(p0,p1)
 } 
 
@@ -77,7 +126,8 @@ getProbRR = function(logrr, logop = NA) {
 #' getProbRR.alt(logrr = logrr_matrix)
 #'
 #' @export
-getProbRR.alt <- function(logrr, logop) {
+getProbRR.alt <- function(logrr, logop,
+                          clipping = T) {
   if (is.matrix(logrr) && ncol(logrr) == 2) {
     logop <- logrr[, 2]
     logrr <- logrr[, 1]
@@ -90,6 +140,11 @@ getProbRR.alt <- function(logrr, logop) {
            sqrt((1 + exp(logop) * (1 + exp(logrr)))^2 - 4 * exp(logrr + 2 * logop)))/(2 * exp(logrr + logop))
   
   p1 <- exp(logrr) * p0
+  
+  if (clipping) {
+    p0 <- pmin(pmax(p0, 1e-15), 1 - 1e-15)
+    p1 <- pmin(pmax(p1, 1e-15), 1 - 1e-15)
+  }
   
   cbind(p0, p1)
 }
