@@ -39,7 +39,10 @@ cv_rbrm <- function(va, vb, x, y, lambda = NULL,
                     n_lambdas = 20, nfolds = 3, 
                     implt = rbrm, 
                     prob_fun = NULL,
+                    relax_lsso = F,
                     ...) {
+  
+  tictoc::tic("Total time")
   # nfolds need to be at least 2
   if (nfolds < 2) {
     # stop("nfolds must be at least 2")
@@ -119,8 +122,6 @@ cv_rbrm <- function(va, vb, x, y, lambda = NULL,
         if (is.null(prob_fun) & 
             identical(implt, rbrm.experimental)) prob_fun <- getProbRR.org
         if (is.null(prob_fun) &
-            identical(implt, rbrm.experimental2)) prob_fun <- getProbRR.alt
-        if (is.null(prob_fun) &
             identical(implt, rbrm)) prob_fun <- brm::getProbRR
         
         ps <- prob_fun(logrr, logop)
@@ -128,7 +129,6 @@ cv_rbrm <- function(va, vb, x, y, lambda = NULL,
         p0 <- ps[, 1]
         p1 <- ps[, 2]
         
-        # if (#!identical(implt, rbrm.experimental2)
         #     T
         #     ) {
         # p0 <- pmin(pmax(p0, 1e-15), 1 - 1e-15)
@@ -168,6 +168,12 @@ cv_rbrm <- function(va, vb, x, y, lambda = NULL,
                  prob_fun = prob_fun, ...)
   }
   
+  # if (relax_lsso) {
+  #   best_fit
+  # }
+  
+  time <- tictoc::toc(quiet = TRUE)
+  
   
   obj <- list(
     model_history = model_results,
@@ -179,7 +185,8 @@ cv_rbrm <- function(va, vb, x, y, lambda = NULL,
     cv_mean_deviance = cv_mean_deviance,
     fold_deviances = cv_results,
     best_lambda_idx = best_lambda_idx,
-    lambda_grid = lambda_grid
+    lambda_grid = lambda_grid,
+    time = round(time$toc - time$tic, 4)
   )
   
   class(obj) = "cv_rbrm"

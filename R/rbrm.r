@@ -1,3 +1,5 @@
+
+#' @export
 stop_crit <- function(eval_grad = T,
                       grad_thres = 1e-3,
                       grad_alpha = NULL,
@@ -118,7 +120,7 @@ step_fista <- function(alpha, beta,
   return(list(value_new = value_new, t_value = t_new, y_value = y_value_new))
 }
 
-
+#' @export
 fista_opt <- function(alpha.start, beta.start,
                       step_size_alpha, step_size_beta,
                       lambda, 
@@ -232,7 +234,7 @@ fista_opt <- function(alpha.start, beta.start,
 }
 
 
-
+#' @export
 double_fista_opt <- function(alpha.start, beta.start,
                       step_size_alpha, step_size_beta,
                       lambda, 
@@ -771,7 +773,7 @@ step_asfista <- function(alpha, beta,
 }
 
 
-
+#' @export
 asfista <- function(alpha.start, beta.start,
                     step_size_alpha, step_size_beta,
                     lambda, 
@@ -1027,7 +1029,6 @@ greedy_fista <- function(alpha.start, beta.start,
 #' #result <- rbrm(va, vb, y, x)
 #'
 #' @export
-
 rbrm.experimental <- function(va, vb, x, y,
                               alpha.start = NULL, beta.start = NULL,
                  max.step = 1000, lambda = 0,
@@ -1084,6 +1085,7 @@ rbrm.experimental <- function(va, vb, x, y,
   
   opt <- list(
     point.est = c(alpha, beta), 
+    optimization.info = opt_result,
     convergence = (step < max.step),
     value = penalized_nllh(alpha, beta, 
                            va, vb, x, y,
