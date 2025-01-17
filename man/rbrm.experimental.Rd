@@ -11,17 +11,13 @@ rbrm.experimental(
   y,
   alpha.start = NULL,
   beta.start = NULL,
-  max.step = 3000,
-  thres = 1e-04,
+  max.step = 1000,
   lambda = 0,
-  lr.alpha = 0.1,
-  lr.beta = 0.1,
+  lr.alpha = 0.06,
+  lr.beta = 0.02,
   intercept = TRUE,
-  early_stopping_rounds = 10,
-  min_ss = 1e-13,
-  tol_ch = 1e-05,
   prob_fun = getProbRR.org,
-  opt_fun = proximal.gd.asfista
+  opt_fun = fista
 )
 }
 \arguments{
@@ -39,8 +35,6 @@ rbrm.experimental(
 
 \item{max.step}{Maximum number of optimization steps. Default is 3000.}
 
-\item{thres}{Threshold for convergence. Default is 1e-04.}
-
 \item{lambda}{Regularization parameter for L1 penalty. Default is 0 (no regularization).}
 
 \item{lr.alpha}{Learning rate for alpha parameters. Default is 0.06.}
@@ -48,6 +42,8 @@ rbrm.experimental(
 \item{lr.beta}{Learning rate for beta parameters. Default is 0.02.}
 
 \item{intercept}{Logical. If TRUE, the intercept is included and not penalized. Default is TRUE.}
+
+\item{thres}{Threshold for convergence. Default is 1e-04.}
 
 \item{early_stopping_rounds}{The number of rounds without improvement before early stopping occurs.}
 }

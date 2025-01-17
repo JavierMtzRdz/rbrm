@@ -7,7 +7,7 @@
 proximal.gd.asfista(
   alpha,
   beta,
-  last_value,
+  last_y,
   opt,
   step_size,
   lambda,
@@ -17,9 +17,9 @@ proximal.gd.asfista(
   vb,
   x,
   y,
-  max_backtrack = 15,
-  backtrack_factor = 0.5,
-  beta_increase = 1.2,
+  max_backtrack = 10,
+  backtrack_factor = 0.8,
+  beta_increase = 1.1,
   prob_fun = getProbRR.org
 )
 }
@@ -27,8 +27,6 @@ proximal.gd.asfista(
 \item{alpha}{A numeric vector of alpha coefficients.}
 
 \item{beta}{A numeric vector of beta coefficients.}
-
-\item{last_value}{A numeric vector representing the coefficients from the previous iteration.}
 
 \item{opt}{A character string indicating the parameter to optimize; either "alpha" or "beta".}
 
@@ -47,6 +45,8 @@ proximal.gd.asfista(
 \item{backtrack_factor}{A numeric factor by which the step size is reduced when backtracking.}
 
 \item{beta_increase}{A numeric factor by which the step size is increased if backtracking succeeds.}
+
+\item{last_value}{A numeric vector representing the coefficients from the previous iteration.}
 }
 \value{
 A list with the following components:

@@ -140,7 +140,7 @@ cv_rbrm <- function(va, vb, x, y, lambda = NULL,
         true.y <- c(y_test[x_test == 0], y_test[x_test == 1])
 
         y_hat <- round(fitted.prob)
-
+        
       return(
         (-2/length(true.y))*(sum(log(fitted.prob[true.y == 1]))+
                                sum(log1p(-fitted.prob[true.y == 0])))
@@ -170,6 +170,7 @@ cv_rbrm <- function(va, vb, x, y, lambda = NULL,
   
   
   obj <- list(
+    model_history = model_results,
     lambda = lambda_grid[best_lambda_idx],
     alpha = best_fit$point.est[1:ncol(va)],
     beta = best_fit$point.est[(ncol(va) + 1):(ncol(va) + ncol(vb))],
@@ -178,7 +179,6 @@ cv_rbrm <- function(va, vb, x, y, lambda = NULL,
     cv_mean_deviance = cv_mean_deviance,
     fold_deviances = cv_results,
     best_lambda_idx = best_lambda_idx,
-    model_history = model_results,
     lambda_grid = lambda_grid
   )
   
