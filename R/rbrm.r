@@ -1,6 +1,6 @@
 
 #' @export
-stop_crit <- function(eval_grad = F,
+stop_crit <- function(eval_grad = T,
                       grad_thres = 1e-2,
                       grad_alpha = NULL,
                       grad_beta = NULL,
@@ -128,7 +128,9 @@ fista_opt <- function(alpha.start, beta.start,
                       max.step, 
                       va, vb, x, y,
                       prob_fun = getProbRR.org,
-                      opt_step = step_fista){
+                      opt_step = step_fista,
+                      eval_grad = T,
+                      eval_rel_chang = T){
   ## Optimization
   step <- 0
   alpha <- y_alpha <- last_alpha <- alpha.start
@@ -203,8 +205,10 @@ fista_opt <- function(alpha.start, beta.start,
     g_betas[step,] <- grad_beta
     nllh_results[step] <- nllh_iter
     
-    stop_boolean <- stop_crit(grad_alpha = grad_alpha,
+    stop_boolean <- stop_crit(eval_grad = eval_grad,
+                              grad_alpha = grad_alpha,
                               grad_beta = grad_beta,
+                              eval_rel_chang = eval_rel_chang,
                               alpha = alpha,
                               beta = beta,
                               last_alpha = last_alpha,
