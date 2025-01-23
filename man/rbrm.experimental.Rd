@@ -17,7 +17,8 @@ rbrm.experimental(
   lr.beta = 0.02,
   intercept = TRUE,
   prob_fun = getProbRR.org,
-  opt_fun = fista
+  opt_fun = fista,
+  save_opt = T
 )
 }
 \arguments{

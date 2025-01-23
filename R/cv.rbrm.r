@@ -168,9 +168,23 @@ cv_rbrm <- function(va, vb, x, y, lambda = NULL,
                  prob_fun = prob_fun, ...)
   }
   
-  # if (relax_lsso) {
-  #   best_fit
-  # }
+  if (relax_lsso) {
+    selected_vars <- which(abs(best_fit$point.est) > 0)
+    va_relaxed <- va[, selected_vars[selected_vars <= ncol(va)], drop = FALSE]
+    vb_relaxed <- vb[, selected_vars[selected_vars > ncol(va)] - ncol(vb), drop = FALSE]
+    best_fit_rlasso <- implt(va = va_relaxed, vb = va_relaxed,
+                      x = x, y = y, lambda = 0)
+    
+    best_fit$step <- best_fit_rlasso$step
+    best_fit$convergence <- best_fit_rlasso$convergence
+    
+    best_fit$point.est <- vector("numeric", ncol(va) + ncol(vb))
+    
+    best_fit$point.est[selected_vars[selected_vars <= ncol(va)]] <- best_fit_rlasso$point.est[1:ncol(va_relaxed)]
+    
+    best_fit$point.est[selected_vars[selected_vars <= ncol(va)] +  ncol(va)] <- best_fit_rlasso$point.est[(ncol(va_relaxed)+1):length(best_fit_rlasso$point.est)]
+    
+  }
   
   time <- tictoc::toc(quiet = TRUE)
   
