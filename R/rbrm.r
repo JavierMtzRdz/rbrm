@@ -811,7 +811,7 @@ step_asfista <- function(alpha, beta,
                          intercept, va, vb, x, y,
                          prob_fun = getProbRR.org,
                          max_backtrack = 20,  # Max backtracking iterations
-                         backtrack_factor = .9,  # Step size reduction factor
+                         backtrack_factor = .95,  # Step size reduction factor
                          beta_increase = 1.5  # Factor to increase step size
 ) {
   
@@ -863,7 +863,11 @@ step_asfista <- function(alpha, beta,
     sufficient_adj <- loss_new <= loss_old - 
       (sum((value_new - y_value_new)^2) / (2 * step_size))
     
-    # cli::cli_alert_success("sufficient_decrease {sufficient_decrease}")
+    if (is.na(sufficient_adj)) {
+    cli::cli_alert_success("loss_new {loss_new} || loss_old {loss_old} || step_size: {step_size}")
+      sufficient_adj <- T
+      }
+    
     
     if (sufficient_adj) {
 
@@ -872,6 +876,7 @@ step_asfista <- function(alpha, beta,
       } else {
       
       step_size <- step_size * backtrack_factor
+      if (step_size > 0.5) step_size <- 0.5
       
       input <- y_value_new - step_size * gradient
       
@@ -989,10 +994,10 @@ asfista <- function(alpha.start, beta.start,
                               last_alpha = last_alpha,
                               last_beta = last_beta)
     
-    # if (norm(grad_alpha , type="2") > .5 &
-    #     (step_size_alpha_loop < (step_size_alpha / ceiling(step/100)))) step_size_alpha_loop <- step_size_alpha / ceiling(step/100)
-    # if (norm(grad_beta , type="2") > .5 &
-    #     (step_size_beta_loop < (step_size_beta / ceiling(step/100)))) step_size_beta_loop <- step_size_beta / ceiling(step/100)
+    # if (norm(grad_alpha , type="2") > 1e-2 &
+    #     (step_size_alpha_loop < (step_size_alpha))) step_size_alpha_loop <- step_size_alpha #/ ceiling(step/100)
+    # if (norm(grad_beta , type="2") > 1e-2 &
+    #     (step_size_beta_loop < (step_size_beta))) step_size_beta_loop <- step_size_beta #/ ceiling(step/100)
   
       
   

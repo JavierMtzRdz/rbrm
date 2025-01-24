@@ -19,7 +19,7 @@ step_asfista(
   y,
   prob_fun = getProbRR.org,
   max_backtrack = 20,
-  backtrack_factor = 0.9,
+  backtrack_factor = 0.95,
   beta_increase = 1.5
 )
 }
