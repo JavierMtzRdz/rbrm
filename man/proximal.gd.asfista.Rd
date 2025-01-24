@@ -18,8 +18,8 @@ proximal.gd.asfista(
   x,
   y,
   max_backtrack = 10,
-  backtrack_factor = 0.8,
-  beta_increase = 1.1,
+  backtrack_factor = 0.6,
+  beta_increase = 1.2,
   prob_fun = getProbRR.org
 )
 }

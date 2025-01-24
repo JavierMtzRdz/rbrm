@@ -5,7 +5,7 @@ stop_crit <- function(eval_grad = T,
                       grad_alpha = NULL,
                       grad_beta = NULL,
                       eval_rel_chang = T,
-                      eval_rel_grad_thres = 1e-4,
+                      eval_rel_grad_thres = 1e-2,
                       alpha = NULL,
                       beta = NULL,
                       last_alpha = NULL,
@@ -21,7 +21,7 @@ stop_crit <- function(eval_grad = T,
         any(is.nan(grad_beta))) cli::cli_abort("Gradients has NaN(s).")
     
     if (is.null(grad_alpha) ||
-        is.null(grad_beta)) cli::cli_abort("No enough information to compute relative change.")
+        is.null(grad_beta)) cli::cli_abort("No enough information to compute relative change. grad_alpha: {grad_alpha}, grad_beta: {grad_beta}")
     
     grad_norm_alpha <- norm(grad_alpha, type="2")
     grad_norm_beta <- norm(grad_beta, type="2")
@@ -29,7 +29,7 @@ stop_crit <- function(eval_grad = T,
     grad_eval_return <- (grad_norm_alpha < grad_thres && 
                            grad_norm_beta < grad_thres)
     
-    if(message) cli::cli_alert_success("Gradient eval: {grad_eval_return}")
+    if(message) cli::cli_alert_success("grad_norm_alpha: {grad_norm_alpha} || grad_norm_beta: {grad_norm_beta} || Gradient eval: {grad_eval_return}")
     
   } else {
     grad_eval_return <- F
@@ -42,13 +42,14 @@ stop_crit <- function(eval_grad = T,
         is.null(last_alpha) ||
         is.null(last_beta)) cli::cli_abort("No enough information to compute relative change.")
     
-    rel_change_alpha <- max(abs(alpha - last_alpha)) / max(1e-8, max(abs(last_alpha)))
-    rel_change_beta <- max(abs(beta - last_beta)) / max(1e-8, max(abs(last_beta)))
+    rel_change_alpha <- norm(alpha - last_alpha, type="2") / pmax(1e-8, norm(last_alpha, type="2"))
+ 
+    rel_change_beta <- norm(beta - last_beta, type="2") / pmax(1e-8, norm(last_beta, type="2"))
     
     rel_change_return <- (rel_change_alpha < eval_rel_grad_thres &&
                             rel_change_beta < eval_rel_grad_thres)
     
-    if(message) cli::cli_alert_success("Relative change: {rel_change_return}")
+    if(message) cli::cli_alert_success("rel_change_alpha: {rel_change_alpha} || rel_change_beta: {rel_change_beta} || Relative change: {rel_change_return}")
     
   } else {
     rel_change_return <- F
@@ -360,7 +361,7 @@ double_fista_opt <- function(alpha.start, beta.start,
                       va, vb, x, y,
                       prob_fun = getProbRR.org,
                       opt_step = step_fista,
-                      cont_opt = 20){
+                      cont_opt = 10){
   ## Optimization
   step <- 0
   alpha <- y_alpha <- last_alpha <- alpha.start
@@ -591,8 +592,8 @@ proximal.gd.asfista <- function(alpha, beta, last_y,
                                 step_size, lambda, t_old,
                                 intercept, va, vb, x, y,
                                 max_backtrack = 10,  # Max backtracking iterations
-                                backtrack_factor = 0.8,  # Step size reduction factor
-                                beta_increase = 1.1,  # Factor to increase step size
+                                backtrack_factor = 0.6,  # Step size reduction factor
+                                beta_increase = 1.2,  # Factor to increase step size
                                 prob_fun = getProbRR.org) {
   
   # Ensure the optimization option is valid
@@ -809,9 +810,9 @@ step_asfista <- function(alpha, beta,
                          step_size, lambda, t_old,
                          intercept, va, vb, x, y,
                          prob_fun = getProbRR.org,
-                         max_backtrack = 10,  # Max backtracking iterations
-                         backtrack_factor = 0.8,  # Step size reduction factor
-                         beta_increase = 1.05  # Factor to increase step size
+                         max_backtrack = 20,  # Max backtracking iterations
+                         backtrack_factor = .9,  # Step size reduction factor
+                         beta_increase = 1.5  # Factor to increase step size
 ) {
   
   if (!(opt %in% c("alpha", "beta"))) {
@@ -841,7 +842,7 @@ step_asfista <- function(alpha, beta,
   gradient[is.na(gradient)] <- 0
   
   # Proximal gradient update with soft-thresholding
-  step_size <- step_size * backtrack_factor
+  step_size <- step_size * beta_increase
   input <- y_value_new - step_size * gradient
   value_new <- soft_thres(input, lambda * step_size)
   
@@ -865,11 +866,12 @@ step_asfista <- function(alpha, beta,
     # cli::cli_alert_success("sufficient_decrease {sufficient_decrease}")
     
     if (sufficient_adj) {
+
       break
       
       } else {
       
-      step_size <- step_size * beta_increase
+      step_size <- step_size * backtrack_factor
       
       input <- y_value_new - step_size * gradient
       
@@ -879,6 +881,7 @@ step_asfista <- function(alpha, beta,
     
     
   }
+  # cli::cli_alert_info("{step_size}")
   
   # Return updated values in a structured list
   return(list(
@@ -911,6 +914,10 @@ asfista <- function(alpha.start, beta.start,
   g_betas <- matrix(0, max.step, ncol(v))
   nllh_results <- vector("double", max.step)
   
+  step_size_alpha_loop <- step_size_alpha 
+  step_size_beta_loop <- step_size_beta 
+  
+  
   for (iter in 1:max.step) {
     step <- step + 1
     # FISTA update for alpha
@@ -920,15 +927,15 @@ asfista <- function(alpha.start, beta.start,
     res_alpha <- opt_step(alpha = alpha, beta = beta, 
                           value_old = last_alpha,
                           opt = "alpha",
-                          step_size = step_size_alpha, 
+                          step_size = step_size_alpha_loop, 
                           lambda = lambda, 
                           t_old = t_alpha,
                           intercept = intercept,
                           va = va, vb = vb, x = x, y = y,
                           prob_fun = prob_fun)
     last_alpha <- alpha
-    step_size_alpha <- ifelse(is.null(res_alpha$step_size), 
-                              step_size_alpha, res_alpha$step_size)
+    step_size_alpha_loop <- ifelse(is.null(res_alpha$step_size),
+                                   step_size_alpha_loop, res_alpha$step_size)
     alpha <- res_alpha$value_new
     t_alpha <- res_alpha$t_value
     y_alpha <- res_alpha$y_value
@@ -938,7 +945,7 @@ asfista <- function(alpha.start, beta.start,
     res_beta <- opt_step(alpha = alpha, beta = beta, 
                          value_old = last_beta,
                          opt = "beta",
-                         step_size = step_size_beta, 
+                         step_size = step_size_beta_loop, 
                          lambda = lambda, t_old = t_beta,
                          intercept = intercept,
                          va = va, vb = vb, x = x, y = y,
@@ -947,8 +954,8 @@ asfista <- function(alpha.start, beta.start,
     last_beta <- beta
     
     
-    step_size_beta <- ifelse(is.null(res_beta$step_size), 
-                             step_size_beta, res_beta$step_size)
+    step_size_beta_loop <- ifelse(is.null(res_beta$step_size),
+                                  step_size_beta_loop, res_beta$step_size)
     
     beta <- res_beta$value_new
     t_beta <- res_beta$t_value
@@ -981,6 +988,14 @@ asfista <- function(alpha.start, beta.start,
                               beta = beta,
                               last_alpha = last_alpha,
                               last_beta = last_beta)
+    
+    # if (norm(grad_alpha , type="2") > .5 &
+    #     (step_size_alpha_loop < (step_size_alpha / ceiling(step/100)))) step_size_alpha_loop <- step_size_alpha / ceiling(step/100)
+    # if (norm(grad_beta , type="2") > .5 &
+    #     (step_size_beta_loop < (step_size_beta / ceiling(step/100)))) step_size_beta_loop <- step_size_beta / ceiling(step/100)
+  
+      
+  
     
     if (stop_boolean) {
       
@@ -1149,7 +1164,7 @@ greedy_fista <- function(alpha.start, beta.start,
 rbrm.experimental <- function(va, vb, x, y,
                               alpha.start = NULL, beta.start = NULL,
                  max.step = 1000, lambda = 0,
-                 lr.alpha = 0.06, lr.beta = 0.02,
+                 lr.alpha = 0.01, lr.beta = 0.01,
                  intercept = TRUE,
                  prob_fun = getProbRR.org,
                  opt_fun = fista , save_opt = T) {

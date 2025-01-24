@@ -18,9 +18,9 @@ step_asfista(
   x,
   y,
   prob_fun = getProbRR.org,
-  max_backtrack = 10,
-  backtrack_factor = 0.8,
-  beta_increase = 1.05
+  max_backtrack = 20,
+  backtrack_factor = 0.9,
+  beta_increase = 1.5
 )
 }
 \arguments{
