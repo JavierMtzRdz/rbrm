@@ -95,10 +95,12 @@ nllh <- function(alpha, beta, va, vb, x, y,
   p0 <- ps[, 1]
   p1 <- ps[, 2]
   
-  return(-sum((1 - y[x == 0]) * log1p(-p0[x == 0]) + 
+  nll <- -sum((1 - y[x == 0]) * log1p(-p0[x == 0]) + 
                 (y[x == 0]) * log(p0[x == 0])) -
-           sum((1 - y[x == 1]) * log1p(-p1[x == 1]) + 
-                 (y[x == 1]) * log(p1[x == 1])))
+    sum((1 - y[x == 1]) * log1p(-p1[x == 1]) + 
+          (y[x == 1]) * log(p1[x == 1]))
+  
+  return(nll)
 }
 
 

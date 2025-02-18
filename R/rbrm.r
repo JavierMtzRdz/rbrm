@@ -1,24 +1,28 @@
 
 #' @export
 stop_crit <- function(eval_grad = T,
-                      grad_thres = 1e-2,
+                      grad_thres = 1e-3,
                       grad_alpha = NULL,
                       grad_beta = NULL,
                       eval_rel_chang = T,
-                      eval_rel_grad_thres = 1e-2,
+                      eval_rel_grad_thres = 1e-03,
                       alpha = NULL,
                       beta = NULL,
                       last_alpha = NULL,
                       last_beta = NULL,
-                      message = F
+                      stop_nan = T,
+                      message = F,
+                      message_true = T
                       ){
   
-  # cli::cli_alert_success("grad_alpha: {grad_alpha} || grad_beta: {grad_beta}")
+  if (any(is.nan(grad_alpha)) ||
+      any(is.nan(grad_beta))) {
+    cli::cli_alert_danger("Gradients has NaN(s).")
+    
+    return(T)
+  }
   
   if(eval_grad){
-    
-    if (any(is.nan(grad_alpha)) ||
-        any(is.nan(grad_beta))) cli::cli_abort("Gradients has NaN(s).")
     
     if (is.null(grad_alpha) ||
         is.null(grad_beta)) cli::cli_abort("No enough information to compute relative change. grad_alpha: {grad_alpha}, grad_beta: {grad_beta}")
@@ -29,7 +33,7 @@ stop_crit <- function(eval_grad = T,
     grad_eval_return <- (grad_norm_alpha < grad_thres && 
                            grad_norm_beta < grad_thres)
     
-    if(message) cli::cli_alert_success("grad_norm_alpha: {grad_norm_alpha} || grad_norm_beta: {grad_norm_beta} || Gradient eval: {grad_eval_return}")
+    if(message | (message_true & grad_eval_return)) cli::cli_alert_success("grad_norm_alpha: {grad_norm_alpha} || grad_norm_beta: {grad_norm_beta} || Gradient eval: {grad_eval_return}")
     
   } else {
     grad_eval_return <- F
@@ -42,20 +46,103 @@ stop_crit <- function(eval_grad = T,
         is.null(last_alpha) ||
         is.null(last_beta)) cli::cli_abort("No enough information to compute relative change.")
     
-    rel_change_alpha <- norm(alpha - last_alpha, type="2") / pmax(1e-8, norm(last_alpha, type="2"))
+    rel_change_alpha <- norm(alpha - last_alpha, type="2")^2 / pmax(1e-08, norm(alpha, type="2")^2)
  
-    rel_change_beta <- norm(beta - last_beta, type="2") / pmax(1e-8, norm(last_beta, type="2"))
+    rel_change_beta <- norm(beta - last_beta, type="2")^2 / pmax(1e-08, norm(beta, type="2")^2)
     
     rel_change_return <- (rel_change_alpha < eval_rel_grad_thres &&
                             rel_change_beta < eval_rel_grad_thres)
     
-    if(message) cli::cli_alert_success("rel_change_alpha: {rel_change_alpha} || rel_change_beta: {rel_change_beta} || Relative change: {rel_change_return}")
+    if(message | (message_true & rel_change_return)) cli::cli_alert_success("rel_change_alpha: {rel_change_alpha} || rel_change_beta: {rel_change_beta} || Relative change: {rel_change_return}")
     
   } else {
     rel_change_return <- F
   }
   return(grad_eval_return || rel_change_return)
   
+}
+
+#' @export
+compute_L <- function(alpha, beta, va, vb, x, y, prob_fun, 
+                      opt) {
+  
+  if (opt == "alpha") {
+    hessian_matrix <- numDeriv::hessian(function(.x) {
+      nllh(.x, beta, va, vb, x, y, prob_fun = prob_fun)
+    }, alpha)
+  }
+  
+  if (opt == "beta") {
+    hessian_matrix <- numDeriv::hessian(function(.x) {
+      nllh(alpha, .x, va, vb, x, y, prob_fun = prob_fun)
+    }, beta)
+  }
+  
+  
+  # Compute the largest eigenvalue (Lipschitz constant)
+  L <- max(eigen(hessian_matrix, symmetric = TRUE, only.values = TRUE)$values)
+  
+  return(L)
+}
+
+#' @export
+step_fista2 <- function(alpha, beta,
+                       value_old,
+                       opt,
+                       step_size, lambda, t_old,
+                       intercept, va, vb, x, y,
+                       prob_fun = getProbRR.org) {
+  
+  if (!(opt %in% c("alpha","beta"))) {
+    cli::cli_abort("Option 'opt' must be either 'alpha' or 'beta'.")
+  }
+  
+  if (opt == "alpha") value <- alpha
+  if (opt == "beta") value <- beta
+  
+  # Momentum update
+  t_new <- (1 + sqrt(1 + 4 * t_old^2)) / 2
+  
+  damping_factor <- 0.8  # Reduce momentum effect
+  a_new <- damping_factor * (t_old - 1) / t_new
+  # a_new <- (t_old-1)/t_new
+  
+  y_value_new <- value + a_new * (value - value_old)
+  
+  if (opt == "alpha") {
+    
+    gradient <- numDeriv::grad(function(.x){nllh(.x, beta, va, vb, x, y,
+                                                 prob_fun = prob_fun)}, 
+                               y_value_new, method = "simple")
+  }
+  
+  if (opt == "beta") {
+    
+    gradient <- numDeriv::grad(function(.x) {nllh(alpha, .x, va, vb, x, y,
+                                                  prob_fun = prob_fun)},
+                               y_value_new, method = "simple")
+    
+  }
+  
+  
+  # Clean any NA gradients to prevent issues during computation
+  if (any(is.na(gradient))) {
+    cli::cli_alert_danger("NaN in gradient, replacing with 0.")
+    print(gradient)
+    gradient[is.na(gradient)] <- 0
+  }
+  
+  # Proximal gradient update with soft-thresholding
+  input <- y_value_new - step_size * gradient
+  
+  value_new <- soft_thres(input, lambda * step_size)
+  
+  # Maintain intercept term if specified
+  if (intercept) value_new[1] <- input[1]
+  
+  
+  # Return updated values in a structured list
+  return(list(value_new = value_new, t_value = t_new, y_value = y_value_new))
 }
 
 #' FISTA Proximal Gradient Descent for Alpha and beta
@@ -106,7 +193,11 @@ step_fista <- function(alpha, beta,
   }
   
   # Clean any NA gradients to prevent issues during computation
-  gradient[is.na(gradient)] <- 0
+  if (any(is.na(gradient))) {
+    cli::cli_alert_danger("NaN in gradient, replacing with 0.")
+    print(gradient)
+    gradient[is.na(gradient)] <- 0
+  }
   
   # Proximal gradient update with soft-thresholding
   input <- y_value_new - step_size * gradient
@@ -120,6 +211,7 @@ step_fista <- function(alpha, beta,
   # Return updated values in a structured list
   return(list(value_new = value_new, t_value = t_new, y_value = y_value_new))
 }
+
 
 #' @export
 fista_opt <- function(alpha.start, beta.start,
@@ -238,6 +330,7 @@ fista_opt <- function(alpha.start, beta.start,
               nllh_results = nllh_results))
 }
 
+#' @export
 fista_opt2 <- function(alpha.start, beta.start,
                       step_size_alpha, step_size_beta,
                       lambda, 
@@ -248,8 +341,12 @@ fista_opt2 <- function(alpha.start, beta.start,
                       opt_step = step_fista){
   ## Optimization
   step <- 0
-  alpha <- y_alpha <- last_alpha <- alpha.start
-  beta <- y_beta <- last_beta <- beta.start
+  
+  last_alpha <- alpha.start + 1
+  last_beta <- beta.start + 1
+  
+  alpha <- y_alpha <- alpha.start
+  beta <- y_beta <- beta.start
   t_alpha <- t_beta <- 1
   
   alphas <- matrix(0, max.step, ncol(v))
@@ -257,6 +354,17 @@ fista_opt2 <- function(alpha.start, beta.start,
   g_alphas <- matrix(0, max.step, ncol(v))
   g_betas <- matrix(0, max.step, ncol(v))
   nllh_results <- vector("double", max.step)
+  
+  L_alpha <- compute_L(alpha, beta, va, vb, x, y, prob_fun, 
+                       opt = "alpha")
+  
+  L_beta <- compute_L(alpha, beta, va, vb, x, y, prob_fun, 
+                      opt = "beta")
+  
+  step_size_alpha <- 1/L_alpha
+  step_size_beta <- 1/L_beta
+  
+  cli::cli_alert("step_size_alpha: {step_size_alpha} | step_size_beta: {step_size_beta}")
   
   for (iter in 1:max.step) {
     step <- step + 1
@@ -283,33 +391,17 @@ fista_opt2 <- function(alpha.start, beta.start,
                          va = va, vb = vb, x = x, y = y,
                          prob_fun = prob_fun)
     
-    # Update values 
-    last_alpha <- alpha
-    step_size_alpha <- ifelse(is.null(res_alpha$step_size), 
-                              step_size_alpha, res_alpha$step_size)
-    alpha <- res_alpha$value_new
-    t_alpha <- res_alpha$t_value
-    y_alpha <- res_alpha$y_value
-    
-    last_beta <- beta
-    
-    step_size_beta <- ifelse(is.null(res_beta$step_size), 
-                             step_size_beta, res_beta$step_size)
-    
-    beta <- res_beta$value_new
-    t_beta <- res_beta$t_value
-    y_beta <- res_beta$y_value
     
     # Update alpha and beta for the next iteration
     # beta <- beta_new
     
-    grad_alpha <- numDeriv::grad(function(.x) {nllh(.x, beta, va, vb, x, y,
+    grad_alpha <-  numDeriv::grad(function(.x){nllh(.x, beta, va, vb, x, y,
                                                     prob_fun = prob_fun)}, 
-                                 alpha, method = "simple")
+                                  alpha, method = "simple")
     
-    grad_beta <- numDeriv::grad(function(.x) {nllh(alpha, .x, va, vb, x, y,
+    grad_beta <-  numDeriv::grad(function(.x){nllh(alpha, .x, va, vb, x, y,
                                                    prob_fun = prob_fun)}, 
-                                beta, method = "simple")
+                                 beta, method = "simple")
     
     nllh_iter <- penalized_nllh(alpha, beta, va, vb, x, y, 
                                 lambda = lambda, intercept = intercept,
@@ -337,6 +429,24 @@ fista_opt2 <- function(alpha.start, beta.start,
       nllh_results <- nllh_results[1:step]
       
       break
+    } else {
+      # Update values 
+      last_alpha <- alpha
+      step_size_alpha <- ifelse(is.null(res_alpha$step_size), 
+                                step_size_alpha, res_alpha$step_size)
+      alpha <- res_alpha$value_new
+      t_alpha <- res_alpha$t_value
+      last_y_alpha <- y_alpha
+      y_alpha <- res_alpha$y_value
+      
+      last_beta <- beta
+      
+      step_size_beta <- ifelse(is.null(res_beta$step_size), 
+                               step_size_beta, res_beta$step_size)
+      beta <- res_beta$value_new
+      t_beta <- res_beta$t_value
+      last_y_beta <- y_beta
+      y_beta <- res_beta$y_value
     }
     
   }
@@ -350,6 +460,7 @@ fista_opt2 <- function(alpha.start, beta.start,
               grad_betas = g_betas,
               nllh_results = nllh_results))
 }
+
 
 
 #' @export
