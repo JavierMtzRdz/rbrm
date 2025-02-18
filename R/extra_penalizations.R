@@ -56,7 +56,7 @@ step_fista_scad <- function(alpha, beta,
 #' @export
 scad_thres <- function(entry, lambda, a) {
   # size safety of equivalence between SCAD and hard thresholding
-  assertthat::assert_that(a >= 2)
+  if (!(a >= 2)) cli::cli_abort("a < 2")
   
   # Vectorized Version
   e1 <- abs(entry) <= 2 * lambda
