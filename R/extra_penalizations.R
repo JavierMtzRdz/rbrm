@@ -16,9 +16,9 @@ step_fista_scad <- function(alpha, beta,
   
   # Momentum update
   t_new <- (1 + sqrt(1 + 4 * t_old^2)) / 2
-  damping_factor <- 0.8  # Reduce momentum effect
-  a_new <- damping_factor * (t_old - 1) / t_new
-  # a_new <- (t_old - 1) / t_new
+  # damping_factor <- 0.8  # Reduce momentum effect
+  # a_new <- damping_factor * (t_old - 1) / t_new
+  a_new <- (t_old - 1) / t_new
   y_value_new <- value + a_new * (value - value_old)
   
   # Compute gradient

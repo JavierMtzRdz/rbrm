@@ -1,11 +1,11 @@
 
 #' @export
 stop_crit <- function(eval_grad = T,
-                      grad_thres = 1e-3,
+                      grad_thres = 1e-4,
                       grad_alpha = NULL,
                       grad_beta = NULL,
                       eval_rel_chang = T,
-                      eval_rel_grad_thres = 1e-03,
+                      eval_rel_grad_thres = 1e-3,
                       alpha = NULL,
                       beta = NULL,
                       last_alpha = NULL,
@@ -46,9 +46,9 @@ stop_crit <- function(eval_grad = T,
         is.null(last_alpha) ||
         is.null(last_beta)) cli::cli_abort("No enough information to compute relative change.")
     
-    rel_change_alpha <- norm(alpha - last_alpha, type="2")^2 / pmax(1e-08, norm(alpha, type="2")^2)
+    rel_change_alpha <- norm(alpha - last_alpha, type="2") / pmax(1e-08, norm(alpha, type="2"))
  
-    rel_change_beta <- norm(beta - last_beta, type="2")^2 / pmax(1e-08, norm(beta, type="2")^2)
+    rel_change_beta <- norm(beta - last_beta, type="2") / pmax(1e-08, norm(beta, type="2"))
     
     rel_change_return <- (rel_change_alpha < eval_rel_grad_thres &&
                             rel_change_beta < eval_rel_grad_thres)

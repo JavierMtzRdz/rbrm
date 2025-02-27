@@ -4,7 +4,17 @@
 \alias{generate_data}
 \title{Generative model for rbrm}
 \usage{
-generate_data(pa, pb, n, n_test, alpha, beta, gamma)
+generate_data(
+  pa,
+  pb,
+  n,
+  n_test,
+  alpha,
+  beta,
+  gamma,
+  misspec_nuisance = FALSE,
+  misspec_propensity = FALSE
+)
 }
 \arguments{
 \item{pa}{the number of alpha coefficients without the intercept}
