@@ -14,7 +14,9 @@ cv_rbrm(
   nfolds = 3,
   implt = rbrm,
   prob_fun = NULL,
-  relax_lsso = F,
+  relax_lsso = FALSE,
+  index = "min",
+  type.measure = "mae",
   ...
 )
 }
