@@ -9,7 +9,7 @@
 #' #soft_thres(c(3, -1.5, 0.2), 0.5)
 #' @export
 soft_thres <- function(x, lambda) {
-  sx <- abs(x) - lambda
+  sx <- abs(x) - lambda*10
   sx[sx < 0] <- 0
   return(sx * sign(x))
 }
@@ -123,9 +123,9 @@ penalized_nllh <- function(alpha, beta, va, vb, x, y,
   
   # Applying the penalty term
   if (intercept == TRUE) {
-    penalty <- lambda * (sum(abs(alpha[-1])) + sum(abs(beta[-1]))) # Exclude intercept
+    penalty <- lambda*10 * (sum(abs(alpha[-1])) + sum(abs(beta[-1]))) # Exclude intercept
   } else {
-    penalty <- lambda * (sum(abs(alpha)) + sum(abs(beta)))
+    penalty <- lambda *10* (sum(abs(alpha)) + sum(abs(beta)))
   }
   return(unpenalized.nllh + penalty)
 }
