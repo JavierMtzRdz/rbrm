@@ -31,9 +31,25 @@
 #'
 #' @importFrom magrittr %>%
 #' @export
-plot.cv_rbrm <- function(.model) {
-  tibble::as_tibble(do.call(cbind, .model$fold_deviances),
-                    .name_repair = 'unique') %>%
+plot.cv_rbrm <- function(.model, type.measure = "mae") {
+  result <- do.call(cbind, lapply(.model$cv_results,
+                                   function(m) m[type.measure, ])) 
+  
+  lambda_grid <- .model$lambda_grid
+  # Choose which measure to use
+  
+  nfolds <- length(.model$cv_results)
+  cv_mean <- rowMeans(result)
+  cv_sd   <- apply(result, 1, sd)
+  cv_se <- cv_sd / sqrt(nfolds)
+  
+  # Lambda selection: "min" or "1se"
+  best_lambda_idx <- which.min(cv_mean)
+  threshold <- cv_mean[best_lambda_idx] + cv_se[best_lambda_idx]
+  valid_idx <- which(cv_mean <= threshold)
+  lambda_1se <- max(lambda_grid[valid_idx])
+  
+  tibble::as_tibble(result) %>%
     dplyr::mutate(lambda = .model$lambda_grid) %>%
     tidyr::pivot_longer(-lambda, names_to = "fold") %>%
     ggplot2::ggplot(ggplot2::aes(x = lambda, y = value, group = lambda)) +
@@ -41,12 +57,16 @@ plot.cv_rbrm <- function(.model) {
                           width = 0.05, colour = "#277DA1") +
     ggplot2::stat_summary(fun = mean, geom = "point",
                           colour = "#277DA1", alpha = 1) +
-    ggplot2::geom_vline(ggplot2::aes(xintercept = .model$lambda,
-                                     colour = "Lambda min"),
-                        linetype = "dashed") +
+    ggplot2::geom_vline(ggplot2::aes(xintercept = lambda_grid[best_lambda_idx], ,
+                                     linetype = "Lambda min"),
+                        colour = "#f94144") +
+    ggplot2::geom_vline(ggplot2::aes(xintercept = lambda_1se,
+                                     linetype = "Lambda 1SE"),
+                        colour = "#f94144") +
     ggplot2::scale_x_log10(n.breaks = 6) +
-    ggplot2::scale_color_manual(values = "#f94144") +
-    ggplot2::labs(x = "Lambda", y = "Deviance",
+    ggplot2::scale_linetype_manual(values = c("dotted", "dashed")) +
+    ggplot2::labs(x = "Lambda", y = type.measure,
+                  linetype = ggplot2::element_blank(),
                   colour = ggplot2::element_blank()) +
     ggplot2::theme_minimal() +
     ggplot2::theme(legend.position = "top")
