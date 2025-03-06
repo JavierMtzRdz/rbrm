@@ -40,6 +40,7 @@ cv_rbrm <- function(va, vb, x, y, lambda = NULL,
                     implt = rbrm, 
                     prob_fun = NULL,
                     relax_lsso = FALSE,
+                    relax_factor = 0,
                     index = "min",           # "min" or "1se"
                     type.measure = "mae", # "deviance" or "Mae"
                     ...) {
@@ -182,7 +183,7 @@ cv_rbrm <- function(va, vb, x, y, lambda = NULL,
     va_relaxed <- va[, selected_vars[selected_vars <= ncol(va)], drop = FALSE]
     vb_relaxed <- vb[, selected_vars[selected_vars > ncol(va)] - ncol(vb), drop = FALSE]
     best_fit_rlasso <- implt(va = va_relaxed, vb = va_relaxed,
-                             x = x, y = y, lambda = 0)
+                             x = x, y = y, lambda = lambda_selected*relax_factor)
     
     best_fit$step <- best_fit_rlasso$step
     best_fit$convergence <- best_fit_rlasso$convergence
