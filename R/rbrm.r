@@ -12,7 +12,7 @@ stop_crit <- function(eval_grad = T,
                       last_beta = NULL,
                       stop_nan = T,
                       message = F,
-                      message_true = T
+                      message_true = F
                       ){
   
   if (any(is.nan(grad_alpha)) ||
