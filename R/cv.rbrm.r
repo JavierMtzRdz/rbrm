@@ -1,5 +1,3 @@
-
-
 #' Cross-Validation for Regularized Binary Regression Model (RBRM)
 #'
 #' This function performs k-fold cross-validation to tune the regularization parameter (lambda) 
@@ -42,7 +40,7 @@ cv_rbrm <- function(va, vb, x, y, lambda = NULL,
                     relax_lsso = FALSE,
                     relax_factor = 0,
                     index = "min",           # "min" or "1se"
-                    type.measure = "mae", # "deviance" or "Mae"
+                    type.measure = "deviance", # "deviance" or "Mae"
                     ...) {
   
   tictoc::tic("Total time")
@@ -121,8 +119,8 @@ cv_rbrm <- function(va, vb, x, y, lambda = NULL,
         prob_fun <- brm::getProbRR
       
       ps <- prob_fun(logrr, logop)
-      p0 <- ps[, 1]
-      p1 <- ps[, 2]
+      p0 <- ps$p0
+      p1 <- ps$p1
       
       # Separate observations based on x_test
       fitted.prob <- c(p0[x_test == 0], p1[x_test == 1])
@@ -182,17 +180,29 @@ cv_rbrm <- function(va, vb, x, y, lambda = NULL,
     selected_vars <- which(abs(best_fit$point.est) > 0)
     va_relaxed <- va[, selected_vars[selected_vars <= ncol(va)], drop = FALSE]
     vb_relaxed <- vb[, selected_vars[selected_vars > ncol(va)] - ncol(vb), drop = FALSE]
-    best_fit_rlasso <- implt(va = va_relaxed, vb = va_relaxed,
-                             x = x, y = y, lambda = lambda_selected*relax_factor)
     
+    if (is.null(prob_fun)) {
+      best_fit_rlasso <- implt(va = va_relaxed, vb = va_relaxed,
+            x = x, y = y, 
+            lambda = lambda_selected*relax_factor,
+            ...)
+    } else {
+      best_fit_rlasso <- implt(va = va_relaxed, vb = va_relaxed,
+            x = x, y = y, 
+            lambda = lambda_selected*relax_factor,
+            prob_fun = prob_fun, ...)
+    }
+    
+    # browser()
     best_fit$step <- best_fit_rlasso$step
     best_fit$convergence <- best_fit_rlasso$convergence
-    
     best_fit$point.est <- vector("numeric", ncol(va) + ncol(vb))
     best_fit$point.est[selected_vars[selected_vars <= ncol(va)]] <- 
       best_fit_rlasso$point.est[1:ncol(va_relaxed)]
+    
     best_fit$point.est[selected_vars[selected_vars <= ncol(va)] + ncol(va)] <- 
       best_fit_rlasso$point.est[(ncol(va_relaxed) + 1):length(best_fit_rlasso$point.est)]
+    browser()
   }
   
   time <- tictoc::toc(quiet = TRUE)
