@@ -92,8 +92,8 @@ nllh <- function(alpha, beta, va, vb, x, y,
   
   ps <- prob_fun(logrr, logop)
   
-  p0 <- ps[, 1]
-  p1 <- ps[, 2]
+  p0 <- ps$p0
+  p1 <- ps$p1
   
   nll <- -sum((1 - y[x == 0]) * log1p(-p0[x == 0]) + 
                 (y[x == 0]) * log(p0[x == 0])) -
@@ -268,4 +268,5 @@ rbrm <- function(va, vb, x, y,
   
   return(structure(opt, class = c("rbrm")))
 }
+
 
