@@ -248,10 +248,10 @@ fista_opt <- function(alpha.start, beta.start,
   beta <- y_beta <- last_beta <- beta.start
   t_alpha <- t_beta <- 1
   
-  alphas <- matrix(0, max.step, ncol(v))
-  betas <- matrix(0, max.step, ncol(v))
-  g_alphas <- matrix(0, max.step, ncol(v))
-  g_betas <- matrix(0, max.step, ncol(v))
+  alphas <- matrix(0, max.step, ncol(va))
+  betas <- matrix(0, max.step, ncol(vb))
+  g_alphas <- matrix(0, max.step, ncol(va))
+  g_betas <- matrix(0, max.step, ncol(vb))
   nllh_results <- vector("double", max.step)
   
   for (iter in 1:max.step) {
@@ -368,10 +368,10 @@ fista_opt_an <- function(alpha.start, beta.start,
   beta <- y_beta <- last_beta <- beta.start
   t_alpha <- t_beta <- 1
   
-  alphas <- matrix(0, max.step, ncol(v))
-  betas <- matrix(0, max.step, ncol(v))
-  g_alphas <- matrix(0, max.step, ncol(v))
-  g_betas <- matrix(0, max.step, ncol(v))
+  alphas <- matrix(0, max.step, ncol(va))
+  betas <- matrix(0, max.step, ncol(vb))
+  g_alphas <- matrix(0, max.step, ncol(va))
+  g_betas <- matrix(0, max.step, ncol(vb))
   nllh_results <- vector("double", max.step)
   
 
@@ -503,10 +503,10 @@ fista_opt2 <- function(alpha.start, beta.start,
   beta <- y_beta <- beta.start
   t_alpha <- t_beta <- 1
   
-  alphas <- matrix(0, max.step, ncol(v))
-  betas <- matrix(0, max.step, ncol(v))
-  g_alphas <- matrix(0, max.step, ncol(v))
-  g_betas <- matrix(0, max.step, ncol(v))
+  alphas <- matrix(0, max.step, ncol(va))
+  betas <- matrix(0, max.step, ncol(vb))
+  g_alphas <- matrix(0, max.step, ncol(va))
+  g_betas <- matrix(0, max.step, ncol(vb))
   nllh_results <- vector("double", max.step)
   
   for (iter in 1:max.step) {
