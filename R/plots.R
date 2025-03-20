@@ -31,7 +31,7 @@
 #'
 #' @importFrom magrittr %>%
 #' @export
-plot.cv_rbrm <- function(.model, type.measure = "mae") {
+plot.cv_rbrm <- function(.model, type.measure = "deviance") {
   result <- do.call(cbind, lapply(.model$cv_results,
                                    function(m) m[type.measure, ])) 
   
