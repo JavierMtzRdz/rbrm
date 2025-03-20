@@ -79,9 +79,8 @@ getProbRR.org = function(logrr, logop = NA,
     p0 <- pmin(pmax(p0, 1e-15), 1 - 1e-15)
     p1 <- pmin(pmax(p1, 1e-15), 1 - 1e-15)
   }
-  
-  
-  cbind(p0,p1)
+
+  return(list(p0 = p0, p1 = p1, class = "ProbRR.org"))
 } 
 
 
@@ -146,6 +145,6 @@ getProbRR.alt <- function(logrr, logop,
     p1 <- pmin(pmax(p1, 1e-15), 1 - 1e-15)
   }
   
-  cbind(p0, p1)
+  return(list(p0 = p0, p1 = p1, class = "ProbRR.alt"))
 }
 
