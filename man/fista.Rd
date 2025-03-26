@@ -17,7 +17,8 @@ fista(
   x,
   y,
   prob_fun = getProbRR.org,
-  opt_step = proximal.gd.fista
+  opt_step = proximal.gd.fista,
+  grad_alpha = T
 )
 }
 \arguments{

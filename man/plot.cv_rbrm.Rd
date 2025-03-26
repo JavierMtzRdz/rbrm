@@ -4,7 +4,7 @@
 \alias{plot.cv_rbrm}
 \title{Plot Cross-Validation Results for Regularized Models}
 \usage{
-\method{plot}{cv_rbrm}(.model, type.measure = "mae")
+\method{plot}{cv_rbrm}(.model, type.measure = "deviance")
 }
 \arguments{
 \item{.model}{A list containing:

@@ -15,9 +15,9 @@ cv_rbrm(
   implt = rbrm,
   prob_fun = NULL,
   relax_lsso = FALSE,
-  relax_factor = 0,
+  relax_factor = NULL,
   index = "min",
-  type.measure = "mae",
+  type.measure = "deviance",
   ...
 )
 }
