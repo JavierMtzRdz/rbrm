@@ -1579,6 +1579,365 @@ opt_mle <- function(alpha.start, beta.start,
               nllh_results = nllh_results))
 }
 
+# --- rbrm.experimental (Minor correction from previous) ---
+#' @export
+rbrm.experimental2 <- function(va, vb, x, y,
+                              alpha.start = NULL, beta.start = NULL,
+                              max.step = 1000, lambda = 0,
+                              lr.alpha = 0.01, lr.beta = 0.01, # These are step_size for FISTA
+                              intercept = TRUE,
+                              prob_fun = getProbRR.org, # Make sure available
+                              opt_fun = fista_opt2,     # Default to corrected FISTA
+                              save_opt = TRUE,
+                              ...) { # Allow passing extra args to opt_fun if needed
+  
+  tictoc::tic("rbrm.experimental time")
+  
+  if (is.null(vb)) { vb <- va }
+  va <- as.matrix(va); vb <- as.matrix(vb)
+  pa <- ncol(va); pb <- ncol(vb)
+  
+  # Intercept detection/flagging (same as previous corrected)
+  has_intercept_va <- pa > 0 && isTRUE(all(va[, 1] == 1))
+  has_intercept_vb <- pb > 0 && isTRUE(all(vb[, 1] == 1))
+  model_intercept <- intercept
+  # Add warnings if inconsistent, as before...
+  
+  ## starting values
+  if (is.null(alpha.start)) alpha.start <- rep(0, pa)
+  if (length(alpha.start) != pa) {
+    cli::cli_warn("alpha.start length mismatch. Using default zeros.")
+    alpha.start <- rep(0, pa)
+  }
+  if (is.null(beta.start)) beta.start <- rep(0, pb) # Default beta to 0 too
+  # *** Corrected bug from original user code ***
+  if (length(beta.start) != pb) { # Use pb here!
+    cli::cli_warn("beta.start length mismatch. Using default zeros.")
+    beta.start <- rep(0, pb) # Use pb here!
+  }
+  
+  ## Optimization
+  # Pass arguments expected by fista_opt2 (or other opt_fun)
+  opt_result <- opt_fun(alpha.start = alpha.start, beta.start = beta.start,
+                        step_size_alpha = lr.alpha, step_size_beta = lr.beta, # Map lr to step_size
+                        lambda = lambda,
+                        intercept = model_intercept,
+                        max.step = max.step,
+                        va = va, vb = vb, x = x, y = y,
+                        prob_fun = prob_fun,
+                        ...) # Pass extra arguments like tol, eval_grad if needed
+  
+  step <- opt_result$step
+  alpha <- opt_result$alpha
+  beta <- opt_result$beta
+  
+  # Final check on returned lengths
+  if(is.null(alpha) || is.null(beta) || length(alpha) != pa || length(beta) != pb){
+    cli::cli_abort("Optimizer returned NULL or coefficients of incorrect length! alpha: %s (expected %d), beta: %s (expected %d)",
+                   length(alpha), pa, length(beta), pb)
+  }
+  
+  # Calculate final penalized NLLH
+  final_nllh_val <- tryCatch({
+    penalized_nllh(alpha, beta, va, vb, x, y, lambda, model_intercept, prob_fun = prob_fun)
+  }, error = function(e){ NA_real_ })
+  
+  opt <- list(
+    point.est = c(alpha, beta),
+    optimization.info = if(save_opt) opt_result else NULL,
+    convergence = (!is.null(step) && !is.na(step) && step < max.step),
+    value = final_nllh_val,
+    step = step,
+    time = NA_real_ # Updated below
+  )
+  
+  elapsed <- tictoc::toc(log = TRUE, quiet = TRUE)
+  opt$time <- round(elapsed$toc - elapsed$tic, 4)
+  # tictoc::tic.clearlog() # Optional: prevent message
+  
+  return(structure(opt, class = c("rbrm")))
+}
+
+
+fista_opt2_ls <-  function(alpha.start, beta.start,
+                           # Initial step size guesses (will be adapted)
+                           step_size_alpha_init = 1.0,
+                           step_size_beta_init = 1.0,
+                           lambda,
+                           intercept, # Boolean: Is the first element an intercept?
+                           max.step,
+                           va, vb, x, y,
+                           prob_fun = getProbRR.org,
+                           # Stopping criterion function (MUST handle NULL gradients if eval_grad=FALSE)
+                           # Line Search parameters
+                           ls_beta_shrink = 0.5, # Step size reduction factor
+                           ls_max_iter = 20,     # Max iterations for line search step
+                           # Gradient function (replace with analytic if possible!)
+                           grad_fun = numDeriv::grad,
+                           grad_method = "simple", # Method for numDeriv::grad
+                           # Objective function components
+                           nllh_fun = nllh,
+                           penalized_nllh_fun = penalized_nllh,
+                           soft_thres_fun = soft_thres,
+                           # Other controls
+                           eval_grad = TRUE, # Evaluate gradients for stop_crit?
+                           tol = 1e-6        # Tolerance (can be used within stop_crit)
+){
+  
+  ## Input dimensions
+  pa <- ncol(va)
+  pb <- ncol(vb)
+  if(length(alpha.start) != pa) { cli::cli_abort("alpha.start length mismatch: %d vs %d", length(alpha.start), pa); }
+  if(length(beta.start) != pb) { cli::cli_abort("beta.start length mismatch: %d vs %d", length(beta.start), pb); }
+  
+  ## Initialization
+  step <- 0
+  alpha <- alpha.start
+  beta <- beta.start
+  last_alpha <- alpha.start # Store previous iteration's value for momentum
+  last_beta <- beta.start
+  t_alpha <- 1
+  t_beta <- 1
+  current_step_size_alpha <- step_size_alpha_init
+  current_step_size_beta <- step_size_beta_init
+  
+  # Preallocate storage
+  alphas <- matrix(NA_real_, nrow = max.step + 1, ncol = pa)
+  betas <- matrix(NA_real_, nrow = max.step + 1, ncol = pb)
+  # Store gradients computed at momentum points 'y' during update/line search
+  g_alphas <- if(pa > 0) matrix(NA_real_, nrow = max.step + 1, ncol = pa) else matrix(NA_real_, 0, 0)
+  g_betas <- if(pb > 0) matrix(NA_real_, nrow = max.step + 1, ncol = pb) else matrix(NA_real_, 0, 0)
+  nllh_results <- vector("double", max.step + 1)
+  
+  # Store initial values
+  if(pa > 0) alphas[1,] <- alpha.start
+  if(pb > 0) betas[1,] <- beta.start
+  nllh_results[1] <- tryCatch(penalized_nllh_fun(alpha, beta, va, vb, x, y, lambda, intercept, prob_fun, nllh_fun), error = function(e) NA_real_)
+  
+  ## Optimization Loop
+  for (iter in 1:max.step) {
+    step <- iter
+    storage_idx <- iter + 1
+    
+    alpha_iter_start <- alpha # Value at the start of this iteration
+    beta_iter_start <- beta
+    
+    # --- Alpha Update with Line Search ---
+    grad_alpha_y <- NULL # Gradient computed at y_alpha
+    if (pa > 0) {
+      t_new_alpha <- (1 + sqrt(1 + 4 * t_alpha^2)) / 2
+      momentum_coeff_alpha <- (t_alpha - 1) / t_new_alpha
+      if (!is.finite(momentum_coeff_alpha)) momentum_coeff_alpha <- 0
+      y_alpha <- alpha + momentum_coeff_alpha * (alpha - last_alpha)
+      
+      grad_alpha_y <- tryCatch({ # grad at y_alpha
+        grad_fun(function(.a) nllh_fun(.a, beta, va, vb, x, y, prob_fun),
+                 y_alpha, method = grad_method)
+      }, error = function(e) { NULL })
+      
+      if (is.null(grad_alpha_y) || length(grad_alpha_y) != pa || any(!is.finite(grad_alpha_y))) {
+        cli::cli_warn("Invalid gradient grad_alpha_y at step %d. Skipping alpha update.", step)
+        grad_alpha_y <- rep(NA_real_, pa) # Store NA gradient
+        t_new_alpha <- t_alpha # Keep old momentum
+      } else {
+        f_y_alpha <- nllh_fun(y_alpha, beta, va, vb, x, y, prob_fun)
+        if(!is.finite(f_y_alpha)){
+          cli::cli_warn("Non-finite NLLH at y_alpha (step %d). Skipping alpha update.", step)
+          t_new_alpha <- t_alpha
+          grad_alpha_y <- rep(NA_real_, pa) # Store NA gradient
+        } else {
+          ss_alpha <- current_step_size_alpha
+          alpha_updated <- FALSE
+          for (ls_iter in 1:ls_max_iter) {
+            prox_arg_alpha <- y_alpha - ss_alpha * grad_alpha_y
+            trial_alpha <- soft_thres_fun(prox_arg_alpha, lambda * ss_alpha)
+            if (intercept && pa > 0) trial_alpha[1] <- prox_arg_alpha[1]
+            f_trial_alpha <- nllh_fun(trial_alpha, beta, va, vb, x, y, prob_fun)
+            if (!is.finite(f_trial_alpha)) {
+              ss_alpha <- ss_alpha * ls_beta_shrink; next
+            }
+            quad_approx <- f_y_alpha + sum(grad_alpha_y * (trial_alpha - y_alpha)) +
+              (0.5 / ss_alpha) * sum((trial_alpha - y_alpha)^2)
+            if (f_trial_alpha <= quad_approx + 1e-8) {
+              alpha <- trial_alpha; current_step_size_alpha <- ss_alpha
+              t_alpha <- t_new_alpha; alpha_updated <- TRUE; break
+            } else {
+              ss_alpha <- ss_alpha * ls_beta_shrink
+            }
+          }
+          if (!alpha_updated) {
+            cli::cli_warn("Line search for alpha failed at iteration %d. Skipping alpha update.", step)
+            t_new_alpha <- t_alpha; grad_alpha_y <- rep(NA_real_, pa) # Store NA
+          }
+        }
+      }
+      # Store the gradient computed at y_alpha (even if NA)
+      g_alphas[storage_idx, ] <- grad_alpha_y
+    } else {
+      if (pa > 0) g_alphas[storage_idx, ] <- NA_real_ # No update, store NA
+    }
+    
+    
+    # --- Beta Update with Line Search (using updated alpha) ---
+    grad_beta_y <- NULL # Gradient computed at y_beta
+    if (pb > 0) {
+      t_new_beta <- (1 + sqrt(1 + 4 * t_beta^2)) / 2
+      momentum_coeff_beta <- (t_beta - 1) / t_new_beta
+      if (!is.finite(momentum_coeff_beta)) momentum_coeff_beta <- 0
+      y_beta <- beta + momentum_coeff_beta * (beta - last_beta)
+      
+      grad_beta_y <- tryCatch({ # grad at y_beta
+        grad_fun(function(.b) nllh_fun(alpha, .b, va, vb, x, y, prob_fun),
+                 y_beta, method = grad_method)
+      }, error = function(e) { NULL })
+      
+      if (is.null(grad_beta_y) || length(grad_beta_y) != pb || any(!is.finite(grad_beta_y))) {
+        cli::cli_warn("Invalid gradient grad_beta_y at step %d. Skipping beta update.", step)
+        grad_beta_y <- rep(NA_real_, pb) # Store NA gradient
+        t_new_beta <- t_beta # Keep old momentum
+      } else {
+        f_y_beta <- nllh_fun(alpha, y_beta, va, vb, x, y, prob_fun)
+        if(!is.finite(f_y_beta)){
+          cli::cli_warn("Non-finite NLLH at y_beta (step %d). Skipping beta update.", step)
+          t_new_beta <- t_beta
+          grad_beta_y <- rep(NA_real_, pb) # Store NA gradient
+        } else {
+          ss_beta <- current_step_size_beta
+          beta_updated <- FALSE
+          for (ls_iter in 1:ls_max_iter) {
+            prox_arg_beta <- y_beta - ss_beta * grad_beta_y
+            trial_beta <- soft_thres_fun(prox_arg_beta, lambda * ss_beta)
+            if (intercept && pb > 0) trial_beta[1] <- prox_arg_beta[1]
+            f_trial_beta <- nllh_fun(alpha, trial_beta, va, vb, x, y, prob_fun)
+            if (!is.finite(f_trial_beta)) {
+              ss_beta <- ss_beta * ls_beta_shrink; next
+            }
+            quad_approx <- f_y_beta + sum(grad_beta_y * (trial_beta - y_beta)) +
+              (0.5 / ss_beta) * sum((trial_beta - y_beta)^2)
+            if (f_trial_beta <= quad_approx + 1e-8) {
+              beta <- trial_beta; current_step_size_beta <- ss_beta
+              t_beta <- t_new_beta; beta_updated <- TRUE; break
+            } else {
+              ss_beta <- ss_beta * ls_beta_shrink
+            }
+          }
+          if (!beta_updated) {
+            cli::cli_warn("Line search for beta failed at iteration %d. Skipping beta update.", step)
+            t_new_beta <- t_beta; grad_beta_y <- rep(NA_real_, pb) # Store NA
+          }
+        }
+      }
+      # Store the gradient computed at y_beta (even if NA)
+      g_betas[storage_idx, ] <- grad_beta_y
+    } else {
+      if (pb > 0) g_betas[storage_idx, ] <- NA_real_ # No update, store NA
+    }
+    
+    # --- Store results ---
+    if (pa > 0) alphas[storage_idx,] <- alpha
+    if (pb > 0) betas[storage_idx,] <- beta
+    nllh_iter <- tryCatch({
+      penalized_nllh_fun(alpha, beta, va, vb, x, y,
+                         lambda = lambda, intercept = intercept, prob_fun = prob_fun, nllh_fun = nllh_fun)
+    }, error = function(e) { NA_real_ })
+    nllh_results[storage_idx] <- nllh_iter
+    
+    # --- Check Stopping Criterion ---
+    grad_alpha_for_stop <- NULL
+    grad_beta_for_stop <- NULL
+    
+    if (eval_grad) {
+      # Calculate gradients at the updated alpha/beta *if* needed by stop_crit
+      if (pa > 0) {
+        grad_alpha_for_stop <- tryCatch({
+          grad_fun(function(.a) nllh_fun(.a, beta, va, vb, x, y, prob_fun),
+                   alpha, method = grad_method)
+        }, error = function(e) { cli::cli_warn("Stop_crit grad alpha failed: %s", e$message); NULL })
+        if (is.null(grad_alpha_for_stop) || length(grad_alpha_for_stop) != pa || any(!is.finite(grad_alpha_for_stop))) {
+          grad_alpha_for_stop <- NULL # Ensure it's NULL if invalid
+        }
+      }
+      if (pb > 0) {
+        grad_beta_for_stop <- tryCatch({
+          grad_fun(function(.b) nllh_fun(alpha, .b, va, vb, x, y, prob_fun),
+                   beta, method = grad_method)
+        }, error = function(e) { cli::cli_warn("Stop_crit grad beta failed: %s", e$message); NULL })
+        if (is.null(grad_beta_for_stop) || length(grad_beta_for_stop) != pb || any(!is.finite(grad_beta_for_stop))) {
+          grad_beta_for_stop <- NULL # Ensure it's NULL if invalid
+        }
+      }
+    }
+    
+    # Call the user-provided stop_crit function
+    # It MUST handle NULL for grad_alpha_for_stop/grad_beta_for_stop if eval_grad=FALSE
+    # stop_boolean <- stop_crit(
+    #   grad_alpha = grad_alpha_for_stop,
+    #   grad_beta = grad_beta_for_stop,
+    #   alpha = alpha,
+    #   beta = beta,
+    #   last_alpha = alpha_iter_start, # Value from start of this iteration
+    #   last_beta = beta_iter_start,   # Value from start of this iteration
+    #   iter = iter,
+    #   max_step = max.step,
+    #   tol = tol
+    #   # Add any other arguments your specific stop_crit function needs
+    # )
+    stop_boolean <- stop_crit(eval_grad = eval_grad,
+                              grad_alpha = grad_alpha_for_stop,
+                              grad_beta = grad_beta_for_stop,
+                              # eval_rel_chang = eval_rel_chang,
+                              alpha = alpha,
+                              beta = beta,
+                              last_alpha = last_alpha,
+                              last_beta = last_beta)
+    
+    if (stop_boolean) {
+      # cli::cli_alert_info("Convergence reached at step %d by stop_crit.", step)
+      break # Exit main optimization loop
+    }
+    
+    # --- Update 'last' values for next iteration's momentum ---
+    # Use values from the *start* of the current iteration
+    last_alpha <- alpha_iter_start
+    last_beta <- beta_iter_start
+    
+    # Note: t_alpha and t_beta were updated within the line search success blocks
+    
+  } # End main optimization loop (for iter ...)
+  
+  # --- Prepare results ---
+  # (Same as previous version)
+  final_step <- step
+  final_idx <- final_step + 1
+  
+  alphas <- alphas[1:final_idx, , drop = FALSE]
+  betas <- betas[1:final_idx, , drop = FALSE]
+  if(pa > 0) g_alphas <- g_alphas[1:final_idx, , drop = FALSE] # Gradients at y_alpha
+  if(pb > 0) g_betas <- g_betas[1:final_idx, , drop = FALSE]   # Gradients at y_beta
+  nllh_results <- nllh_results[1:final_idx]
+  
+  final_alpha <- if (pa > 0) alphas[final_idx, ] else numeric(0)
+  final_beta <- if (pb > 0) betas[final_idx, ] else numeric(0)
+  
+  if (final_step == 0 && max.step > 0) {
+    cli::cli_warn("Optimization loop did not complete any steps.")
+    return(list(alpha = alpha.start, beta = beta.start, step = 0,
+                alphas = matrix(alpha.start, nrow=1), betas = matrix(beta.start, nrow=1),
+                grad_alphas = if(pa > 0) matrix(NA_real_, nrow=1, ncol=pa) else matrix(NA_real_,0,0),
+                grad_betas = if(pb > 0) matrix(NA_real_, nrow=1, ncol=pb) else matrix(NA_real_,0,0),
+                nllh_results = nllh_results[1]))
+  }
+  
+  return(list(alpha = final_alpha,
+              beta = final_beta,
+              step = final_step,
+              alphas = alphas,
+              betas = betas,
+              grad_alphas = g_alphas, # Note: Gradients are at momentum point 'y'
+              grad_betas = g_betas,   # Note: Gradients are at momentum point 'y'
+              nllh_results = nllh_results))
+}
+
 
 
 # L_alpha <- L(alpha, beta, va, vb, x, y, prob_fun, 

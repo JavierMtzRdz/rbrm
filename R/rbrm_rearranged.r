@@ -8,10 +8,17 @@
 #' @examples
 #' #soft_thres(c(3, -1.5, 0.2), 0.5)
 #' @export
+# soft_thres <- function(x, lambda) {
+#   sx <- abs(x) - lambda*2
+#   sx[sx < 0] <- 0
+#   return(sx * sign(x))
+# }
 soft_thres <- function(x, lambda) {
-  sx <- abs(x) - lambda*2
-  sx[sx < 0] <- 0
-  return(sx * sign(x))
+  if (!is.numeric(x) || !is.numeric(lambda) || length(lambda) != 1) {
+    stop("Invalid input to soft_thres")
+  }
+  # Element-wise operation: sign(x) * max(abs(x) - lambda, 0)
+  return(sign(x) * pmax(abs(x) - lambda, 0))
 }
 
 
@@ -85,21 +92,57 @@ proximal.gd.beta.fista <- function(beta, step_size, lambda, t_old, last_beta,
 #' #alpha <- c(1, 2, 3)
 #' #nllh.alpha(alpha)
 #' @export
-nllh <- function(alpha, beta, va, vb, x, y,
-                 prob_fun = getProbRR.org) {
-  logrr <- (va %*% alpha)
-  logop <- (vb %*% beta)
+# nllh <- function(alpha, beta, va, vb, x, y,
+#                  prob_fun = getProbRR.org) {
+#   logrr <- (va %*% alpha)
+#   logop <- (vb %*% beta)
+#   
+#   ps <- prob_fun(logrr, logop)
+#   
+#   p0 <- ps$p0
+#   p1 <- ps$p1
+#   
+#   nll <- -sum((1 - y[x == 0]) * log1p(-p0[x == 0]) + 
+#                 (y[x == 0]) * log(p0[x == 0])) -
+#     sum((1 - y[x == 1]) * log1p(-p1[x == 1]) + 
+#           (y[x == 1]) * log(p1[x == 1]))
+#   
+#   return(nll)
+# }
+
+nllh <- function(alpha, beta, va, vb, x, y, prob_fun = getProbRR.org) {
+  n <- length(y)
+  pa <- length(alpha) # Use length of coeff vector
+  pb <- length(beta)
+  
+  # Safe matrix multiplication: result is 0 vector if no columns/coefficients
+  logrr <- if (pa > 0 && ncol(va) == pa) va %*% alpha else matrix(0, nrow = n, ncol = 1)
+  logop <- if (pb > 0 && ncol(vb) == pb) vb %*% beta else matrix(0, nrow = n, ncol = 1)
   
   ps <- prob_fun(logrr, logop)
-  
   p0 <- ps$p0
   p1 <- ps$p1
   
-  nll <- -sum((1 - y[x == 0]) * log1p(-p0[x == 0]) + 
-                (y[x == 0]) * log(p0[x == 0])) -
-    sum((1 - y[x == 1]) * log1p(-p1[x == 1]) + 
-          (y[x == 1]) * log(p1[x == 1]))
+  # Add epsilon for numerical stability (avoid log(0))
+  eps <- 1e-15
+  p0 <- pmax(eps, pmin(1 - eps, p0))
+  p1 <- pmax(eps, pmin(1 - eps, p1))
   
+  idx0 <- which(x == 0)
+  idx1 <- which(x == 1)
+  nll <- 0
+  # Calculate likelihood safely, avoiding issues if idx0 or idx1 are empty
+  if(length(idx0) > 0){
+    nll <- nll - sum(y[idx0] * log(p0[idx0]) + (1 - y[idx0]) * log(1 - p0[idx0]))
+  }
+  if(length(idx1) > 0){
+    nll <- nll - sum(y[idx1] * log(p1[idx1]) + (1 - y[idx1]) * log(1 - p1[idx1]))
+  }
+  
+  # Return Inf if calculation failed (result is NA or NaN)
+  if (!is.finite(nll)) {
+    return(Inf)
+  }
   return(nll)
 }
 
@@ -114,21 +157,44 @@ nllh <- function(alpha, beta, va, vb, x, y,
 #' #pars <- c(alpha = 1, beta = 2)
 #' #penalized.neg.log.likelihood(pars)
 #' @export
+# penalized_nllh <- function(alpha, beta, va, vb, x, y,
+#                            lambda, intercept,
+#                            prob_fun = getProbRR.org) {
+#   
+#   unpenalized.nllh <- nllh(alpha, beta, va, vb, x, y,
+#                            prob_fun = prob_fun)
+#   
+#   # Applying the penalty term
+#   if (intercept == TRUE) {
+#     penalty <- lambda*2 * (sum(abs(alpha[-1])) + sum(abs(beta[-1]))) # Exclude intercept
+#   } else {
+#     penalty <- lambda *2* (sum(abs(alpha)) + sum(abs(beta)))
+#   }
+#   return(unpenalized.nllh + penalty)
+# }
 penalized_nllh <- function(alpha, beta, va, vb, x, y,
                            lambda, intercept,
-                           prob_fun = getProbRR.org) {
+                           prob_fun = getProbRR.org,
+                           nllh_fun = nllh) {
   
-  unpenalized.nllh <- nllh(alpha, beta, va, vb, x, y,
-                           prob_fun = prob_fun)
+  unpenalized.nllh <- nllh_fun(alpha, beta, va, vb, x, y, 
+                               prob_fun = prob_fun)
   
-  # Applying the penalty term
-  if (intercept == TRUE) {
-    penalty <- lambda*2 * (sum(abs(alpha[-1])) + sum(abs(beta[-1]))) # Exclude intercept
-  } else {
-    penalty <- lambda *2* (sum(abs(alpha)) + sum(abs(beta)))
-  }
+  # Check if nllh calculation failed
+  if (!is.finite(unpenalized.nllh)) return(Inf)
+  
+  pa <- length(alpha)
+  pb <- length(beta)
+  
+  # Calculate L1 penalty (avoiding intercept)
+  penalty <- 0
+  l1_norm_alpha <- if(pa > 0) sum(abs(alpha[if(intercept) -1 else TRUE])) else 0
+  l1_norm_beta  <- if(pb > 0) sum(abs(beta[ if(intercept) -1 else TRUE])) else 0
+  penalty <- lambda * (l1_norm_alpha + l1_norm_beta) # Assuming lambda applies to sum
+  
   return(unpenalized.nllh + penalty)
 }
+
 
 
 #' Regularized Binary Regression Model (RBRM)
