@@ -38,7 +38,7 @@ cv_rbrm <- function(va, vb, x, y, lambda = NULL,
                     implt = rbrm, 
                     prob_fun = NULL,
                     relax_lsso = FALSE,
-                    relax_factor = 0,
+                    relax_factor = NULL,
                     index = "min",           # "min" or "1se"
                     type.measure = "deviance", # "deviance" or "Mae"
                     ...) {
@@ -163,46 +163,86 @@ cv_rbrm <- function(va, vb, x, y, lambda = NULL,
   }
   
   # Refit model on full data using selected lambda
-  best_fit <- if (is.null(prob_fun)) {
-    implt(va = va, vb = vb,
+  if (is.null(prob_fun)) {
+    best_fit <- implt(va = va, vb = vb,
           x = x, y = y, 
           lambda = lambda_selected,
           ...)
   } else {
-    implt(va = va, vb = vb,
+    best_fit <- implt(va = va, vb = vb,
           x = x, y = y, 
           lambda = lambda_selected,
           prob_fun = prob_fun, ...)
   }
   
   # Optionally, perform relaxed LSSO step
+  # if (relax_lsso) {
+  #   selected_vars <- which(abs(best_fit$point.est) > 0)
+  #   va_relaxed <- va[, selected_vars[selected_vars <= ncol(va)], drop = FALSE]
+  #   vb_relaxed <- vb[, selected_vars[selected_vars > ncol(va)] - ncol(vb), drop = FALSE]
+  #   
+    # if (is.null(prob_fun)) {
+    #   best_fit_rlasso <- implt(va = va_relaxed, vb = va_relaxed,
+    #         x = x, y = y,
+    #         lambda = lambda_selected*relax_factor,
+    #         ...)
+    # } else {
+    #   best_fit_rlasso <- implt(va = va_relaxed, vb = va_relaxed,
+    #         x = x, y = y,
+    #         lambda = lambda_selected*relax_factor,
+    #         prob_fun = prob_fun, ...)
+    # }
+  #   
+  #   # browser()
+    # best_fit$step <- best_fit_rlasso$step
+    # best_fit$convergence <- best_fit_rlasso$convergence
+    # best_fit$point.est <- vector("numeric", ncol(va) + ncol(vb))
+    # best_fit$point.est[selected_vars[selected_vars <= ncol(va)]] <-
+    #   best_fit_rlasso$point.est[1:ncol(va_relaxed)]
+    # 
+    # best_fit$point.est[selected_vars[selected_vars <= ncol(va)] + ncol(va)] <-
+    #   best_fit_rlasso$point.est[(ncol(va_relaxed) + 1):length(best_fit_rlasso$point.est)]
+  # }
+  
+  # Relaxed Lasso step
+  relax_result <- NULL
   if (relax_lsso) {
     selected_vars <- which(abs(best_fit$point.est) > 0)
     va_relaxed <- va[, selected_vars[selected_vars <= ncol(va)], drop = FALSE]
     vb_relaxed <- vb[, selected_vars[selected_vars > ncol(va)] - ncol(vb), drop = FALSE]
     
-    if (is.null(prob_fun)) {
-      best_fit_rlasso <- implt(va = va_relaxed, vb = va_relaxed,
-            x = x, y = y, 
-            lambda = lambda_selected*relax_factor,
-            ...)
+    if (length(selected_vars) == 0) {
+      warning("No variables selected - skipping relax_lsso")
     } else {
-      best_fit_rlasso <- implt(va = va_relaxed, vb = va_relaxed,
-            x = x, y = y, 
-            lambda = lambda_selected*relax_factor,
-            prob_fun = prob_fun, ...)
+      if (is.null(relax_factor)) relax_factor <- seq(0,1,0.25)
+      
+      relax_result <- handle_relaxation(
+        va, vb, selected_vars, x, y, cv_results$lambda_selected,
+        relax_factor, nfolds, implt, prob_fun, type.measure, ...
+      )
+      cli::cli_bullets("relax_result: {relax_result}")
+      
+      if (is.null(prob_fun)) {
+        best_fit_rlasso <- implt(va = va_relaxed, vb = va_relaxed,
+                                 x = x, y = y,
+                                 lambda = lambda_selected*relax_result,
+                                 ...)
+      } else {
+        best_fit_rlasso <- implt(va = va_relaxed, vb = va_relaxed,
+                                 x = x, y = y,
+                                 lambda = lambda_selected*relax_result,
+                                 prob_fun = prob_fun, ...)
+      }
+      
+      best_fit$step <- best_fit_rlasso$step
+      best_fit$convergence <- best_fit_rlasso$convergence
+      best_fit$point.est <- vector("numeric", ncol(va) + ncol(vb))
+      best_fit$point.est[selected_vars[selected_vars <= ncol(va)]] <-
+        best_fit_rlasso$point.est[1:ncol(va_relaxed)]
+      
+      best_fit$point.est[selected_vars[selected_vars <= ncol(va)] + ncol(va)] <-
+        best_fit_rlasso$point.est[(ncol(va_relaxed) + 1):length(best_fit_rlasso$point.est)]
     }
-    
-    # browser()
-    best_fit$step <- best_fit_rlasso$step
-    best_fit$convergence <- best_fit_rlasso$convergence
-    best_fit$point.est <- vector("numeric", ncol(va) + ncol(vb))
-    best_fit$point.est[selected_vars[selected_vars <= ncol(va)]] <- 
-      best_fit_rlasso$point.est[1:ncol(va_relaxed)]
-    
-    best_fit$point.est[selected_vars[selected_vars <= ncol(va)] + ncol(va)] <- 
-      best_fit_rlasso$point.est[(ncol(va_relaxed) + 1):length(best_fit_rlasso$point.est)]
-    browser()
   }
   
   time <- tictoc::toc(quiet = TRUE)
@@ -225,6 +265,7 @@ cv_rbrm <- function(va, vb, x, y, lambda = NULL,
   
   return(obj)
 }
+
 
 
 
