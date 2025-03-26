@@ -71,3 +71,29 @@ plot.cv_rbrm <- function(.model, type.measure = "deviance") {
     ggplot2::theme_minimal() +
     ggplot2::theme(legend.position = "top")
 }
+#' @export
+plot.cv_rbrm2 <- function(.model, type.measure = "deviance") {
+  
+  tibble::as_tibble(.model$cv_results_matrix) %>%
+    tidyr::pivot_longer(everything(), names_to = "lambda") %>%
+    dplyr::mutate(lambda = as.numeric(lambda)) %>% 
+    ggplot2::ggplot(ggplot2::aes(x = lambda, y = value, group = lambda)) +
+    ggplot2::stat_summary(fun.data = ggplot2::mean_se, geom = "errorbar",
+                          width = 0.05, colour = "#277DA1") +
+    ggplot2::stat_summary(fun = mean, geom = "point",
+                          colour = "#277DA1", alpha = 1) +
+    ggplot2::geom_vline(ggplot2::aes(xintercept = .model$lambda.min,
+                                     linetype = "Lambda min"),
+                        colour = "#f94144") +
+    ggplot2::geom_vline(ggplot2::aes(xintercept = .model$lambda.1se,
+                                     linetype = "Lambda 1SE"),
+                        colour = "#f94144") +
+    ggplot2::scale_x_log10(n.breaks = 6) +
+    ggplot2::scale_linetype_manual(values = c("dotted", "dashed")) +
+    ggplot2::labs(x = "Lambda", y = paste0(toupper(substr(.model$type.measure, 1, 1)), 
+                                           substr(.model$type.measure, 2, nchar(.model$type.measure))),
+                  linetype = ggplot2::element_blank(),
+                  colour = ggplot2::element_blank()) +
+    ggplot2::theme_minimal() +
+    ggplot2::theme(legend.position = "top")
+}
