@@ -36,6 +36,7 @@ generate_data <- function(pa, pb, n, n_test, alpha, beta, gamma, misspec_nuisanc
     gamma_true <- c(0, gamma)
   }
   pscore.true <- sigmoid(cbind(rep(1, n), v.train) %*% gamma_true)
+
   x.train <- stats::rbinom(n, 1, pscore.true)
   
   # Generate outcome probabilities for training data

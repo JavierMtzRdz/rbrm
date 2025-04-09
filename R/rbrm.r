@@ -4,7 +4,7 @@ stop_crit <- function(eval_grad = T,
                       grad_alpha = NULL,
                       grad_beta = NULL,
                       eval_rel_chang = T,
-                      eval_rel_grad_thres = 1e-3,
+                      eval_rel_grad_thres = 1e-4,
                       alpha = NULL,
                       beta = NULL,
                       last_alpha = NULL,
@@ -1452,6 +1452,7 @@ rbrm.experimental <- function(va, vb, x, y,
   # lr.alpha = 0.06; lr.beta = 0.02;
   # intercept = TRUE;  prob_fun = getProbRR.org;
   # opt_fun = fista
+  
   tictoc::tic("Total time")
   
   if (is.null(vb)) {
@@ -1516,6 +1517,179 @@ rbrm.experimental <- function(va, vb, x, y,
   return(structure(opt, class = c("rbrm")))
 }
 
+#' Initialize Coefficient Starting Vectors
+#'
+#' Handles NULL or incorrectly sized starting vectors, returning a vector
+#' of the expected length.
+#'
+#' @param start_vec User-provided starting vector (or NULL).
+#' @param expected_len The required length (number of columns).
+#' @param default_val The default value to use if start_vec is NULL or invalid.
+#' @param vec_name Character name of the vector for warning messages.
+#' @return A numeric vector of length expected_len.
+#' @keywords internal
+.initialize_start_coeffs <- function(start_vec, expected_len, default_val = 0, vec_name = "coeffs") {
+  # Handle zero-column case
+  if (expected_len <= 0) {
+    return(numeric(0))
+  }
+  
+  if (is.null(start_vec)) {
+    # Default initialization
+    final_vec <- rep(default_val, expected_len)
+  } else if (length(start_vec) == expected_len) {
+    # Use user-provided if length is correct
+    final_vec <- start_vec
+  } else {
+    # Provided vector has wrong length
+    cli::cli_warn(
+      "Length of {vec_name} ({length(start_vec)}) != expected ({expected_len}). Using default value {default_val} instead."
+    )
+    final_vec <- rep(default_val, expected_len)
+  }
+  return(as.numeric(final_vec)) # Ensure numeric type
+}
+
+#' Experimental RBRM Model Fitting Function
+#'
+#' Wraps an optimization function to fit the RBRM model with Lasso penalty.
+#'
+#' @param va Matrix of predictors for alpha.
+#' @param vb Matrix of predictors for beta (defaults to `va` if `NULL`).
+#' @param x Binary treatment vector (0/1).
+#' @param y Binary outcome vector (0/1).
+#' @param alpha_start Optional starting vector for alpha coefficients.
+#' @param beta_start Optional starting vector for beta coefficients.
+#' @param max_step Maximum iterations for the optimizer.
+#' @param lambda Lasso penalty strength (non-negative scalar).
+#' @param step_size_alpha_init Initial step size guess for alpha (used by some optimizers).
+#' @param step_size_beta_init Initial step size guess for beta (used by some optimizers).
+#' @param intercept Logical. Does the model include an intercept term (as the first
+#'   element of alpha/beta)? Controls penalization. User should ensure `va`/`vb`
+#'   matrices include/exclude a column of 1s accordingly.
+#' @param prob_fun Function to calculate probabilities (e.g., `getProbRR.org`).
+#' @param opt_fun The optimization function to use (e.g., `fista_opt2_ls_sc`).
+#'   Must accept specific arguments (see code).
+#' @param save_optimizer_details Logical. If `TRUE`, include the full raw output
+#'   from `opt_fun` in the results.
+#' @param ... Additional arguments passed directly to `opt_fun` (e.g., `tol`,
+#'   `ls_max_iter`, `eval_grad`).
+#'
+#' @return An object of class "rbrm" (or similar), typically a list containing
+#'   estimated coefficients, convergence status, objective value, etc.
+#'
+#' @importFrom utils modifyList
+#' @importFrom cli cli_abort cli_warn cli_alert_info
+#' @importFrom tictoc tic toc
+rbrm.experimental2 <- function(va, vb = NULL, x, y,
+                               alpha.start = NULL, beta.start = NULL,
+                              max_step = 1000, lambda = 0,
+                              lr.alpha = 0.01, lr.beta = 0.01,
+                              intercept = F,
+                              prob_fun = getProbRR.org,    
+                              opt_fun = fista_opt, 
+                              save_opt = F) {
+  # browser()
+  tictoc::tic("rbrm_experimental time")
+
+  # --- 1. Input Validation and Preparation ---
+  if (!is.function(opt_fun)) cli::cli_abort("'opt_fun' must be a function.")
+  if (!is.null(prob_fun) && !is.function(prob_fun)) cli::cli_abort("If provided, 'prob_fun' must be a function.")
+  if (lambda < 0) { cli::cli_warn("lambda is negative ({lambda}), using 0 instead."); lambda <- 0 }
+
+  if (is.null(vb)) {
+    cli::cli_alert_info("vb is NULL, using va for beta predictors.")
+    vb <- va
+  }
+  # Ensure matrix format
+  va <- tryCatch(as.matrix(va), error = function(e) cli::cli_abort("Failed to coerce 'va' to matrix: {e$message}"))
+  vb <- tryCatch(as.matrix(vb), error = function(e) cli::cli_abort("Failed to coerce 'vb' to matrix: {e$message}"))
+
+  n <- length(y)
+  pa <- ncol(va)
+  pb <- ncol(vb)
+  if (nrow(va) != n || nrow(vb) != n || length(x) != n) {
+    cli::cli_abort("Input dimension mismatch (va, vb, x, y rows/lengths).")
+  }
+
+  # Check intercept column based on user flag (guidance only)
+  has_intercept_col <- pa > 0 && isTRUE(all(va[, 1] == 1)) # Check only va
+  if (intercept && !has_intercept_col) {
+    cli::cli_warn("intercept=TRUE but a column of 1s was not detected as the first column of 'va'. Ensure data includes intercept if needed.")
+  }
+  if (!intercept && has_intercept_col) {
+    cli::cli_warn("intercept=FALSE but a column of 1s was detected as the first column of 'va'. Ensure data excludes intercept if not desired.")
+  }
+
+  # --- 2. Initialize Starting Values ---
+  alpha_start_final <- .initialize_start_coeffs(alpha.start, pa, default_val = 0, "alpha_start")
+  beta_start_final  <- .initialize_start_coeffs(beta.start, pb, default_val = 0.01, "beta_start") # Default beta to 0
+
+
+  # Prepare arguments list
+  opt_args <- list(
+    alpha.start = alpha_start_final,
+    beta.start = beta_start_final,
+    # Pass step sizes using names expected
+    step_size_alpha = lr.alpha,
+    step_size_beta = lr.beta,
+    lambda = lambda,
+    intercept = intercept, # Pass the user's intent
+    max.step = max_step,
+    va = va, vb = vb, x = x, y = y,
+    prob_fun = prob_fun
+  )
+  
+  # Call the optimizer
+  opt_result <- tryCatch({
+    do.call(opt_fun, opt_args)
+  }, error = function(e){
+    cli::cli_abort("Optimization failed: {e$message}") # Abort if optimizer itself errors
+  })
+
+# browser()
+  # --- 4. Validate and Extract Results ---
+  step  <- opt_result$step
+  alpha <- opt_result$alpha
+  beta  <- opt_result$beta
+  
+  # Check if optimizer returned expected results
+  if(is.null(step) || is.null(alpha) || is.null(beta) || length(alpha) != pa || length(beta) != pb){
+    cli::cli_abort("Optimizer returned NULL or coefficients/step of incorrect length! Check 'opt_fun'. alpha: {length(alpha)} (exp {pa}), beta: {length(beta)} (exp {pb})")
+  }
+  
+  # --- 5. Calculate Final Objective Value ---
+  final_value <- tryCatch({penalized_nllh(alpha, beta, va, vb, x, y, lambda, intercept, prob_fun = prob_fun)}, error = function(e){
+    cli::cli_warn("Calculation of final penalized NLLH failed: {e$message}")
+    NA_real_
+  })
+  if (!is.finite(final_value)) {
+    cli::cli_warn("Final penalized NLLH is non-finite (NA/Inf).")
+  }
+  
+  # --- 6. Structure Output ---
+  time_info <- tictoc::toc(quiet = TRUE)
+  run_time <- round(time_info$toc - time_info$tic, 4)
+  
+  if(!save_opt)  opt_result <- NULL
+  
+  result <- list(
+    point.est = c(alpha, beta),
+    alpha = alpha,
+    beta = beta,
+    convergence = (!is.null(step) && is.numeric(step) && step < max_step), # Check step validity
+    value = final_value, # Penalized NLLH
+    step = step,
+    optimizer_details = opt_result,
+    lambda = lambda,
+    intercept = intercept,
+    dimensions = list(n = n, p_a = pa, p_b = pb),
+    time = run_time
+  )
+  # cli::cli_alert_success("rbrm_experimental finished in {run_time} seconds.")
+  return(structure(result, class = c("rbrm")))
+}
+
 
 
 opt_mle <- function(alpha.start, beta.start,
@@ -1577,85 +1751,6 @@ opt_mle <- function(alpha.start, beta.start,
               grad_alphas = g_alphas,
               grad_betas = g_betas,
               nllh_results = nllh_results))
-}
-
-# --- rbrm.experimental (Minor correction from previous) ---
-#' @export
-rbrm.experimental2 <- function(va, vb, x, y,
-                              alpha.start = NULL, beta.start = NULL,
-                              max.step = 1000, lambda = 0,
-                              lr.alpha = 0.01, lr.beta = 0.01, # These are step_size for FISTA
-                              intercept = TRUE,
-                              prob_fun = getProbRR.org, # Make sure available
-                              opt_fun = fista_opt2,     # Default to corrected FISTA
-                              save_opt = TRUE,
-                              ...) { # Allow passing extra args to opt_fun if needed
-  
-  tictoc::tic("rbrm.experimental time")
-  
-  if (is.null(vb)) { vb <- va }
-  va <- as.matrix(va); vb <- as.matrix(vb)
-  pa <- ncol(va); pb <- ncol(vb)
-  
-  # Intercept detection/flagging (same as previous corrected)
-  has_intercept_va <- pa > 0 && isTRUE(all(va[, 1] == 1))
-  has_intercept_vb <- pb > 0 && isTRUE(all(vb[, 1] == 1))
-  model_intercept <- intercept
-  # Add warnings if inconsistent, as before...
-  
-  ## starting values
-  if (is.null(alpha.start)) alpha.start <- rep(0, pa)
-  if (length(alpha.start) != pa) {
-    cli::cli_warn("alpha.start length mismatch. Using default zeros.")
-    alpha.start <- rep(0, pa)
-  }
-  if (is.null(beta.start)) beta.start <- rep(0, pb) # Default beta to 0 too
-  # *** Corrected bug from original user code ***
-  if (length(beta.start) != pb) { # Use pb here!
-    cli::cli_warn("beta.start length mismatch. Using default zeros.")
-    beta.start <- rep(0, pb) # Use pb here!
-  }
-  
-  ## Optimization
-  # Pass arguments expected by fista_opt2 (or other opt_fun)
-  opt_result <- opt_fun(alpha.start = alpha.start, beta.start = beta.start,
-                        step_size_alpha = lr.alpha, step_size_beta = lr.beta, # Map lr to step_size
-                        lambda = lambda,
-                        intercept = model_intercept,
-                        max.step = max.step,
-                        va = va, vb = vb, x = x, y = y,
-                        prob_fun = prob_fun,
-                        ...) # Pass extra arguments like tol, eval_grad if needed
-  
-  step <- opt_result$step
-  alpha <- opt_result$alpha
-  beta <- opt_result$beta
-  
-  # Final check on returned lengths
-  if(is.null(alpha) || is.null(beta) || length(alpha) != pa || length(beta) != pb){
-    cli::cli_abort("Optimizer returned NULL or coefficients of incorrect length! alpha: %s (expected %d), beta: %s (expected %d)",
-                   length(alpha), pa, length(beta), pb)
-  }
-  
-  # Calculate final penalized NLLH
-  final_nllh_val <- tryCatch({
-    penalized_nllh(alpha, beta, va, vb, x, y, lambda, model_intercept, prob_fun = prob_fun)
-  }, error = function(e){ NA_real_ })
-  
-  opt <- list(
-    point.est = c(alpha, beta),
-    optimization.info = if(save_opt) opt_result else NULL,
-    convergence = (!is.null(step) && !is.na(step) && step < max.step),
-    value = final_nllh_val,
-    step = step,
-    time = NA_real_ # Updated below
-  )
-  
-  elapsed <- tictoc::toc(log = TRUE, quiet = TRUE)
-  opt$time <- round(elapsed$toc - elapsed$tic, 4)
-  # tictoc::tic.clearlog() # Optional: prevent message
-  
-  return(structure(opt, class = c("rbrm")))
 }
 
 

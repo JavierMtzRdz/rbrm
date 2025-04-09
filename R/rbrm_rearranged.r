@@ -138,6 +138,8 @@ nllh <- function(alpha, beta, va, vb, x, y, prob_fun = getProbRR.org) {
   if(length(idx1) > 0){
     nll <- nll - sum(y[idx1] * log(p1[idx1]) + (1 - y[idx1]) * log(1 - p1[idx1]))
   }
+  # size adjustment
+  nll <- nll/n
   
   # Return Inf if calculation failed (result is NA or NaN)
   if (!is.finite(nll)) {

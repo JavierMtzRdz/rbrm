@@ -16,9 +16,9 @@ step_fista_scad <- function(alpha, beta,
   
   # Momentum update
   t_new <- (1 + sqrt(1 + 4 * t_old^2)) / 2
-  damping_factor <- 0.8  # Reduce momentum effect
-  a_new <- damping_factor * (t_old - 1) / t_new
-  # a_new <- (t_old - 1) / t_new
+  # damping_factor <- 0.8  # Reduce momentum effect
+  # a_new <- damping_factor * (t_old - 1) / t_new
+  a_new <- (t_old - 1) / t_new
   y_value_new <- value + a_new * (value - value_old)
   
   # Compute gradient
@@ -57,7 +57,6 @@ step_fista_scad <- function(alpha, beta,
 scad_thres <- function(entry, lambda, a) {
   # size safety of equivalence between SCAD and hard thresholding
   if (!(a >= 2)) cli::cli_abort("a < 2")
-  lambda <- lambda*2
   
   # Vectorized Version
   e1 <- abs(entry) <= 2 * lambda
@@ -122,11 +121,22 @@ step_fista_adaptive_lasso <- function(alpha, beta,
 
 #' @export
 # Adaptive Soft-Thresholding Function
-adaptive_soft_thres <- function(z, lambda, weights) {
-  sign_z <- sign(z)
-  abs_z <- abs(z)
-  # Adaptive soft-thresholding rule
-  result <- sign_z * pmax(abs_z - lambda * weights, 0)
-  return(result)
+# adaptive_soft_thres <- function(z, lambda, weights) {
+#   sign_z <- sign(z)
+#   abs_z <- abs(z)
+#   # Adaptive soft-thresholding rule
+#   result <- sign_z * pmax(abs_z - lambda * weights, 0)
+#   return(result)
+# }
+adaptive_soft_thres <- function(entry, lambda, n) {
+  # define thresholding multiplier
+  s <- abs(entry) - (lambda^(n + 1)) * abs(entry)^(-n)
+  
+  # apply regularization
+  s[s < 0] <- 0
+  s[s > 0] <- sign(entry[s > 0]) * s[s > 0]
+  
+  # output regularized entry
+  return(s)
 }
 
