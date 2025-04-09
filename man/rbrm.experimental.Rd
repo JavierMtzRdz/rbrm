@@ -15,7 +15,7 @@ rbrm.experimental(
   lambda = 0,
   lr.alpha = 0.01,
   lr.beta = 0.01,
-  intercept = TRUE,
+  intercept = FALSE,
   prob_fun = getProbRR.org,
   opt_fun = fista,
   save_opt = T
