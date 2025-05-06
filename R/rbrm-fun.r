@@ -45,12 +45,20 @@ stop_crit <- function(eval_grad = T,
         is.null(last_alpha) ||
         is.null(last_beta)) cli::cli_abort("No enough information to compute relative change.")
     
-    rel_change_alpha <- norm(alpha - last_alpha, type="2")^2 / pmax(1e-08, norm(alpha, type="2"))^2
- 
-    rel_change_beta <- norm(beta - last_beta, type="2")^2 / pmax(1e-08, norm(beta, type="2"))^2
+    # rel_change_alpha <- norm(alpha - last_alpha, type="2")^2 / pmax(1e-08, norm(alpha, type="2"))^2
+    # 
+    # rel_change_beta <- norm(beta - last_beta, type="2")^2 / pmax(1e-08, norm(beta, type="2"))^2
     
-    rel_change_return <- (rel_change_alpha < eval_rel_grad_thres &&
-                            rel_change_beta < eval_rel_grad_thres)
+    # rel_change_return <- (rel_change_alpha < eval_rel_grad_thres &&
+    #                         rel_change_beta < eval_rel_grad_thres)
+    
+    rel_change_alpha <- sum((alpha-last_alpha)^2)/sum(alpha^2+eval_rel_grad_thres)
+    
+    rel_change_beta <- sum((beta-last_beta)^2)/sum(beta^2+eval_rel_grad_thres)
+    
+    diff <-  max(rel_change_alpha, rel_change_beta)
+    
+    rel_change_return <- (diff < eval_rel_grad_thres)
     
     if(message | (message_true & rel_change_return)) cli::cli_alert_success("rel_change_alpha: {round(rel_change_alpha, 5)} || rel_change_beta: {round(rel_change_beta, 5)}")
     
@@ -160,6 +168,75 @@ step_fista <- function(alpha, beta,
   return(list(value_new = value_new, t_value = t_new, y_value = y_value_new))
 }
 
+
+#' @export
+step_bp <- function(alpha, beta,
+                       value_old,
+                       opt,
+                       step_size, lambda, t_old,
+                       intercept, va, vb, x, y,
+                       prob_fun = getProbRR.org) {
+  
+  if (!(opt %in% c("alpha","beta"))) {
+    cli::cli_abort("Option 'opt' must be either 'alpha' or 'beta'.")
+  }
+  
+  if (opt == "alpha") value <- alpha
+  if (opt == "beta") value <- beta
+  
+  # Momentum update
+  t_new <- (1 + sqrt(1 + 4 * t_old^2)) / 2
+  
+  a_new <- (t_old-1)/t_new
+  
+  y_value_new <- value + a_new * (value - value_old)
+  
+  if (opt == "alpha") {
+    # browser()
+    gradient <- numDeriv::grad(function(.x){nllh(.x, beta, va, vb, x, y,
+                                                 prob_fun = prob_fun)},
+                               y_value_new, method = "simple")
+    
+    lambda_step <- ((sum(abs(y_value_new))+ 1e-10)/(sum(abs(beta), 
+                                                 abs(alpha))+2e-10))*lambda*2
+  }
+  
+  if (opt == "beta") {
+    # browser()
+    gradient <- numDeriv::grad(function(.x) {nllh(alpha, .x, va, vb, x, y,
+                                                  prob_fun = prob_fun)},
+                               y_value_new, method = "simple")
+    
+    lambda_step <- ((sum(abs(y_value_new))+ 1e-10)/(sum(abs(beta), 
+                                                   abs(alpha))+2e-10))*lambda*2
+  }
+  
+  
+  # Clean any NA gradients to prevent issues during computation
+  if (any(is.na(gradient))) {
+    cli::cli_alert_danger("NaN in gradient, replacing with 0.")
+    print(gradient)
+    gradient[is.na(gradient)] <- 0
+  }
+  
+  # Proximal gradient update with soft-thresholding
+  input <- y_value_new - step_size * gradient
+  # value_new <- soft_thres(input, lambda_step * step_size)
+  value_new <-  try(soft_thres(input, lambda_step * step_size))
+  
+  if(class(value_new) == "try-error") browser()
+  if(any(abs(value_new) > 3)) browser()
+  
+  
+  
+  
+  # Maintain intercept term if specified
+  if (intercept) value_new[1] <- input[1]
+  
+  # Return updated values in a structured list
+  return(list(value_new = value_new, t_value = t_new, y_value = y_value_new))
+}
+
 #' @export
 step_fista_an <- function(alpha, beta,
                        value_old,
@@ -184,29 +261,29 @@ step_fista_an <- function(alpha, beta,
   
   if (opt == "alpha") {
     # browser()
-    # gradient <- numDeriv::grad(function(.x){nllh(.x, beta, va, vb, x, y,
-    #                                              prob_fun = prob_fun)},
-    #                            y_value_new, method = "simple")
     
-    
-    gradient <- grad_nll(alpha, y_value_new, x, y, va, vb,
+    gradient <- grad_nll(y_value_new, beta, x, y, va, vb,
                          prob_fun, opt = "alpha")
-
-    # if(any(abs(gradient - gradient2) > 3)) {browser()} else {gradient <- gradient2}
+    
+    # gradient2 <- numDeriv::grad(function(.x){nllh(.x, beta, va, vb, x, y,
+    #                                              prob_fun = prob_fun)},
+    #                            y_value_new, method = "Richardson")
+    # 
+    # if(any(abs(gradient - gradient2) > 0.1)) {browser()} 
     
     
   }
   
   if (opt == "beta") {
     
-    # gradient <- numDeriv::grad(function(.x) {nllh(alpha, .x, va, vb, x, y,
-    #                                               prob_fun = prob_fun)},
-    #                            y_value_new, method = "simple")
-
     gradient <- grad_nll(alpha, y_value_new, x, y, va, vb,
-                                      prob_fun, opt = "beta")
-
-    # if(any(abs(gradient - gradient2) > 1.5)) {browser()} else {gradient <- gradient2}
+    prob_fun, opt = "beta")
+    
+    # gradient2 <- numDeriv::grad(function(.x) {nllh(alpha, .x, va, vb, x, y,
+    #                                               prob_fun = prob_fun)},
+    #                            y_value_new, method = "Richardson")
+    # 
+    # if(any(abs(gradient - gradient2) > 0.1)) {browser()}
 
   }
   
@@ -360,7 +437,7 @@ fista_opt_an <- function(alpha.start, beta.start,
                       max.step, 
                       va, vb, x, y,
                       prob_fun = getProbRR.org,
-                      opt_step = step_fista,
+                      opt_step = step_fista_an,
                       eval_grad = T){
   ## Optimization
   step <- 0
@@ -441,6 +518,9 @@ fista_opt_an <- function(alpha.start, beta.start,
     grad_beta <- grad_nll(alpha, beta, x, y, va, vb,
                             prob_fun, opt = "beta")
     
+    # if (any(is.nan(grad_alpha)) ||
+    #     any(is.nan(grad_beta))) browser()
+    
     nllh_iter <- penalized_nllh(alpha, beta, va, vb, x, y, 
                                 lambda = lambda, intercept = intercept,
                                 prob_fun = prob_fun)
@@ -454,7 +534,7 @@ fista_opt_an <- function(alpha.start, beta.start,
     stop_boolean <- stop_crit(eval_grad = eval_grad,
                               grad_alpha = grad_alpha,
                               grad_beta = grad_beta,
-                              eval_rel_grad_thres = 1e-4,
+                              eval_rel_grad_thres = 1e-5,
                               alpha = alpha,
                               beta = beta,
                               last_alpha = last_alpha,

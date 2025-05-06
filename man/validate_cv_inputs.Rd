@@ -4,7 +4,7 @@
 \alias{validate_cv_inputs}
 \title{Refit a Cross-Validated RBRM Model (with Fragile Auto-Retrieval)}
 \usage{
-\method{refit}{cv_rbrm2}(va, vb, x, y, nfolds, type.measure)
+validate_cv_inputs(va, vb, x, y, nfolds, type.measure)
 }
 \arguments{
 \item{object}{A fitted object of class \code{cv_rbrm2}.}

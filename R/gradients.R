@@ -480,6 +480,7 @@ ll_gradient_pzz <- function(alpha, beta, x, y, va, vb, prob_fun = getProbRR.alt)
   if (is_richardson) {
     exp_logrr <- exp(logrr)
     exp_logop <- exp(logop)
+    exp_logop[abs(exp_logop -1) < 1e-15] <- exp_logop[exp_logop -1 < 1e-15] - 1e-15
     
     # Calculate dp0/dlogop (derivative of p0 with respect to logop)
     term1 <- -(exp_logrr + 1) * exp_logop
@@ -500,7 +501,7 @@ ll_gradient_pzz <- function(alpha, beta, x, y, va, vb, prob_fun = getProbRR.alt)
     dL_dp1 <- (Y * X) / p1 - ((1 - Y) * X) / (1 - p1)
     
     grad <- t(vb) %*% (dL_dp0 * dp0_dlogop + dL_dp1 * dp1_dlogop)
-    
+    # if(any(is.nan(grad))) browser()
     return(-as.vector(grad))
   } else if (is_alternative){
     derivative_p0_dlogop <- function(eta1,eta2)
@@ -529,6 +530,7 @@ ll_gradient_pzz <- function(alpha, beta, x, y, va, vb, prob_fun = getProbRR.alt)
       }
       grad_beta[k] <- score_beta_k
     }
+    if(any(is.nan(grad_beta))) browser()
     return(as.vector(-grad_beta))
   } else {
     stop("prob_fun not recognized.")
@@ -543,15 +545,15 @@ ll_gradient_pzz <- function(alpha, beta, x, y, va, vb, prob_fun = getProbRR.alt)
 #'   dispatching to either `.grad_nll_alpha` or `.grad_nll_beta` based on the `opt` argument.
 #'   It's the primary exported function for gradient calculation.
 #'
-#' @inheritParams .grad_nll_alpha
 #' @export
 grad_nll <- function(alpha, beta, X, Y, va, vb, prob_fun, opt = c("alpha", "beta")) {
+  n <- length(Y)
   opt <- match.arg(opt)
   
   if (opt == "alpha") {
-    return(.grad_nll_alpha(alpha, beta, X, Y, va, vb, prob_fun))
+    return(.grad_nll_alpha(alpha, beta, X, Y, va, vb, prob_fun)/n)
   } else if (opt == "beta") {
-    return(.grad_nll_beta(alpha, beta, X, Y, va, vb, prob_fun))
+    return(.grad_nll_beta(alpha, beta, X, Y, va, vb, prob_fun)/n)
   }
 }
 

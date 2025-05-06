@@ -19,3 +19,6 @@ misc/
 /src/rust/.idea
 /inst/cargo.log
 /authors-scratch.txt
+src/rust/vendor
+src/Makevars
+src/Makevars.win

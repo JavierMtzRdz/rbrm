@@ -701,12 +701,139 @@ cv_relax_factor <- function(va, vb, x, y, fold_ids, selected_lambda, implt, prob
 
 
 
-#' Refit a Cross-Validated RBRM Model (with Fragile Auto-Retrieval)
+#' Complete the relax lasss step on cv_rbrm2
 #'
+#' This internal function is called by `cv_rbrm2` to perform the relaxed Lasso
+#' step if `relax_lsso = TRUE`. It handles the selection of the relax factor
+#' (either by cross-validation or using a provided value) and fits the
+#' relaxed Lasso model on the full dataset using the active set of variables
+#' identified in the initial Lasso fit.
+#'
+#' @param va Full validation matrix for alpha.
+#' @param vb Full validation matrix for beta.
+#' @param x Treatment assignment vector.
+#' @param y Outcome vector.
+#' @param initial_full_fit The fitted model object from the initial Lasso fit on the full data.
+#' @param lambda_selected The selected lambda value from the initial cross-validation.
+#' @param relax_lsso Logical indicating whether to perform relaxed Lasso.
+#' @param relax_factor Optional numeric (0-1). The relaxation factor (gamma). If NULL, it is cross-validated.
+#' @param relax_factors_grid A numeric vector of relax factors to try during cross-validation (if `relax_factor = NULL`).
+#' @param fold_ids A vector indicating fold membership for each observation (used if `relax_factor = NULL`).
+#' @param implt The underlying model fitting function (e.g., `rbrm`).
+#' @param prob_fun Function to calculate probabilities.
+#' @param type.measure The metric to optimize during relax factor cross-validation ("deviance" or "mae").
+#' @param nfolds Number of folds for relax factor cross-validation (if `relax_factor = NULL`).
+#' @param p_a Number of alpha predictors in the full model.
+#' @param p_b Number of beta predictors in the full model.
+#' @param ... Additional arguments passed to `implt`.
+#'
+#' @return A list containing information about the relaxed Lasso step, including:
+#'   - `performed`: Logical indicating if relaxed Lasso was performed.
+#'   - `factor_used`: The relaxation factor used.
+#'   - `factor_source`: How the factor was determined ("Provided" or "CV").
+#'   - `factor_cv_results`: If CV was used, the results of the cross-validation.
+#'   - `reconstruction_status`: Status of coefficient reconstruction ("Success" or failure reason).
+#'   - `final_fit`: The fitted model object from the relaxed Lasso (or the initial fit if relaxation failed or was skipped).
+#'
+#' @keywords internal
+complete_relax_lasso <- function(va, vb, x, y, initial_full_fit, lambda_selected,
+                                 relax_lsso, relax_factor, relax_factors_grid,
+                                 fold_ids, implt, prob_fun, type.measure, nfolds,
+                                 p_a, p_b, ...) {
+  relax_info <- list(
+    performed = FALSE,
+    factor_used = NA_real_,
+    factor_source = "N/A",
+    factor_cv_results = NULL,
+    reconstruction_status = "N/A"
+  )
+  final_fit <- initial_full_fit # Default to initial fit
+  
+  if (relax_lsso) {
+    relax_info$performed <- TRUE
+    actual_relax_factor <- NULL
+    relax_cv_output <- NULL
+    
+    # Determine the relax factor
+    if (is.null(relax_factor)) {
+      relax_info$factor_source <- "CV"
+      relax_cv_output <- cv_relax_factor(
+        va = va, vb = vb, x = x, y = y, fold_ids = fold_ids,
+        selected_lambda = lambda_selected, implt = implt, prob_fun = prob_fun,
+        relax_factors_grid = relax_factors_grid, type.measure = type.measure,
+        nfolds = nfolds, ...
+      )
+      actual_relax_factor <- relax_cv_output$best_relax_factor
+      relax_info$factor_cv_results <- relax_cv_output # Store CV details
+  
+    } else {
+      relax_info$factor_source <- "Provided"
+      if (!is.numeric(relax_factor) || length(relax_factor) != 1 || relax_factor < 0 || relax_factor > 1) {
+        cli::cli_alert_warning("Provided relax_factor invalid. Using 1.0.")
+        actual_relax_factor <- 1.0
+      } else {
+        actual_relax_factor <- relax_factor
+      }
+      cli::cli_alert_info(paste("Using provided relax factor:", actual_relax_factor))
+    }
+    relax_info$factor_used <- actual_relax_factor
+    
+    # Fit the relaxed Lasso model
+    relaxed_result <- fit_relaxed_lasso(
+      va = va, vb = vb, x = x, y = y,
+      initial_fit = initial_full_fit,
+      lambda = lambda_selected,
+      relax_factor = actual_relax_factor,
+      implt = implt, prob_fun = prob_fun, ...
+    )
+    
+    # --- Robust Coefficient Reconstruction ---
+    if (!is.null(relaxed_result$fit)) {
+      relaxed_coeffs_vec <- relaxed_result$fit$point.est
+      n_active_alpha <- length(relaxed_result$active_alpha_indices)
+      n_active_beta <- length(relaxed_result$active_beta_indices)
+      expected_relaxed_coeffs_len <- n_active_alpha + n_active_beta
+      
+      if (length(relaxed_coeffs_vec) == expected_relaxed_coeffs_len) {
+        final_coeffs_relaxed <- vector("numeric", p_a + p_b)
+        names(final_coeffs_relaxed) <- c(colnames(va), colnames(vb))
+        
+        if (n_active_alpha > 0) {
+          final_coeffs_relaxed[relaxed_result$active_alpha_indices] <- relaxed_coeffs_vec[1:n_active_alpha]
+        }
+        if (n_active_beta > 0) {
+          final_coeffs_relaxed[relaxed_result$active_beta_indices] <- relaxed_coeffs_vec[(n_active_alpha + 1):expected_relaxed_coeffs_len]
+        }
+        
+        final_fit$point.est <- final_coeffs_relaxed
+        final_fit$convergence <- relaxed_result$fit$convergence
+        final_fit$step <- relaxed_result$fit$step
+        final_fit$time <- initial_full_fit$time + ifelse(!is.null(relaxed_result$fit$time), relaxed_result$fit$time, 0)
+        relax_info$reconstruction_status <- "Success"
+        cli::cli_alert_success("Relaxed Lasso fitting and reconstruction complete.")
+      } else {
+        cli::cli_alert_warning(sprintf("Relaxed Lasso: Coefficient length mismatch after fitting. Expected %d, got %d. Using non-relaxed coefficients.",
+                                       expected_relaxed_coeffs_len, length(relaxed_coeffs_vec)))
+        relax_info$reconstruction_status <- "Failed (Length Mismatch)"
+      }
+    } else {
+      cli::cli_alert_warning("Final relaxed Lasso step failed. Using non-relaxed coefficients.")
+      relax_info$reconstruction_status <- "Failed (Fit Error)"
+    }
+  }
+  
+  return(list(relax_info = relax_info, final_fit = final_fit))
+}
+
+
+
+
+#' Refit a Cross-Validated RBRM Model (with Fragile Auto-Retrieval)
+#' 
 #' Refits a model based on a fitted \code{cv_rbrm2} object. Attempts to
 #' automatically retrieve fitting functions from the original call if not provided,
 #' but **this is fragile and explicit passing is recommended.**
-#'
+#' 
 #' @param object A fitted object of class \code{cv_rbrm2}.
 #' @param newdata_va New validation matrix for alpha predictors. Required.
 #' @param newdata_vb New validation matrix for beta predictors. Required.
@@ -721,10 +848,9 @@ cv_relax_factor <- function(va, vb, x, y, fold_ids, selected_lambda, implt, prob
 #' @param prob_fun Optional. The probability function. If NULL, attempts (fragile) retrieval/determination. **Explicit passing recommended.**
 #' @param opt_fun Optional. The optimization function used by implt. If NULL, attempts (fragile) retrieval from original call. **Explicit passing recommended.**
 #' @param ... Additional arguments passed to the \code{implt} function during refitting.
-#'
+#' 
 #' @return A list of class \code{refit_cv_rbrm} with refitted results.
-#'
-#' @method refit cv_rbrm2
+#' 
 #' @export
 
 # --- Helper Functions -------
@@ -750,7 +876,7 @@ validate_cv_inputs <- function(va, vb, x, y, nfolds, type.measure) {
 }
 
 # 2. Lambda Grid Setup
-setup_lambda_grid <- function(lambda, va, vb, y, n_lambdas) {
+setup_lambda_grid <- function(lambda, va, vb, y, n_lambdas, epsilon = 0.1) {
   if (is.null(lambda)) {
     lambda_grid <- tryCatch({
       # Simplified lambda max heuristic (as before)
@@ -769,7 +895,6 @@ setup_lambda_grid <- function(lambda, va, vb, y, n_lambdas) {
       ## Calculate lambda path (first get lambda_max):
       max_lambda_est <- max(abs(colSums(sx*y)))/n
       if (!is.finite(max_lambda_est) || max_lambda_est <= 1e-6) max_lambda_est <- 1.0
-      epsilon <- 0.1
       l_max <- log(max_lambda_est)
       l_min <- log(epsilon * max_lambda_est)
       # Ensure l_min is smaller than l_max
@@ -1144,50 +1269,29 @@ cv_rbrm2 <- function(va, vb, x, y, lambda = NULL,
   }
   
   # --- 7. Relaxed Lasso Step (Optional) ---
-  # (Same logic as before using determine_relaxation_params, potentially
-  #  cv_relax_factor, fit_relaxed_lasso, reconstruct_coeffs helpers)
-  final_fit <- initial_full_fit
-  relaxation_params <- determine_relaxation_params(relax_lsso, relax_factor, NULL, FALSE)
-  relax_info <- list(performed = relaxation_params$perform, factor_used = relaxation_params$factor,
-                     factor_source = relaxation_params$source, factor_cv_results = NULL,
-                     reconstruction_status = ifelse(relaxation_params$perform, "Pending", "N/A"))
-  
-  if (relax_info$performed) {
-    if (is.na(relax_info$factor_used)) {
-      # Call cv_relax_factor if needed and available
-      if (exists("cv_relax_factor") && is.function(cv_relax_factor)) {
-        # ... call cv_relax_factor ...
-        # relax_info$factor_used <- result$best_relax_factor etc.
-      } else { relax_info$factor_used <- 1.0; # ... fallback ...
-      }
-    }
-    # Call fit_relaxed_lasso if needed and available
-    if (exists("fit_relaxed_lasso") && is.function(fit_relaxed_lasso)) {
-      relaxed_result <- fit_relaxed_lasso(
-        # ... args ...
-        lambda = lambda_selected, relax_factor = relax_info$factor_used,
-        ... # pass dots
-      )
-      if (!is.null(relaxed_result$fit)) {
-        recon_result <- reconstruct_coeffs(
-          # ... args ...
-          alpha_indices_fit = relaxed_result$active_alpha_indices,
-          beta_indices_fit = relaxed_result$active_beta_indices,
-          # ...
-        )
-        if(recon_result$status == "Success") {
-          # ... update final_fit ...
-          relax_info$reconstruction_status <- "Success"
-        } else { relax_info$reconstruction_status <- recon_result$status }
-      } else { relax_info$reconstruction_status <- "Failed (Fit Error)" }
-    } else { relax_info$performed <- FALSE; relax_info$reconstruction_status <- "Skipped (Missing Helper)" }
-    if(relax_info$reconstruction_status != "Success") {
-      cli::cli_alert_warning("Relaxed Lasso failed/skipped. Using non-relaxed coefficients.")
-    }
-  } # End if(relax_info$performed)
+  relax_output <- complete_relax_lasso(
+    va = va, vb = vb, x = x, y = y,
+    initial_full_fit = initial_full_fit,
+    lambda_selected = lambda_selected,
+    relax_lsso = relax_lsso,
+    relax_factor = relax_factor,
+    relax_factors_grid = relax_factors_grid,
+    fold_ids = fold_ids,
+    implt = implt,
+    prob_fun = prob_fun,
+    type.measure = type.measure,
+    nfolds = nfolds,
+    p_a = p_a,
+    p_b = p_b,
+    ...
+  )
+  relax_info <- relax_output$relax_info
+  final_fit <- relax_output$final_fit
   
   # --- 8. Prepare Output ---
-  if (length(final_fit$point.est) != p_a + p_b) { cli::cli_abort("FATAL: Final coefficient length mismatch.") }
+  if (length(final_fit$point.est) != p_a + p_b) {
+    cli::cli_abort("FATAL: Final coefficient length mismatch.")
+  }
   relax_factor_out <- ifelse(relax_info$performed && relax_info$reconstruction_status == "Success", relax_info$factor_used, NA_real_)
   output <- list(
     call = match.call(), lambda_grid = lambda_grid, cv_mean = lambda_selection$cv_mean,
@@ -1209,12 +1313,6 @@ cv_rbrm2 <- function(va, vb, x, y, lambda = NULL,
 }
 
 
-
-# Ensure necessary libraries and helper functions are loaded
-# library(cli)
-# library(tictoc)
-# Need: validate_cv_inputs, determine_function, determine_relaxation_params,
-#       fit_model_on_data, reconstruct_coeffs, etc. (from previous refactoring)
 
 # refit.cv_rbrm2 <- function(object,
 #                            newdata_va, newdata_vb, newdata_x, newdata_y,
