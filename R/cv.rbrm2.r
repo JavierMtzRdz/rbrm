@@ -1196,7 +1196,7 @@ perform_cv_fold <- function(fold, fold_ids, va, vb, x, y, lambda_grid,
 #' @export
 cv_rbrm2 <- function(va, vb, x, y, lambda = NULL,
                      n_lambdas = 20, nfolds = 3,
-                     implt = rbrm.experimental, # Ensure defined
+                     implt = rbrm.exp2, # Ensure defined
                      prob_fun = NULL,
                      relax_lsso = FALSE,
                      relax_factor = NULL,
