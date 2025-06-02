@@ -1575,6 +1575,7 @@ greedy_fista <- function(alpha.start, beta.start,
 #' @importFrom utils modifyList
 #' @importFrom cli cli_abort cli_warn cli_alert_info
 #' @importFrom tictoc tic toc
+#' @export
 rbrm.exp2 <- function(va, vb = NULL, x, y,
                       alpha.start = NULL, beta.start = NULL,
                       max_step = 1000, lambda = 0,
@@ -1736,7 +1737,7 @@ opt_mle <- function(alpha.start, beta.start,
               nllh_results = nllh_results))
 }
 
-
+#' @export
 step_fista_ls <- function(current_param_val, # Current value of param being optimized (alpha_k or beta_k)
                           other_param_val,   # The other param (beta_k or updated alpha_{k+1})
                           param_val_old,     # Param value from iter k-1 (alpha_{k-1} or beta_{k-1})
@@ -1817,17 +1818,15 @@ step_fista_ls <- function(current_param_val, # Current value of param being opti
               y_value = y_extrapolated, step_size = current_s))
 }
 
-
+#' @export
 fista_opt2_ls <- function(alpha.start, beta.start,
-                                      initial_step_size_alpha, initial_step_size_beta,
+                          step_size_alpha, step_size_beta,
                                       lambda, intercept, max.step,
                                       va, vb, x, y,
                                       prob_fun,           # For nllh_fun, penalized_nllh_fun, grad_nll_fun
                                       eval_grad = TRUE,
                                       ls_shrink_factor = 0.5,
-                                      ls_max_iter = 20,
-                                      grad_stop_crit_alpha = NULL, # Optional precomputed grad for stop_crit
-                                      grad_stop_crit_beta = NULL) { 
+                                      ls_max_iter = 20) { 
   
   alpha <- alpha.start
   beta <- beta.start
@@ -1838,8 +1837,8 @@ fista_opt2_ls <- function(alpha.start, beta.start,
   t_alpha <- 1.0
   t_beta <- 1.0
   
-  current_s_alpha <- initial_step_size_alpha
-  current_s_beta <- initial_step_size_beta
+  current_s_alpha <- step_size_alpha
+  current_s_beta <- step_size_beta
   
   # History storage
   p_alpha <- length(alpha.start)
@@ -1905,19 +1904,17 @@ fista_opt2_ls <- function(alpha.start, beta.start,
                                                   prob_fun = prob_fun)
     
     # Gradient for stopping criterion
-    g_alpha_sc <- grad_stop_crit_alpha # Use precomputed if available for this iter
-    g_beta_sc <- grad_stop_crit_beta   # Use precomputed if available for this iter
     
-    if (eval_grad && (is.null(g_alpha_sc) || is.null(g_beta_sc))) {
+    if (eval_grad) {
       # If not precomputed, calculate them now based on *updated* alpha and beta
       grads_sc <- grad_nll(alpha, beta, x, y, va, vb, prob_fun)
-      if(p_alpha > 0) g_alpha_sc <- grads_sc$grad_alpha
-      if(p_beta > 0) g_beta_sc <- grads_sc$grad_beta
+      g_alpha_sc <- grads_sc$grad_alpha
+      g_beta_sc <- grads_sc$grad_beta
     }
     
     if(eval_grad){
-      if(p_alpha > 0) grad_alphas_hist_sc[iter, ] <- g_alpha_sc
-      if(p_beta > 0) grad_betas_hist_sc[iter, ] <- g_beta_sc
+      grad_alphas_hist_sc[iter, ] <- g_alpha_sc
+      grad_betas_hist_sc[iter, ] <- g_beta_sc
     }
     
     # Check stopping criterion

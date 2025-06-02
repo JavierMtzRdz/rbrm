@@ -70,6 +70,7 @@ dp0_phi <- function(theta, phi,
 #' @param opt Character string specifying which gradient to return ("alpha", "beta", or "both").
 #'
 #' @return Analytical gradient vector(s) of the negative log-likelihood defined by user's nllh.
+#' @export
 grad_nll <- function(alpha, beta, y, x, va, vb, 
                      prob_fun, opt = c("both", "alpha", "beta"),
                      method = c("analytical", "numerical")) {
@@ -124,6 +125,7 @@ grad_nll <- function(alpha, beta, y, x, va, vb,
   
 }
 
+#' @export
 grad_nll_k <- function(alpha, beta, y, x, va, vb,
                        prob_fun,
                        opt = c("alpha", "beta"), 
