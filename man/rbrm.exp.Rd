@@ -11,7 +11,7 @@ rbrm.exp(
   y,
   alpha.start = NULL,
   beta.start = NULL,
-  max.step = 1000,
+  max_step = 1000,
   lambda = 0,
   lr.alpha = 1,
   lr.beta = 1,
@@ -34,7 +34,7 @@ rbrm.exp(
 
 \item{beta.start}{Initial values for beta coefficients. Defaults to a vector of 0.01.}
 
-\item{max.step}{Maximum number of optimization steps. Default is 3000.}
+\item{max_step}{Maximum number of optimization steps. Default is 3000.}
 
 \item{lambda}{Regularization parameter for L1 penalty. Default is 0 (no regularization).}
 

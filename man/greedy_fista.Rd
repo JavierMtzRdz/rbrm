@@ -11,7 +11,7 @@ greedy_fista(
   step_size_beta,
   lambda,
   intercept,
-  max.step,
+  max_step,
   thres,
   va,
   vb,

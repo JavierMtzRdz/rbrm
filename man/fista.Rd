@@ -11,7 +11,7 @@ fista(
   step_size_beta,
   lambda,
   intercept,
-  max.step,
+  max_step,
   va,
   vb,
   x,

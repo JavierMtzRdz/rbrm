@@ -138,7 +138,7 @@ fista_opt <- function(alpha.start, beta.start,
                       step_size_alpha, step_size_beta,
                       lambda, 
                       intercept, 
-                      max.step, 
+                      max_step, 
                       va, vb, x, y,
                       prob_fun = getProbRR.org,
                       opt_step = step_fista,
@@ -149,13 +149,13 @@ fista_opt <- function(alpha.start, beta.start,
   beta <- y_beta <- last_beta <- beta.start
   t_alpha <- t_beta <- 1
   
-  alphas <- matrix(0, max.step, ncol(va))
-  betas <- matrix(0, max.step, ncol(vb))
-  g_alphas <- matrix(0, max.step, ncol(va))
-  g_betas <- matrix(0, max.step, ncol(vb))
-  nllh_results <- vector("double", max.step)
+  alphas <- matrix(0, max_step, ncol(va))
+  betas <- matrix(0, max_step, ncol(vb))
+  g_alphas <- matrix(0, max_step, ncol(va))
+  g_betas <- matrix(0, max_step, ncol(vb))
+  nllh_results <- vector("double", max_step)
   
-  for (iter in 1:max.step) {
+  for (iter in 1:max_step) {
     step <- step + 1
     # FISTA update for alpha
     
@@ -278,7 +278,7 @@ fista_opt2 <- function(alpha.start, beta.start,
                        step_size_alpha, step_size_beta,
                        lambda, 
                        intercept, 
-                       max.step, 
+                       max_step, 
                        va, vb, x, y,
                        prob_fun = getProbRR.org,
                        opt_step = step_fista,
@@ -293,11 +293,11 @@ fista_opt2 <- function(alpha.start, beta.start,
   beta <- y_beta <- beta.start
   t_alpha <- t_beta <- 1
   
-  alphas <- matrix(0, max.step, ncol(va))
-  betas <- matrix(0, max.step, ncol(vb))
-  g_alphas <- matrix(0, max.step, ncol(va))
-  g_betas <- matrix(0, max.step, ncol(vb))
-  nllh_results <- vector("double", max.step)
+  alphas <- matrix(0, max_step, ncol(va))
+  betas <- matrix(0, max_step, ncol(vb))
+  g_alphas <- matrix(0, max_step, ncol(va))
+  g_betas <- matrix(0, max_step, ncol(vb))
+  nllh_results <- vector("double", max_step)
   
   # L_alpha <- L(alpha, beta, va, vb, x, y, prob_fun,
   #              opt = "alpha")
@@ -310,7 +310,7 @@ fista_opt2 <- function(alpha.start, beta.start,
 
      # cli::cli_alert("step_size_alpha: {step_size_alpha} | step_size_beta: {step_size_beta}")
   
-  for (iter in 1:max.step) {
+  for (iter in 1:max_step) {
     step <- step + 1
     # FISTA update for alpha
     
@@ -433,7 +433,7 @@ fista_opt2 <- function(alpha.start, beta.start,
 
 
 
-
+#' @export
 cd_opt <- function(alpha.start, beta.start,
                    step_size_alpha, step_size_beta,
                    lambda,
@@ -552,7 +552,7 @@ cd_opt <- function(alpha.start, beta.start,
 #' @param x A vector indicating the group assignment (1 or 0) for each observation.
 #' @param alpha.start Initial values for alpha coefficients. Defaults to a zero vector.
 #' @param beta.start Initial values for beta coefficients. Defaults to a vector of 0.01.
-#' @param max.step Maximum number of optimization steps. Default is 3000.
+#' @param max_step Maximum number of optimization steps. Default is 3000.
 #' @param thres Threshold for convergence. Default is 1e-04.
 #' @param lambda Regularization parameter for L1 penalty. Default is 0 (no regularization).
 #' @param lr.alpha Learning rate for alpha parameters. Default is 0.06.
@@ -577,14 +577,14 @@ cd_opt <- function(alpha.start, beta.start,
 #' @export
 rbrm.exp <- function(va, vb, x, y,
                               alpha.start = NULL, beta.start = NULL,
-                              max.step = 1000, lambda = 0,
+                              max_step = 1000, lambda = 0,
                               lr.alpha = 1, lr.beta = 1,
                               intercept = FALSE,
                               prob_fun = getProbRR.org,
                               opt_fun = fista , save_opt = T) {
   
   # va <- v; vb <- v; alpha.start = NULL; beta.start = NULL;
-  # max.step = 1000;  lambda = 0;
+  # max_step = 1000;  lambda = 0;
   # lr.alpha = 0.06; lr.beta = 0.02;
   # intercept = TRUE;  prob_fun = getProbRR.org;
   # opt_fun = fista
@@ -627,7 +627,7 @@ rbrm.exp <- function(va, vb, x, y,
                         lr.alpha, lr.beta,
                         lambda, 
                         intercept, 
-                        max.step,
+                        max_step,
                         va, vb, x, y,
                         prob_fun)
   
@@ -642,7 +642,7 @@ rbrm.exp <- function(va, vb, x, y,
   opt <- list(
     point.est = c(alpha, beta), 
     optimization.info = opt_result,
-    convergence = (step < max.step),
+    convergence = (step < max_step),
     value = penalized_nllh(alpha, beta, 
                            va, vb, x, y,
                            lambda, intercept),
@@ -724,7 +724,7 @@ double_fista_opt <- function(alpha.start, beta.start,
                       step_size_alpha, step_size_beta,
                       lambda, 
                       intercept, 
-                      max.step, 
+                      max_step, 
                       va, vb, x, y,
                       prob_fun = getProbRR.org,
                       opt_step = step_fista,
@@ -736,15 +736,15 @@ double_fista_opt <- function(alpha.start, beta.start,
   beta <- y_beta <- last_beta <- beta.start
   t_alpha <- t_beta <- 1
   
-  max.step <- ceiling(max.step/cont_opt)
+  max_step <- ceiling(max_step/cont_opt)
   
-  alphas <- matrix(0, max.step, ncol(va))
-  betas <- matrix(0, max.step, ncol(va))
-  g_alphas <- matrix(0, max.step, ncol(va))
-  g_betas <- matrix(0, max.step, ncol(va))
-  nllh_results <- vector("double", max.step)
+  alphas <- matrix(0, max_step, ncol(va))
+  betas <- matrix(0, max_step, ncol(va))
+  g_alphas <- matrix(0, max_step, ncol(va))
+  g_betas <- matrix(0, max_step, ncol(va))
+  nllh_results <- vector("double", max_step)
   
-  for (iter in 1:max.step) {
+  for (iter in 1:max_step) {
     step <- step + 1
     
     # FISTA update for beta
@@ -1083,7 +1083,7 @@ fista <- function(alpha.start, beta.start,
                   step_size_alpha, step_size_beta,
                   lambda, 
                   intercept, 
-                  max.step, 
+                  max_step, 
                   va, vb, x, y,
                   prob_fun = getProbRR.org,
                   opt_step = proximal.gd.fista,
@@ -1093,7 +1093,7 @@ fista <- function(alpha.start, beta.start,
   alpha <- y_alpha <- alpha.start
   beta <- y_beta <- beta.start
   t_alpha <- t_beta <- 1
-  for (iter in 1:max.step) {
+  for (iter in 1:max_step) {
     step <- step + 1
     # FISTA update for alpha
     last_alpha <- alpha
@@ -1276,7 +1276,7 @@ asfista <- function(alpha.start, beta.start,
                     step_size_alpha, step_size_beta,
                     lambda, 
                     intercept, 
-                    max.step, 
+                    max_step, 
                     va, vb, x, y,
                     prob_fun = getProbRR.org,
                     opt_step = step_asfista,
@@ -1287,17 +1287,17 @@ asfista <- function(alpha.start, beta.start,
   beta <- y_beta <- last_beta <- beta.start
   t_alpha <- t_beta <- 1
   
-  alphas <- matrix(0, max.step, ncol(v))
-  betas <- matrix(0, max.step, ncol(v))
-  g_alphas <- matrix(0, max.step, ncol(v))
-  g_betas <- matrix(0, max.step, ncol(v))
-  nllh_results <- vector("double", max.step)
+  alphas <- matrix(0, max_step, ncol(v))
+  betas <- matrix(0, max_step, ncol(v))
+  g_alphas <- matrix(0, max_step, ncol(v))
+  g_betas <- matrix(0, max_step, ncol(v))
+  nllh_results <- vector("double", max_step)
   
   step_size_alpha_loop <- step_size_alpha 
   step_size_beta_loop <- step_size_beta 
   
   
-  for (iter in 1:max.step) {
+  for (iter in 1:max_step) {
     step <- step + 1
     # FISTA update for alpha
     
@@ -1420,7 +1420,7 @@ greedy_fista <- function(alpha.start, beta.start,
     step_size_alpha, step_size_beta,
     lambda, 
     intercept, 
-    max.step, thres,
+    max_step, thres,
     va, vb, x, y,
     prob_fun = getProbRR.org,
     opt_step = proximal.gd.fista,
@@ -1432,7 +1432,7 @@ greedy_fista <- function(alpha.start, beta.start,
   alpha <- y_alpha <- alpha.start
   beta <- y_beta <- beta.start
   t_alpha <- t_beta <- 1
-  for (iter in 1:max.step) {
+  for (iter in 1:max_step) {
     step <- step + 1
     
     # FISTA update for alpha
@@ -1622,7 +1622,7 @@ rbrm.exp2 <- function(va, vb = NULL, x, y,
     step_size_beta = lr.beta,
     lambda = lambda,
     intercept = intercept, 
-    max.step = max_step,
+    max_step = max_step,
     va = va, vb = vb, x = x, y = y,
     prob_fun = prob_fun
   )
@@ -1679,35 +1679,35 @@ opt_mle <- function(alpha.start, beta.start,
                      step_size_alpha, step_size_beta,
                      lambda, 
                      intercept, 
-                     max.step, 
+                     max_step, 
                      va, vb, x, y,
                      prob_fun = getProbRR.org,
                     thres = 1e-08) {
   
   
-  alphas <- matrix(0, max.step, ncol(v))
-  betas <- matrix(0, max.step, ncol(v))
-  g_alphas <- matrix(0, max.step, ncol(v))
-  g_betas <- matrix(0, max.step, ncol(v))
-  nllh_results <- vector("double", max.step)
+  alphas <- matrix(0, max_step, ncol(v))
+  betas <- matrix(0, max_step, ncol(v))
+  g_alphas <- matrix(0, max_step, ncol(v))
+  g_betas <- matrix(0, max_step, ncol(v))
+  nllh_results <- vector("double", max_step)
   
   Diff = function(x,y) sum((x-y)^2)/sum(x^2+thres)
   alpha = alpha.start; beta = beta.start
   diff = thres + 1; step = 0
-  while(diff > thres & step < max.step){
+  while(diff > thres & step < max_step){
     step = step + 1
     opt1 = stats::optim(alpha,
                         function(.x){penalized_nllh(.x, beta, va, vb, x, y, 
                                        lambda = lambda, intercept = intercept,
                                        prob_fun = prob_fun)},
-                        control=list(maxit=max(100,max.step/10)))
+                        control=list(maxit=max(100,max_step/10)))
     diff1 = Diff(opt1$par,alpha)
     alpha = opt1$par
     opt2 = stats::optim(beta,
                         function(.x){penalized_nllh(alpha, .x, va, vb, x, y, 
                                                     lambda = lambda, intercept = intercept,
                                                     prob_fun = prob_fun)},
-                        ,control=list(maxit=max(100,max.step/10)))
+                        ,control=list(maxit=max(100,max_step/10)))
     diff  = max(diff1,Diff(opt2$par,beta))
     beta = opt2$par
     nllh_iter <- penalized_nllh(alpha, beta, va, vb, x, y, 
@@ -1821,7 +1821,7 @@ step_fista_ls <- function(current_param_val, # Current value of param being opti
 #' @export
 fista_opt2_ls <- function(alpha.start, beta.start,
                           step_size_alpha, step_size_beta,
-                                      lambda, intercept, max.step,
+                                      lambda, intercept, max_step,
                                       va, vb, x, y,
                                       prob_fun,           # For nllh_fun, penalized_nllh_fun, grad_nll_fun
                                       eval_grad = TRUE,
@@ -1843,15 +1843,15 @@ fista_opt2_ls <- function(alpha.start, beta.start,
   # History storage
   p_alpha <- length(alpha.start)
   p_beta <- length(beta.start)
-  alphas_hist <- matrix(NA_real_, nrow = max.step, ncol = p_alpha)
-  betas_hist <- matrix(NA_real_, nrow = max.step, ncol = p_beta)
-  grad_alphas_hist_sc <- matrix(NA_real_, nrow = max.step, ncol = p_alpha) # For stopping criteria
-  grad_betas_hist_sc <- matrix(NA_real_, nrow = max.step, ncol = p_beta)   # For stopping criteria
-  nllh_results_hist <- vector("double", max.step)
+  alphas_hist <- matrix(NA_real_, nrow = max_step, ncol = p_alpha)
+  betas_hist <- matrix(NA_real_, nrow = max_step, ncol = p_beta)
+  grad_alphas_hist_sc <- matrix(NA_real_, nrow = max_step, ncol = p_alpha) # For stopping criteria
+  grad_betas_hist_sc <- matrix(NA_real_, nrow = max_step, ncol = p_beta)   # For stopping criteria
+  nllh_results_hist <- vector("double", max_step)
   
   final_iter <- 0
   
-  for (iter in 1:max.step) {
+  for (iter in 1:max_step) {
     final_iter <- iter
     
     alpha_k_start <- alpha # Value of alpha at the beginning of iteration k
