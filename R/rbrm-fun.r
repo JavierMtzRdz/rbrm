@@ -417,7 +417,7 @@ fista_opt2 <- function(alpha.start, beta.start,
 #' @param step_size_beta Numeric value for the step size used in beta updates.
 #' @param lambda Numeric value for the L1 regularization parameter.
 #' @param intercept Logical. If TRUE, the first coefficient of alpha and beta is not penalized.
-#' @param max.iter Maximum number of iterations.
+#' @param max_step Maximum number of iterations.
 #' @param va Matrix of independent variables for alpha.
 #' @param vb Matrix of independent variables for beta.
 #' @param x Vector indicating group assignment (e.g., exposure).
@@ -438,7 +438,7 @@ cd_opt <- function(alpha.start, beta.start,
                    step_size_alpha, step_size_beta,
                    lambda,
                    intercept,
-                   max.iter,
+                   max_step,
                    va, vb, x, y,
                    prob_fun = getProbRR.org,
                    nllh_fun = nllh,  
@@ -452,15 +452,15 @@ cd_opt <- function(alpha.start, beta.start,
   p_beta <- length(beta)
   
   # History storage
-  alphas_hist <- matrix(NA, nrow = max.iter, ncol = p_alpha)
-  betas_hist <- matrix(NA, nrow = max.iter, ncol = p_beta)
-  grad_alphas_hist <- matrix(NA, nrow = max.iter, ncol = p_alpha)
-  grad_betas_hist <- matrix(NA, nrow = max.iter, ncol = p_beta)
-  pen_nllh_values_hist <- numeric(max.iter) # Stores penalized NLLH
+  alphas_hist <- matrix(NA, nrow = max_step, ncol = p_alpha)
+  betas_hist <- matrix(NA, nrow = max_step, ncol = p_beta)
+  grad_alphas_hist <- matrix(NA, nrow = max_step, ncol = p_alpha)
+  grad_betas_hist <- matrix(NA, nrow = max_step, ncol = p_beta)
+  pen_nllh_values_hist <- numeric(max_step) # Stores penalized NLLH
   
   iter_count <- 0
   
-  for (current_iter in 1:max.iter) {
+  for (current_iter in 1:max_step) {
     iter_count <- current_iter
     alpha_old_iter <- alpha
     beta_old_iter <- beta
@@ -516,8 +516,8 @@ cd_opt <- function(alpha.start, beta.start,
     }
   }
   
-  if (iter_count == max.iter && verbose && max.iter > 0) {
-    cat("Reached max iterations (", max.iter, ").\n")
+  if (iter_count == max_step && verbose && max_step > 0) {
+    cat("Reached max iterations (", max_step, ").\n")
   }
   
   # Truncate history to actual number of iterations
