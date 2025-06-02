@@ -2,7 +2,42 @@
 # Generator token: 10BE3573-1514-4C36-9D1C-5A225CD40393
 
 #' @export
-rcpp_hello_world <- function() {
-    .Call(`_rbrm_rcpp_hello_world`)
+getProbRR_org_cpp <- function(logrr, logop, clipping = TRUE) {
+    .Call(`_rbrm_getProbRR_org_cpp`, logrr, logop, clipping)
+}
+
+#' @export
+getProbRR_alt_cpp <- function(logrr, logop, clipping = TRUE) {
+    .Call(`_rbrm_getProbRR_alt_cpp`, logrr, logop, clipping)
+}
+
+#' @export
+soft_thres_cpp <- function(x, lambda) {
+    .Call(`_rbrm_soft_thres_cpp`, x, lambda)
+}
+
+#' @export
+nllh_cpp <- function(alpha, beta, va, vb, x_indicator, y_outcome, prob_fun) {
+    .Call(`_rbrm_nllh_cpp`, alpha, beta, va, vb, x_indicator, y_outcome, prob_fun)
+}
+
+#' @export
+penalized_nllh_cpp <- function(alpha, beta, va, vb, x_indicator, y_outcome, lambda, intercept, prob_fun) {
+    .Call(`_rbrm_penalized_nllh_cpp`, alpha, beta, va, vb, x_indicator, y_outcome, lambda, intercept, prob_fun)
+}
+
+#' @export
+grad_nll_alpha_cpp <- function(alpha_eval, beta_current, va, vb, x_indicator, y_outcome, prob_fun_selector, clipping_for_prob_fun_passed_to_nllh = TRUE) {
+    .Call(`_rbrm_grad_nll_alpha_cpp`, alpha_eval, beta_current, va, vb, x_indicator, y_outcome, prob_fun_selector, clipping_for_prob_fun_passed_to_nllh)
+}
+
+#' @export
+grad_nll_beta_cpp <- function(alpha_current, beta_eval, va, vb, x_indicator, y_outcome, prob_fun_selector, clipping_for_prob_fun_passed_to_nllh = TRUE) {
+    .Call(`_rbrm_grad_nll_beta_cpp`, alpha_current, beta_eval, va, vb, x_indicator, y_outcome, prob_fun_selector, clipping_for_prob_fun_passed_to_nllh)
+}
+
+#' @export
+fista_opt2_cpp <- function(alpha_start_rcpp, beta_start_rcpp, step_size_alpha, step_size_beta, lambda, intercept, max_iter, va_rcpp, vb_rcpp, x_indicator, y_outcome, prob_fun_selector, clipping_for_prob_fun = TRUE, eval_grad_for_output_and_stop_crit = TRUE, tol_param_change = 1e-6, tol_grad_norm = 1e-6) {
+    .Call(`_rbrm_fista_opt2_cpp`, alpha_start_rcpp, beta_start_rcpp, step_size_alpha, step_size_beta, lambda, intercept, max_iter, va_rcpp, vb_rcpp, x_indicator, y_outcome, prob_fun_selector, clipping_for_prob_fun, eval_grad_for_output_and_stop_crit, tol_param_change, tol_grad_norm)
 }
 
