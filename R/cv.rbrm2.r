@@ -876,7 +876,7 @@ validate_cv_inputs <- function(va, vb, x, y, nfolds, type.measure) {
 }
 
 # 2. Lambda Grid Setup
-setup_lambda_grid <- function(lambda, va, vb, y, n_lambdas, epsilon = 0.1) {
+setup_lambda_grid <- function(lambda, va, vb, y, n_lambdas, epsilon = 0.05) {
   if (is.null(lambda)) {
     lambda_grid <- tryCatch({
       # Simplified lambda max heuristic (as before)
@@ -1130,6 +1130,7 @@ reconstruct_coeffs <- function(fit_coeffs, # Coeff vector from the actual fit
 perform_cv_fold <- function(fold, fold_ids, va, vb, x, y, lambda_grid,
                             implt, prob_fun, opt_fun, type.measure,
                             progress_bar_id, # <-- New argument
+                            alpha.start = NULL, beta.start = NULL,
                             ...) {
   test_idx <- which(fold_ids == fold)
   train_idx <- which(fold_ids != fold)
@@ -1146,6 +1147,15 @@ perform_cv_fold <- function(fold, fold_ids, va, vb, x, y, lambda_grid,
   fold_metrics_raw <- matrix(NA_real_, nrow = 3, ncol = n_lambdas,
                              dimnames = list(c("deviance", "mae", "mse"), lambda_names))
   
+  pa <- dim(va_train)[2]
+  pb <- dim(vb_train)[2]
+  
+  if (is.null(alpha.start)) alpha.start <- c(rep(0, pa))
+  if (length(alpha.start) < pa) alpha.start <- c(rep(alpha.start[1], pa))
+  
+  if (is.null(beta.start)) beta.start <- c(rep(0.01, pb))
+  if (length(beta.start) < pb) beta.start <- c(rep(beta.start[1], pb))
+  
   for (i in 1:n_lambdas) {
     current_lambda <- lambda_grid[i]
     
@@ -1154,8 +1164,11 @@ perform_cv_fold <- function(fold, fold_ids, va, vb, x, y, lambda_grid,
       lambda = current_lambda,
       implt = implt, prob_fun = prob_fun, opt_fun = opt_fun,
       expected_pa = p_a_train, expected_pb = p_b_train,
+      alpha.start = alpha.start, beta.start = beta.start,
       ...
     )
+    alpha.start <- fit$point.est[1:pa]
+    beta.start <- fit$point.est[(pa+1):(pa+pb)]
     
     if (!is.null(fit)) {
       metrics <- calculate_metrics(

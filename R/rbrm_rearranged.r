@@ -114,19 +114,13 @@ nllh <- function(alpha, beta, va, vb, x, y, prob_fun = getProbRR.org) {
   n <- length(y)
   pa <- length(alpha) # Use length of coeff vector
   pb <- length(beta)
-  
   # Safe matrix multiplication: result is 0 vector if no columns/coefficients
-  logrr <- if (pa > 0 && ncol(va) == pa) va %*% alpha else matrix(0, nrow = n, ncol = 1)
-  logop <- if (pb > 0 && ncol(vb) == pb) vb %*% beta else matrix(0, nrow = n, ncol = 1)
+  if (pa > 0 && ncol(va) == pa) logrr <- va %*% alpha else logrr <- matrix(0, nrow = n, ncol = 1)
+  if (pb > 0 && ncol(vb) == pb) logop <- vb %*% beta else logop <- matrix(0, nrow = n, ncol = 1)
   
-  ps <- prob_fun(logrr, logop)
+  ps <- prob_fun(as.vector(logrr), as.vector(logop))
   p0 <- ps$p0
   p1 <- ps$p1
-  
-  # Add epsilon for numerical stability (avoid log(0))
-  eps <- 1e-15
-  p0 <- pmax(eps, pmin(1 - eps, p0))
-  p1 <- pmax(eps, pmin(1 - eps, p1))
   
   idx0 <- which(x == 0)
   idx1 <- which(x == 1)
@@ -175,28 +169,22 @@ nllh <- function(alpha, beta, va, vb, x, y, prob_fun = getProbRR.org) {
 #   return(unpenalized.nllh + penalty)
 # }
 penalized_nllh <- function(alpha, beta, va, vb, x, y,
-                           lambda, intercept,
+                           lambda, intercept = F,
                            prob_fun = getProbRR.org,
-                           nllh_fun = nllh) {
+                           nllh_fun = nllh,
+                           balance = 0.5) {
   
   unpenalized.nllh <- nllh_fun(alpha, beta, va, vb, x, y, 
                                prob_fun = prob_fun)
   
-  # Check if nllh calculation failed
-  if (!is.finite(unpenalized.nllh)) return(Inf)
-  
-  pa <- length(alpha)
-  pb <- length(beta)
-  
-  # Calculate L1 penalty (avoiding intercept)
-  penalty <- 0
-  l1_norm_alpha <- if(pa > 0) sum(abs(alpha[if(intercept) -1 else TRUE])) else 0
-  l1_norm_beta  <- if(pb > 0) sum(abs(beta[ if(intercept) -1 else TRUE])) else 0
-  penalty <- lambda * (l1_norm_alpha + l1_norm_beta) # Assuming lambda applies to sum
+  # Calculate L1 penalty 
+  l1_norm_alpha <- sum(abs(ifelse(intercept, alpha[-1], alpha)))
+  l1_norm_beta  <- sum(abs(ifelse(intercept, beta[-1], beta)))
+                       
+  penalty <- lambda * ((balance)*l1_norm_alpha + (1-balance)*l1_norm_beta) # Assuming lambda applies to sum
   
   return(unpenalized.nllh + penalty)
 }
-
 
 
 #' Regularized Binary Regression Model (RBRM)
