@@ -62,10 +62,12 @@ getProbRR.org = function(logrr, logop = NA,
                       1/(1 + exp(logrr)),
                       (-(exp(logrr) + 1) * exp(logop) + sqrt(exp(2 * logop) * (exp(logrr) + 1)^2 + 4 * exp(logrr + logop) * (1 - exp(logop))))/(2 * exp(logrr) * (1 - exp(logop)))))
   
-  p1 <- ifelse((logop < (-12)) | (logop > 12) | (logrr < (-12)) | (logrr > 12),
+  p1 <- ifelse((logop < (-12)) | (logop > 12) | 
+                 (logrr < (-12)) | (logrr > 12),
                ## on the boundary South edge: large -ve logrr or (large -ve logop and -ve
                ## logrr
-               ifelse ((logrr < (-12)) | ((logop < (-12)) & (logrr < 0)),
+               ifelse ((logrr < (-12)) | ((logop < (-12)) & 
+                                            (logrr < 0)),
                        0,
                        ifelse((logrr > 12) | ((logop < (-12)) & (logrr > 0)),
                               ## West edge: large +ve logrr or (large -ve logop and +ve logrr)
@@ -79,8 +81,10 @@ getProbRR.org = function(logrr, logop = NA,
     p0 <- pmin(pmax(p0, 1e-15), 1 - 1e-15)
     p1 <- pmin(pmax(p1, 1e-15), 1 - 1e-15)
   }
-
-  return(list(p0 = p0, p1 = p1, class = "ProbRR.org"))
+  
+  return(structure(
+    list(p0 = p0, p1 = p1), 
+    class="Richardson"))
 } 
 
 
@@ -145,6 +149,10 @@ getProbRR.alt <- function(logrr, logop,
     p1 <- pmin(pmax(p1, 1e-15), 1 - 1e-15)
   }
   
-  return(list(p0 = p0, p1 = p1, class = "ProbRR.alt"))
+  attr(c(1, 2), "dim")
+  
+  return(structure(
+    list(p0 = p0, p1 = p1), 
+    class="Pozza"))
 }
 

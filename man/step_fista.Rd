@@ -8,7 +8,7 @@ step_fista(
   alpha,
   beta,
   value_old,
-  opt,
+  opt = c("alpha", "beta"),
   step_size,
   lambda,
   t_old,
