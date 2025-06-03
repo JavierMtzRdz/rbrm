@@ -11,7 +11,7 @@ cd_opt(
   step_size_beta,
   lambda,
   intercept,
-  max.iter,
+  max_step,
   va,
   vb,
   x,
@@ -36,7 +36,7 @@ cd_opt(
 
 \item{intercept}{Logical. If TRUE, the first coefficient of alpha and beta is not penalized.}
 
-\item{max.iter}{Maximum number of iterations.}
+\item{max_step}{Maximum number of iterations.}
 
 \item{va}{Matrix of independent variables for alpha.}
 

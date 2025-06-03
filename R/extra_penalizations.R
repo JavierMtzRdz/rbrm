@@ -16,23 +16,20 @@ step_fista_scad <- function(alpha, beta,
   
   # Momentum update
   t_new <- (1 + sqrt(1 + 4 * t_old^2)) / 2
-  # damping_factor <- 0.8  # Reduce momentum effect
-  # a_new <- damping_factor * (t_old - 1) / t_new
+  damping_factor <- 0.8  # Reduce momentum effect
+  a_new <- damping_factor * (t_old - 1) / t_new
   a_new <- (t_old - 1) / t_new
   y_value_new <- value + a_new * (value - value_old)
   
   # Compute gradient
-  if (opt == "alpha") {
-    gradient <- numDeriv::grad(function(.x) {
-      nllh(.x, beta, va, vb, x, y, prob_fun = prob_fun)
-    }, y_value_new, method = "simple")
-  }
+  if (opt == "alpha") gradient <- grad_nll(y_value_new, beta,
+                                           x, y, va, vb,
+                                           prob_fun, opt = "alpha")
   
-  if (opt == "beta") {
-    gradient <- numDeriv::grad(function(.x) {
-      nllh(alpha, .x, va, vb, x, y, prob_fun = prob_fun)
-    }, y_value_new, method = "simple")
-  }
+  
+  if (opt == "beta") gradient <- grad_nll(alpha, y_value_new, 
+                                          x, y, va, vb,
+                                          prob_fun, opt = "beta")
   
   
   # Clean any NA gradients to prevent issues during computation

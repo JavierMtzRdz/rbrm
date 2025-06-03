@@ -57,6 +57,9 @@ dp0_phi <- function(theta, phi,
     return(dp0.phi)}
 }
 
+
+
+
 #' Calculate Analytical Gradient of User's nllh Function (RR Model) - Refined Check
 #' Calls the stable derivative helper function.
 #'
@@ -97,7 +100,8 @@ grad_nll <- function(alpha, beta, y, x, va, vb,
   
   if (opt != "beta"){
     if(method == "analytical") dp0_dtheta <- dp0_theta(theta, phi,
-                                                       ps_spe = class(ps))
+    ps_spe = class(ps))
+    # if(method == "analytical") dp0_dtheta <- -(1 - p0)/(1 - p0 + 1 - p1)
     if(method == "numerical") dp0_dtheta <- numDeriv::grad(
       func = (function(theta_val)return(prob_fun(theta_val, phi)$p0)),
       x = theta)
@@ -107,8 +111,9 @@ grad_nll <- function(alpha, beta, y, x, va, vb,
     grad_alpha <- -(t(va)%*%inner_alpha)/n
   }
   if (opt != "alpha"){
-    if(method == "analytical") dp0_dphi <- dp0_phi(theta, phi, 
+    if(method == "analytical") dp0_dphi <- dp0_phi(theta, phi,
                                                    ps_spe = class(ps))
+    # if(method == "analytical") dp0_dphi <- (1 - p0) * (1 - p1)/(1 - p0 + 1 - p1)
     if(method == "numerical") dp0_dphi <- numDeriv::grad(
       func = (function(phi_val) return(prob_fun(theta, phi_val)$p0)),
       x = phi)
@@ -117,6 +122,8 @@ grad_nll <- function(alpha, beta, y, x, va, vb,
     inner_beta <- (dllh_dp1*dp1_dphi + dllh_dp0*dp0_dphi)
     grad_beta <- -(t(vb)%*%inner_beta)/n
   }
+
+  # browser()
   
   if (opt == "alpha") return(grad_alpha)
   if (opt == "beta") return(grad_beta)
@@ -192,3 +199,4 @@ grad_nll_k <- function(alpha, beta, y, x, va, vb,
   
   return(grad_kth_component)
 }
+

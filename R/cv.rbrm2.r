@@ -1157,6 +1157,7 @@ perform_cv_fold <- function(fold, fold_ids, va, vb, x, y, lambda_grid,
   if (length(beta.start) < pb) beta.start <- c(rep(beta.start[1], pb))
   
   for (i in 1:n_lambdas) {
+    
     current_lambda <- lambda_grid[i]
     
     fit <- fit_model_on_data(
@@ -1265,6 +1266,7 @@ cv_rbrm2 <- function(va, vb, x, y, lambda = NULL,
   # Progress bar closing handled by on.exit
   # --- 5. Aggregate Results & Select Lambda ---
   cv_results_matrix <- do.call(rbind, lapply(cv_metrics_per_fold_list, function(m) m[type.measure, ]))
+  browser()
   lambda_selection <- select_lambda(cv_results_matrix, lambda_grid, type.measure, nfolds, index)
   lambda_selected <- lambda_selection$lambda_selected
   

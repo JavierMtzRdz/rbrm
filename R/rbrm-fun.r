@@ -134,7 +134,7 @@ step_fista <- function(alpha, beta,
 
 
 #' @export
-fista_opt <- function(alpha.start, beta.start,
+fista_opt <- function(alpha_start, beta_start,
                       step_size_alpha, step_size_beta,
                       lambda, 
                       intercept, 
@@ -145,8 +145,8 @@ fista_opt <- function(alpha.start, beta.start,
                       eval_grad = T){
   ## Optimization
   step <- 0
-  alpha <- y_alpha <- last_alpha <- alpha.start
-  beta <- y_beta <- last_beta <- beta.start
+  alpha <- y_alpha <- last_alpha <- alpha_start
+  beta <- y_beta <- last_beta <- beta_start
   t_alpha <- t_beta <- 1
   
   alphas <- matrix(0, max_step, ncol(va))
@@ -274,7 +274,7 @@ L <- function(alpha, beta, va, vb, x, y, prob_fun,
 }
 
 #' @export
-fista_opt2 <- function(alpha.start, beta.start,
+fista_opt2 <- function(alpha_start, beta_start,
                        step_size_alpha, step_size_beta,
                        lambda, 
                        intercept, 
@@ -286,11 +286,11 @@ fista_opt2 <- function(alpha.start, beta.start,
   ## Optimization
   step <- 0
   
-  last_alpha <- alpha.start + 1
-  last_beta <- beta.start + 1
+  last_alpha <- alpha_start + 1
+  last_beta <- beta_start + 1
   
-  alpha <- y_alpha <- alpha.start
-  beta <- y_beta <- beta.start
+  alpha <- y_alpha <- alpha_start
+  beta <- y_beta <- beta_start
   t_alpha <- t_beta <- 1
   
   alphas <- matrix(0, max_step, ncol(va))
@@ -411,8 +411,8 @@ fista_opt2 <- function(alpha.start, beta.start,
 #' Applies coordinate descent to optimize alpha and beta for the
 #' L1-penalized negative log-likelihood.
 #'
-#' @param alpha.start Initial numeric vector for alpha coefficients.
-#' @param beta.start Initial numeric vector for beta coefficients.
+#' @param alpha_start Initial numeric vector for alpha coefficients.
+#' @param beta_start Initial numeric vector for beta coefficients.
 #' @param step_size_alpha Numeric value for the step size used in alpha updates.
 #' @param step_size_beta Numeric value for the step size used in beta updates.
 #' @param lambda Numeric value for the L1 regularization parameter.
@@ -434,7 +434,7 @@ fista_opt2 <- function(alpha.start, beta.start,
 
 
 #' @export
-cd_opt <- function(alpha.start, beta.start,
+cd_opt <- function(alpha_start, beta_start,
                    step_size_alpha, step_size_beta,
                    lambda,
                    intercept,
@@ -443,11 +443,11 @@ cd_opt <- function(alpha.start, beta.start,
                    prob_fun = getProbRR.org,
                    nllh_fun = nllh,  
                    penalized_nllh_fun = penalized_nllh, 
-                   tol = 1e-6,
-                   verbose = FALSE)  {
+                   tol = 1e-5,
+                   verbose = T)  {
   
-  alpha <- alpha.start
-  beta <- beta.start
+  alpha <- alpha_start
+  beta <- beta_start
   p_alpha <- length(alpha)
   p_beta <- length(beta)
   
@@ -529,7 +529,6 @@ cd_opt <- function(alpha.start, beta.start,
   nllh_results_out <- pen_nllh_values_hist[1:actual_iters]
   
   
-  
   return(list(alpha = alpha,
               beta = beta,
               step = iter_count, 
@@ -550,8 +549,8 @@ cd_opt <- function(alpha.start, beta.start,
 #' @param vb A matrix of independent variables (without an intercept) for beta. If NULL, va is used.
 #' @param y A vector of binary outcomes (0/1).
 #' @param x A vector indicating the group assignment (1 or 0) for each observation.
-#' @param alpha.start Initial values for alpha coefficients. Defaults to a zero vector.
-#' @param beta.start Initial values for beta coefficients. Defaults to a vector of 0.01.
+#' @param alpha_start Initial values for alpha coefficients. Defaults to a zero vector.
+#' @param beta_start Initial values for beta coefficients. Defaults to a vector of 0.01.
 #' @param max_step Maximum number of optimization steps. Default is 3000.
 #' @param thres Threshold for convergence. Default is 1e-04.
 #' @param lambda Regularization parameter for L1 penalty. Default is 0 (no regularization).
@@ -576,14 +575,14 @@ cd_opt <- function(alpha.start, beta.start,
 #'
 #' @export
 rbrm.exp <- function(va, vb, x, y,
-                              alpha.start = NULL, beta.start = NULL,
+                              alpha_start = NULL, beta_start = NULL,
                               max_step = 1000, lambda = 0,
                               lr.alpha = 1, lr.beta = 1,
                               intercept = FALSE,
                               prob_fun = getProbRR.org,
                               opt_fun = fista , save_opt = T) {
   
-  # va <- v; vb <- v; alpha.start = NULL; beta.start = NULL;
+  # va <- v; vb <- v; alpha_start = NULL; beta_start = NULL;
   # max_step = 1000;  lambda = 0;
   # lr.alpha = 0.06; lr.beta = 0.02;
   # intercept = TRUE;  prob_fun = getProbRR.org;
@@ -614,16 +613,16 @@ rbrm.exp <- function(va, vb, x, y,
     intercept <- TRUE
   }
   ## starting values for parameter optimization
-  if (is.null(alpha.start)) alpha.start <- c(rep(0, pa))
-  if (length(alpha.start) < pa) alpha.start <- c(rep(alpha.start[1], pa))
+  if (is.null(alpha_start)) alpha_start <- c(rep(0, pa))
+  if (length(alpha_start) < pa) alpha_start <- c(rep(alpha_start[1], pa))
   
-  if (is.null(beta.start)) beta.start <- c(rep(0.01, pb))
-  if (length(beta.start) < pa) beta.start <- c(rep(beta.start[1], pa))
+  if (is.null(beta_start)) beta_start <- c(rep(0.01, pb))
+  if (length(beta_start) < pa) beta_start <- c(rep(beta_start[1], pa))
   
   
   ## Optimization
   
-  opt_result <- opt_fun(alpha.start, beta.start,
+  opt_result <- opt_fun(alpha_start, beta_start,
                         lr.alpha, lr.beta,
                         lambda, 
                         intercept, 
@@ -720,7 +719,7 @@ step_bp <- function(alpha, beta,
 
 
 #' @export
-double_fista_opt <- function(alpha.start, beta.start,
+double_fista_opt <- function(alpha_start, beta_start,
                       step_size_alpha, step_size_beta,
                       lambda, 
                       intercept, 
@@ -732,8 +731,8 @@ double_fista_opt <- function(alpha.start, beta.start,
                       eval_grad = T){
   ## Optimization
   step <- 0
-  alpha <- y_alpha <- last_alpha <- alpha.start
-  beta <- y_beta <- last_beta <- beta.start
+  alpha <- y_alpha <- last_alpha <- alpha_start
+  beta <- y_beta <- last_beta <- beta_start
   t_alpha <- t_beta <- 1
   
   max_step <- ceiling(max_step/cont_opt)
@@ -1079,7 +1078,7 @@ proximal.gd.asfista <- function(alpha, beta, last_y,
 #' @param last_alpha A numeric vector representing the alpha coefficients from the previous iteration.
 #' @return A list with the updated alpha, t, and y_alpha values.
 #' @export
-fista <- function(alpha.start, beta.start,
+fista <- function(alpha_start, beta_start,
                   step_size_alpha, step_size_beta,
                   lambda, 
                   intercept, 
@@ -1090,8 +1089,8 @@ fista <- function(alpha.start, beta.start,
                   grad_alpha = T){
   ## Optimization
   step <- 0
-  alpha <- y_alpha <- alpha.start
-  beta <- y_beta <- beta.start
+  alpha <- y_alpha <- alpha_start
+  beta <- y_beta <- beta_start
   t_alpha <- t_beta <- 1
   for (iter in 1:max_step) {
     step <- step + 1
@@ -1272,7 +1271,7 @@ step_asfista <- function(alpha, beta,
 
 
 #' @export
-asfista <- function(alpha.start, beta.start,
+asfista <- function(alpha_start, beta_start,
                     step_size_alpha, step_size_beta,
                     lambda, 
                     intercept, 
@@ -1283,8 +1282,8 @@ asfista <- function(alpha.start, beta.start,
                     eval_grad = T){
   ## Optimization
   step <- 0
-  alpha <- y_alpha <- last_alpha <- alpha.start
-  beta <- y_beta <- last_beta <- beta.start
+  alpha <- y_alpha <- last_alpha <- alpha_start
+  beta <- y_beta <- last_beta <- beta_start
   t_alpha <- t_beta <- 1
   
   alphas <- matrix(0, max_step, ncol(v))
@@ -1416,7 +1415,7 @@ asfista <- function(alpha.start, beta.start,
 #' @param last_alpha A numeric vector representing the alpha coefficients from the previous iteration.
 #' @return A list with the updated alpha, t, and y_alpha values.
 #' @export
-greedy_fista <- function(alpha.start, beta.start,
+greedy_fista <- function(alpha_start, beta_start,
     step_size_alpha, step_size_beta,
     lambda, 
     intercept, 
@@ -1429,8 +1428,8 @@ greedy_fista <- function(alpha.start, beta.start,
   # Initialize variables
   step <- 0
   initial_diff <- NULL
-  alpha <- y_alpha <- alpha.start
-  beta <- y_beta <- beta.start
+  alpha <- y_alpha <- alpha_start
+  beta <- y_beta <- beta_start
   t_alpha <- t_beta <- 1
   for (iter in 1:max_step) {
     step <- step + 1
@@ -1511,38 +1510,6 @@ greedy_fista <- function(alpha.start, beta.start,
 }
 
 
-#' Initialize Coefficient Starting Vectors
-#'
-#' Handles NULL or incorrectly sized starting vectors, returning a vector
-#' of the expected length.
-#'
-#' @param start_vec User-provided starting vector (or NULL).
-#' @param expected_len The required length (number of columns).
-#' @param default_val The default value to use if start_vec is NULL or invalid.
-#' @param vec_name Character name of the vector for warning messages.
-#' @return A numeric vector of length expected_len.
-#' @keywords internal
-.initialize_start_coeffs <- function(start_vec, expected_len, default_val = 0, vec_name = "coeffs") {
-  # Handle zero-column case
-  if (expected_len <= 0) {
-    return(numeric(0))
-  }
-  
-  if (is.null(start_vec)) {
-    # Default initialization
-    final_vec <- rep(default_val, expected_len)
-  } else if (length(start_vec) == expected_len) {
-    # Use user-provided if length is correct
-    final_vec <- start_vec
-  } else {
-    # Provided vector has wrong length
-    cli::cli_warn(
-      "Length of {vec_name} ({length(start_vec)}) != expected ({expected_len}). Using default value {default_val} instead."
-    )
-    final_vec <- rep(default_val, expected_len)
-  }
-  return(as.numeric(final_vec)) # Ensure numeric type
-}
 
 #' Experimental RBRM Model Fitting Function
 #'
@@ -1577,9 +1544,9 @@ greedy_fista <- function(alpha.start, beta.start,
 #' @importFrom tictoc tic toc
 #' @export
 rbrm.exp2 <- function(va, vb = NULL, x, y,
-                      alpha.start = NULL, beta.start = NULL,
+                      alpha_start = NULL, beta_start = NULL,
                       max_step = 1000, lambda = 0,
-                      lr.alpha = 1, lr.beta = 1,
+                      lr.alpha = .05, lr.beta = .1,
                       intercept = F,
                       prob_fun = getProbRR.org,    
                       opt_fun = fista_opt, 
@@ -1608,22 +1575,32 @@ rbrm.exp2 <- function(va, vb = NULL, x, y,
   if (!intercept && has_intercept_col) {
     cli::cli_warn("intercept=FALSE but a column of 1s was detected as the first column of 'va'. Ensure data excludes intercept if not desired.")
   }
+  
+  # --- Standardization ---
+  
+  va_scaled <- scale(va)
+  vb_scaled <- scale(vb)
+  va_scal_info <- cbind(scale = attr(va_scaled, 'scaled:scale'), 
+                        center = attr(va_scaled, 'scaled:center'))
+  vb_scal_info <- cbind(scale = attr(vb_scaled, 'scaled:scale'), 
+                        center = attr(vb_scaled, 'scaled:center'))
+  
 
-  # --- 2. Initialize Starting Values ---
-  alpha_start <- .initialize_start_coeffs(alpha.start, pa, default_val = 0, "alpha_start")
-  beta_start  <- .initialize_start_coeffs(beta.start, pb, default_val = 0.01, "beta_start") # Default beta to 0
+  # Initialize Starting Values ---
+  if (is.null(alpha_start)) alpha_start = rep(0, pa)
+  if (is.null(beta_start)) beta_start = rep(0, pb)
 
 
   # Prepare arguments list
   opt_args <- list(
-    alpha.start = alpha_start,
-    beta.start = beta_start,
+    alpha_start = alpha_start,
+    beta_start = beta_start,
     step_size_alpha = lr.alpha,
     step_size_beta = lr.beta,
     lambda = lambda,
     intercept = intercept, 
     max_step = max_step,
-    va = va, vb = vb, x = x, y = y,
+    va = va_scaled, vb = vb_scaled, x = x, y = y,
     prob_fun = prob_fun
   )
   
@@ -1639,17 +1616,8 @@ rbrm.exp2 <- function(va, vb = NULL, x, y,
   alpha <- opt_result$alpha
   beta  <- opt_result$beta
   
-  # Check if optimizer returned expected results
-  if(is.null(step) || is.null(alpha) || is.null(beta) || length(alpha) != pa || length(beta) != pb){
-    cli::cli_abort("Optimizer returned NULL or coefficients/step of incorrect length! Check 'opt_fun'. alpha: {length(alpha)} (exp {pa}), beta: {length(beta)} (exp {pb})")
-  }
-  
   # Objective Value
-  final_value <- tryCatch({penalized_nllh(alpha, beta, va, vb, x, y, lambda, intercept, prob_fun = prob_fun)}, error = function(e){
-    cli::cli_warn("Calculation of final penalized NLLH failed: {e$message}")
-    NA_real_
-  })
-
+  final_value <- penalized_nllh(alpha, beta, va, vb, x, y, lambda, intercept, prob_fun = prob_fun)
   
   # Structure Output ---
   time_info <- tictoc::toc(quiet = TRUE)
@@ -1666,6 +1634,8 @@ rbrm.exp2 <- function(va, vb = NULL, x, y,
     optimizer_details = opt_result,
     lambda = lambda,
     intercept = intercept,
+    va_scale_info = va_scale_info,
+    vb_scale_info = vb_scale_info,
     dimensions = list(n = n, p_a = pa, p_b = pb),
     time = run_time
   )
@@ -1674,44 +1644,70 @@ rbrm.exp2 <- function(va, vb = NULL, x, y,
 }
 
 
-
-opt_mle <- function(alpha.start, beta.start,
+opt_mle <- function(alpha_start, beta_start,
                      step_size_alpha, step_size_beta,
                      lambda, 
                      intercept, 
-                     max_step, 
+                     max_step,#not usedd
                      va, vb, x, y,
                      prob_fun = getProbRR.org,
-                    thres = 1e-08) {
-  
-  
-  alphas <- matrix(0, max_step, ncol(v))
-  betas <- matrix(0, max_step, ncol(v))
-  g_alphas <- matrix(0, max_step, ncol(v))
-  g_betas <- matrix(0, max_step, ncol(v))
+                    thres = 1e-10) {
+  pa <- length(va)
+  # max_step = min(pa * 20, 2000)
+  alphas <- matrix(0, max_step, ncol(va))
+  betas <- matrix(0, max_step, ncol(vb))
+  g_alphas <- matrix(0, max_step, ncol(va))
+  g_betas <- matrix(0, max_step, ncol(vb))
   nllh_results <- vector("double", max_step)
+  weights <-  rep(1, length(x))
+  
+  neg.log.likelihood.alpha = function(alpha){
+    p0p1 = brm::getProbRR(va %*% alpha, vb %*% beta)
+    p0    = p0p1[,1];  p1 = p0p1[,2]
+    
+    return(-sum((1-y[x==0])*log(1-p0[x==0])*weights[x==0] +
+                  (y[x==0])*log(p0[x==0])*weights[x==0]) -
+             sum((1-y[x==1])*log(1-p1[x==1])*weights[x==1] +
+                   (y[x==1])*log(p1[x==1])*weights[x==1]))  
+  }
+  
+  neg.log.likelihood.beta = function(beta){
+    p0p1 = brm::getProbRR(va %*% alpha, vb %*% beta)
+    p0    = p0p1[,1];  p1 = p0p1[,2]
+    # p0p1 = prob_fun(va %*% alpha, vb %*% beta)
+    # p0    = p0p1$p0;  p1 = p0p1$p1
+    
+    return(-sum((1-y[x==0])*log(1-p0[x==0])*weights[x==0] +
+                  (y[x==0])*log(p0[x==0])*weights[x==0]) -
+             sum((1-y[x==1])*log(1-p1[x==1])*weights[x==1] +
+                   (y[x==1])*log(p1[x==1])*weights[x==1]))  
+  }
+  # browser()
   
   Diff = function(x,y) sum((x-y)^2)/sum(x^2+thres)
-  alpha = alpha.start; beta = beta.start
+  alpha = alpha_start; beta = beta_start
   diff = thres + 1; step = 0
+  
   while(diff > thres & step < max_step){
     step = step + 1
-    opt1 = stats::optim(alpha,
-                        function(.x){penalized_nllh(.x, beta, va, vb, x, y, 
-                                       lambda = lambda, intercept = intercept,
-                                       prob_fun = prob_fun)},
-                        control=list(maxit=max(100,max_step/10)))
+    # opt1 = stats::optim(alpha,
+    #                     function(.x){nllh(.x, beta, va, vb, x, y, 
+    #                                    # lambda = lambda, intercept = intercept,
+    #                                    prob_fun = prob_fun)},
+    #                     control=list(maxit=max(100,max_step/10)))
+    opt1 = stats::optim(alpha,neg.log.likelihood.alpha,control=list(maxit=max(100,max_step/10)))
     diff1 = Diff(opt1$par,alpha)
     alpha = opt1$par
-    opt2 = stats::optim(beta,
-                        function(.x){penalized_nllh(alpha, .x, va, vb, x, y, 
-                                                    lambda = lambda, intercept = intercept,
-                                                    prob_fun = prob_fun)},
-                        ,control=list(maxit=max(100,max_step/10)))
+    # opt2 = stats::optim(beta,
+    #                     function(.x){nllh(alpha, .x, va, vb, x, y, 
+    #                                                 # lambda = lambda, intercept = intercept,
+    #                                                 prob_fun = prob_fun)},
+    #                     ,control=list(maxit=max(100,max_step/10)))
+    opt2 = stats::optim(beta,neg.log.likelihood.beta,control=list(maxit=max(100,max_step/10)))
     diff  = max(diff1,Diff(opt2$par,beta))
     beta = opt2$par
-    nllh_iter <- penalized_nllh(alpha, beta, va, vb, x, y, 
-                                lambda = lambda, intercept = intercept,
+    nllh_iter <- nllh(alpha, beta, va, vb, x, y, 
+                                # lambda = lambda, intercept = intercept,
                                 prob_fun = prob_fun)
     
     alphas[step,] <- alpha
@@ -1819,7 +1815,7 @@ step_fista_ls <- function(current_param_val, # Current value of param being opti
 }
 
 #' @export
-fista_opt2_ls <- function(alpha.start, beta.start,
+fista_opt2_ls <- function(alpha_start, beta_start,
                           step_size_alpha, step_size_beta,
                                       lambda, intercept, max_step,
                                       va, vb, x, y,
@@ -1828,11 +1824,11 @@ fista_opt2_ls <- function(alpha.start, beta.start,
                                       ls_shrink_factor = 0.5,
                                       ls_max_iter = 20) { 
   
-  alpha <- alpha.start
-  beta <- beta.start
+  alpha <- alpha_start
+  beta <- beta_start
   
-  last_alpha <- alpha.start # alpha_{k-1} for the first iteration (k=0)
-  last_beta <- beta.start   # beta_{k-1} for the first iteration (k=0)
+  last_alpha <- alpha_start # alpha_{k-1} for the first iteration (k=0)
+  last_beta <- beta_start   # beta_{k-1} for the first iteration (k=0)
   
   t_alpha <- 1.0
   t_beta <- 1.0
@@ -1841,8 +1837,8 @@ fista_opt2_ls <- function(alpha.start, beta.start,
   current_s_beta <- step_size_beta
   
   # History storage
-  p_alpha <- length(alpha.start)
-  p_beta <- length(beta.start)
+  p_alpha <- length(alpha_start)
+  p_beta <- length(beta_start)
   alphas_hist <- matrix(NA_real_, nrow = max_step, ncol = p_alpha)
   betas_hist <- matrix(NA_real_, nrow = max_step, ncol = p_beta)
   grad_alphas_hist_sc <- matrix(NA_real_, nrow = max_step, ncol = p_alpha) # For stopping criteria
