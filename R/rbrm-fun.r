@@ -1,10 +1,10 @@
 #' @export
 stop_crit <- function(eval_grad = T,
-                      grad_thres = 1e-10,
+                      grad_thres = 1e-5,
                       grad_alpha = NULL,
                       grad_beta = NULL,
                       eval_rel_chang = T,
-                      eval_rel_grad_thres = 1e-10,
+                      eval_rel_grad_thres = 1e-5,
                       alpha = NULL,
                       beta = NULL,
                       last_alpha = NULL,
@@ -379,7 +379,7 @@ fista_opt2 <- function(alpha_start, beta_start,
     step <- step + 1
     # FISTA update for alpha
     
-    if(iter == 2){
+    if(iter == 5){
       L_alpha <- L(alpha, beta, y, x, va, vb, prob_fun,
                    opt = "alpha")
       
