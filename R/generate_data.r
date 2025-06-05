@@ -139,3 +139,109 @@ generate_data2 <- function(pa, pb, n, n_test, alpha, beta, gamma, treatment_prob
               v.test = v.test, x.test = x.test, y.test = y.test, 
               p0.test = p0p1.true.test[, 1], p1.test = p0p1.true.test[, 2]))
 }
+
+
+#' @export
+map_with_interpolation <- function(value) {
+  mapping <- c(
+    `5` = 0.26,
+    `50` = 0.15,
+    `150` = 0.1,
+    `500` = 0.07
+  )
+  # Ensure mapping is sorted by keys
+  mapping <- mapping[order(as.numeric(names(mapping)))]
+  
+  # Extract keys (x) and values (y)
+  keys <- as.numeric(names(mapping))
+  values <- as.numeric(mapping)
+  
+  # Handle exact matches
+  if (value %in% keys) {
+    return(mapping[as.character(value)])
+  }
+  
+  # Handle values outside the range (extrapolation)
+  if (value < min(keys)) {
+    return(values[1])  # Return the smallest value
+  }
+  if (value > max(keys)) {
+    return(values[length(values)])  # Return the largest value
+  }
+  
+  # Interpolation for intermediate values
+  lower_index <- max(which(keys < value))
+  upper_index <- min(which(keys > value))
+  
+  # Linear interpolation formula
+  x0 <- keys[lower_index]
+  x1 <- keys[upper_index]
+  y0 <- values[lower_index]
+  y1 <- values[upper_index]
+  
+  interpolated_value <- y0 + (y1 - y0) * (value - x0) / (x1 - x0)
+  return(interpolated_value)
+}
+
+#' @export
+true_vals <- function(dimensions) {
+  
+  set.seed(657)
+  
+  p <- map_with_interpolation(dimensions)
+  alpha_eff1 <- 1
+  alpha_eff2 <- -1
+  # alpha_eff1 <- 3
+  # alpha_eff2 <- -3
+  true_values$true_alphas <- c(rep(alpha_eff1, round(dimensions*p)), 
+                               rep(alpha_eff2, round(dimensions*p)), 
+                               rep(0, dimensions - round(dimensions*p)*2))#*rnorm(dimensions)
+  beta_eff1 <- -0.5
+  beta_eff2 <- 1
+  # beta_eff1 <- -3
+  # beta_eff2 <- 3
+  true_betas <- c(rep(beta_eff1, round(dimensions*p)), 
+                  rep(beta_eff2, round(dimensions*p)), 
+                  rep(0, dimensions - round(dimensions*p)*2))#*rnorm(dimensions)
+  gamma_eff1 <- 0.1
+  gamma_eff2 <- -0.5
+  true_gammas <- c(rep(gamma_eff1, round(dimensions*p)), 
+                   rep(gamma_eff2, round(dimensions*p)), 
+                   rep(0, dimensions - round(dimensions*p)*2))*rnorm(dimensions)
+  
+  return(list(true_alphas = true_values$true_alphas,
+              true_betas = true_betas,
+              true_gammas = true_gammas))
+}
+
+#' @export
+get_selec_meas <- function(.x, true_alpha = NULL,  threshold = 1e-4) {
+  if(is.null(true_alpha)){
+    p <- length(.x)
+    true_values <- true_vals(p)
+    true <- true_values$true_alphas
+  } else {true <- true_alpha}
+  # Calculate TP, FP, TN, and FN
+  
+  selected_vars <- which(abs(.x) > threshold)
+  
+  non_selected_vars <- which(abs(.x) <= threshold)
+  
+  true_vars <- which(abs(true_values$true_alphas) > threshold)
+  
+  false_vars <- which(abs(true_values$true_alphas) <= threshold)
+  
+  TP <- sum(selected_vars %in% true_vars)
+  FP <- sum(selected_vars %in% false_vars)
+  TN <- sum(non_selected_vars %in% false_vars)
+  FN <- sum(non_selected_vars %in% true_vars)
+  
+  # Calculate TPR, FPR, and accuracy
+  TPR <- TP / (TP + FN)
+  FPR <- FP / (FP + TN)
+  # avoid division by zero
+  # browser()
+  MCC <- (TP * TN - FP * FN) / 
+    sqrt((TP + FP) * (TP + FN) * (TN + FP) * (TN + FN))
+  return(list(mcc = MCC, tpr = TPR, tnr = 1 - FPR))
+}
