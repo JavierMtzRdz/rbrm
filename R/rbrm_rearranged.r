@@ -122,22 +122,22 @@ nllh <- function(alpha, beta, va, vb, x, y, prob_fun = getProbRR.org, weights = 
   p0 <- ps$p0
   p1 <- ps$p1
   
-  # idx0 <- which(x == 0)
-  # idx1 <- which(x == 1)
-  # nll <- 0
-  # # Calculate likelihood safely, avoiding issues if idx0 or idx1 are empty
-  # if(length(idx0) > 0){
-  #   nll <- nll - sum(y[idx0] * log(p0[idx0]) + (1 - y[idx0]) * log(1 - p0[idx0]))
-  # }
-  # if(length(idx1) > 0){
-  #   nll <- nll - sum(y[idx1] * log(p1[idx1]) + (1 - y[idx1]) * log(1 - p1[idx1]))
-  # }
+  idx0 <- which(x == 0)
+  idx1 <- which(x == 1)
+  nll <- 0
+  # Calculate likelihood safely, avoiding issues if idx0 or idx1 are empty
+  if(length(idx0) > 0){
+    nll <- nll - sum(y[idx0] * log(p0[idx0]) + (1 - y[idx0]) * log(1 - p0[idx0]))
+  }
+  if(length(idx1) > 0){
+    nll <- nll - sum(y[idx1] * log(p1[idx1]) + (1 - y[idx1]) * log(1 - p1[idx1]))
+  }
   # browser()
   
-  nll <- -sum((1 - y[x == 0]) * log(1 - p0[x == 0]) * weights[x == 0] + 
-                (y[x == 0]) * log(p0[x == 0]) * weights[x == 0]) - sum((1 - y[x == 
-                                                                                1]) * log(1 - p1[x == 1]) * weights[x == 1] + (y[x == 1]) * log(p1[x == 
-                                                                                                                                                     1]) * weights[x == 1])
+  # nll <- -sum((1 - y[x == 0]) * log(1 - p0[x == 0]) * weights[x == 0] + 
+  #               (y[x == 0]) * log(p0[x == 0]) * weights[x == 0]) - sum((1 - y[x == 
+  #                                                                               1]) * log(1 - p1[x == 1]) * weights[x == 1] + (y[x == 1]) * log(p1[x == 
+  #                                                                                                                                                    1]) * weights[x == 1])
   
   # size adjustment
   nll <- nll/n

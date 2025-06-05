@@ -5,8 +5,8 @@
 \title{Greedy FISTA}
 \usage{
 greedy_fista(
-  alpha.start,
-  beta.start,
+  alpha_start,
+  beta_start,
   step_size_alpha,
   step_size_beta,
   lambda,

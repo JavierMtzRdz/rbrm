@@ -9,16 +9,17 @@ rbrm.exp2(
   vb = NULL,
   x,
   y,
-  alpha.start = NULL,
-  beta.start = NULL,
+  alpha_start = NULL,
+  beta_start = NULL,
   max_step = 1000,
   lambda = 0,
-  lr.alpha = 1,
-  lr.beta = 1,
+  lr.alpha = 0.05,
+  lr.beta = 0.1,
   intercept = F,
   prob_fun = getProbRR.org,
   opt_fun = fista_opt,
-  save_opt = F
+  save_opt = F,
+  standardize = T
 )
 }
 \arguments{
@@ -29,6 +30,10 @@ rbrm.exp2(
 \item{x}{Binary treatment vector (0/1).}
 
 \item{y}{Binary outcome vector (0/1).}
+
+\item{alpha_start}{Optional starting vector for alpha coefficients.}
+
+\item{beta_start}{Optional starting vector for beta coefficients.}
 
 \item{max_step}{Maximum iterations for the optimizer.}
 
@@ -42,10 +47,6 @@ matrices include/exclude a column of 1s accordingly.}
 
 \item{opt_fun}{The optimization function to use (e.g., \code{fista_opt2_ls_sc}).
 Must accept specific arguments (see code).}
-
-\item{alpha_start}{Optional starting vector for alpha coefficients.}
-
-\item{beta_start}{Optional starting vector for beta coefficients.}
 
 \item{step_size_alpha_init}{Initial step size guess for alpha (used by some optimizers).}
 

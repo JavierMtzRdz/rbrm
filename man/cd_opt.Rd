@@ -5,8 +5,8 @@
 \title{Coordinate Descent Optimization for Alpha and Beta}
 \usage{
 cd_opt(
-  alpha.start,
-  beta.start,
+  alpha_start,
+  beta_start,
   step_size_alpha,
   step_size_beta,
   lambda,
@@ -19,14 +19,14 @@ cd_opt(
   prob_fun = getProbRR.org,
   nllh_fun = nllh,
   penalized_nllh_fun = penalized_nllh,
-  tol = 1e-06,
-  verbose = FALSE
+  tol = 1e-05,
+  verbose = T
 )
 }
 \arguments{
-\item{alpha.start}{Initial numeric vector for alpha coefficients.}
+\item{alpha_start}{Initial numeric vector for alpha coefficients.}
 
-\item{beta.start}{Initial numeric vector for beta coefficients.}
+\item{beta_start}{Initial numeric vector for beta coefficients.}
 
 \item{step_size_alpha}{Numeric value for the step size used in alpha updates.}
 

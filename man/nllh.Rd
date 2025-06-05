@@ -4,7 +4,16 @@
 \alias{nllh}
 \title{Negative Log-Likelihood}
 \usage{
-nllh(alpha, beta, va, vb, x, y, prob_fun = getProbRR.org)
+nllh(
+  alpha,
+  beta,
+  va,
+  vb,
+  x,
+  y,
+  prob_fun = getProbRR.org,
+  weights = rep(1, length(x))
+)
 }
 \arguments{
 \item{alpha}{Coefficients.}

@@ -1150,12 +1150,6 @@ perform_cv_fold <- function(fold, fold_ids, va, vb, x, y, lambda_grid,
   pa <- dim(va_train)[2]
   pb <- dim(vb_train)[2]
   
-  if (is.null(alpha.start)) alpha.start <- c(rep(0, pa))
-  if (length(alpha.start) < pa) alpha.start <- c(rep(alpha.start[1], pa))
-  
-  if (is.null(beta.start)) beta.start <- c(rep(0.01, pb))
-  if (length(beta.start) < pb) beta.start <- c(rep(beta.start[1], pb))
-  
   for (i in 1:n_lambdas) {
     
     current_lambda <- lambda_grid[i]
@@ -1165,7 +1159,6 @@ perform_cv_fold <- function(fold, fold_ids, va, vb, x, y, lambda_grid,
       lambda = current_lambda,
       implt = implt, prob_fun = prob_fun, opt_fun = opt_fun,
       expected_pa = p_a_train, expected_pb = p_b_train,
-      alpha.start = alpha.start, beta.start = beta.start,
       ...
     )
     alpha.start <- fit$point.est[1:pa]
@@ -1266,7 +1259,7 @@ cv_rbrm2 <- function(va, vb, x, y, lambda = NULL,
   # Progress bar closing handled by on.exit
   # --- 5. Aggregate Results & Select Lambda ---
   cv_results_matrix <- do.call(rbind, lapply(cv_metrics_per_fold_list, function(m) m[type.measure, ]))
-  browser()
+  
   lambda_selection <- select_lambda(cv_results_matrix, lambda_grid, type.measure, nfolds, index)
   lambda_selected <- lambda_selection$lambda_selected
   

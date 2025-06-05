@@ -9,8 +9,8 @@ rbrm.exp(
   vb,
   x,
   y,
-  alpha.start = NULL,
-  beta.start = NULL,
+  alpha_start = NULL,
+  beta_start = NULL,
   max_step = 1000,
   lambda = 0,
   lr.alpha = 1,
@@ -30,9 +30,9 @@ rbrm.exp(
 
 \item{y}{A vector of binary outcomes (0/1).}
 
-\item{alpha.start}{Initial values for alpha coefficients. Defaults to a zero vector.}
+\item{alpha_start}{Initial values for alpha coefficients. Defaults to a zero vector.}
 
-\item{beta.start}{Initial values for beta coefficients. Defaults to a vector of 0.01.}
+\item{beta_start}{Initial values for beta coefficients. Defaults to a vector of 0.01.}
 
 \item{max_step}{Maximum number of optimization steps. Default is 3000.}
 
