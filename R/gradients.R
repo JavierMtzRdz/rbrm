@@ -128,14 +128,16 @@ grad_nll <- function(alpha, beta, y, x, va, vb,
     #   p0p1 = brm::getProbRR(va %*% alpha, vb %*% beta)
     #   p0 = p0p1[, 1];   p1 = p0p1[, 2]
     #   weights = rep(1, length(y))
-    #   
+    # 
     #   return((-sum((1-y[x==0])*log(1-p0[x==0])*weights[x==0] +
     #                  (y[x==0])*log(p0[x==0])*weights[x==0]) -
     #             sum((1-y[x==1])*log(1-p1[x==1])*weights[x==1] +
-    #                   (y[x==1])*log(p1[x==1])*weights[x==1]))/length(y))  
+    #                   (y[x==1])*log(p1[x==1])*weights[x==1]))/length(y))
     # }
-    # grad_beta2 <- numDeriv::grad(function(.x) {neg.log.likelihood.beta(.x)},
+    # grad_beta <- numDeriv::grad(function(.x) {neg.log.likelihood.beta(.x)},
     #                             beta)
+    # 
+    # if(any(abs(grad_beta-grad_beta) > 0.00001)) browser()
   }
   
   if (opt == "alpha") return(grad_alpha)
