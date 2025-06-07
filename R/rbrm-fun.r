@@ -342,7 +342,7 @@ L <- function(
   # (NLL should be convex for its Hessian eigenvalues to be non-negative)
   eigenvalues <- eigen(hessian_matrix, symmetric = TRUE, only.values = TRUE)$values
   
-  L_value <- max(c(eigenvalues, 0.25))
+  L_value <- max(c(eigenvalues, 0.4))
   
   # L must be positive for step size 1/L to be meaningful.
   # If NLL is not convex or at a saddle point, max eigenvalue could be <= 0.
