@@ -111,19 +111,32 @@ grad_nll <- function(alpha, beta, y, x, va, vb,
     grad_alpha <- -(t(va)%*%inner_alpha)/n
   }
   if (opt != "alpha"){
+    
     if(method == "analytical") dp0_dphi <- dp0_phi(theta, phi,
                                                    ps_spe = class(ps))
     # if(method == "analytical") dp0_dphi <- (1 - p0) * (1 - p1)/(1 - p0 + 1 - p1)
     if(method == "numerical") dp0_dphi <- numDeriv::grad(
       func = (function(phi_val) return(prob_fun(theta, phi_val)$p0)),
       x = phi)
+
     dp1_dphi <- dp0_dphi * exp(theta)
     grad_beta_sum <- numeric(pb)
     inner_beta <- (dllh_dp1*dp1_dphi + dllh_dp0*dp0_dphi)
-    grad_beta <- -(t(vb)%*%inner_beta)/n
-  }
+    grad_beta <- -t(inner_beta%*%vb)/n
 
-  # browser()
+    # neg.log.likelihood.beta = function(beta){
+    #   p0p1 = brm::getProbRR(va %*% alpha, vb %*% beta)
+    #   p0 = p0p1[, 1];   p1 = p0p1[, 2]
+    #   weights = rep(1, length(y))
+    #   
+    #   return((-sum((1-y[x==0])*log(1-p0[x==0])*weights[x==0] +
+    #                  (y[x==0])*log(p0[x==0])*weights[x==0]) -
+    #             sum((1-y[x==1])*log(1-p1[x==1])*weights[x==1] +
+    #                   (y[x==1])*log(p1[x==1])*weights[x==1]))/length(y))  
+    # }
+    # grad_beta2 <- numDeriv::grad(function(.x) {neg.log.likelihood.beta(.x)},
+    #                             beta)
+  }
   
   if (opt == "alpha") return(grad_alpha)
   if (opt == "beta") return(grad_beta)
