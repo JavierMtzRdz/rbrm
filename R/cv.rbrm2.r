@@ -1131,6 +1131,8 @@ perform_cv_fold <- function(fold, fold_ids, va, vb, x, y, lambda_grid,
                             implt, prob_fun, opt_fun, type.measure,
                             progress_bar_id, # <-- New argument
                             alpha.start = NULL, beta.start = NULL,
+                            lr.alpha = 0.5, lr.beta = 1.5,
+                            est_l_fold = F,
                             ...) {
   test_idx <- which(fold_ids == fold)
   train_idx <- which(fold_ids != fold)
@@ -1154,13 +1156,29 @@ perform_cv_fold <- function(fold, fold_ids, va, vb, x, y, lambda_grid,
     
     current_lambda <- lambda_grid[i]
     
+    if(est_l_fold && i == 1){
+    opt_vals <- fista_opt2(rep(0, pa), rep(0, pa),
+                           0.5, 1.5,
+                           lambda = min(lambda_grid), 
+                           intercept = F, 
+                           max_step = 10, 
+                           va_train, vb_train, x_train, y_train,
+                           prob_fun = prob_fun,
+                           eval_grad = F,
+                           est_l = T)
+    lr.alpha <- opt_vals$step_size_alpha
+    lr.beta <- opt_vals$step_size_beta
+    }
+    
     fit <- fit_model_on_data(
       va = va_train, vb = vb_train, x = x_train, y = y_train,
       lambda = current_lambda,
       implt = implt, prob_fun = prob_fun, opt_fun = opt_fun,
       expected_pa = p_a_train, expected_pb = p_b_train,
+      lr.alpha = lr.alpha, lr.beta = lr.beta,
       ...
     )
+    
     alpha.start <- fit$point.est[1:pa]
     beta.start <- fit$point.est[(pa+1):(pa+pb)]
     
@@ -1197,6 +1215,7 @@ cv_rbrm2 <- function(va, vb, x, y, lambda = NULL,
                      relax_factors_grid = c(0, 0.25, 0.5, 0.75, 1),
                      index = "min",
                      type.measure = "deviance",
+                     est_l_fold = F,
                      ...) { # Captures opt_fun etc.
   
   tictoc::tic("Total cv_rbrm2 time")
@@ -1253,6 +1272,7 @@ cv_rbrm2 <- function(va, vb, x, y, lambda = NULL,
       implt = implt, prob_fun = prob_fun,
       type.measure = type.measure,
       progress_bar_id = env$.pb_cv_lambda_id, # <-- Pass ID
+      est_l_fold = est_l_fold,
       ... # Pass opt_fun and other args
     )
   })
