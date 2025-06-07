@@ -146,8 +146,9 @@ map_with_interpolation <- function(value) {
   mapping <- c(
     `5` = 0.26,
     `50` = 0.15,
-    `150` = 0.1,
-    `500` = 0.07
+    `150` = 0.07,
+    `500` = .05
+    # `5` = 0.26, `50` = 0.15, `150` = 0.1, `500` = 0.07
   )
   # Ensure mapping is sorted by keys
   mapping <- mapping[order(as.numeric(names(mapping)))]
@@ -186,16 +187,14 @@ map_with_interpolation <- function(value) {
 #' @export
 true_vals <- function(dimensions) {
   
-  set.seed(657)
-  
   p <- map_with_interpolation(dimensions)
   alpha_eff1 <- 1
   alpha_eff2 <- -1
   # alpha_eff1 <- 3
   # alpha_eff2 <- -3
-  true_values$true_alphas <- c(rep(alpha_eff1, round(dimensions*p)), 
-                               rep(alpha_eff2, round(dimensions*p)), 
-                               rep(0, dimensions - round(dimensions*p)*2))#*rnorm(dimensions)
+  true_alphas <- c(rep(alpha_eff1, round(dimensions*p)), 
+                   rep(alpha_eff2, round(dimensions*p)), 
+                   rep(0, dimensions - round(dimensions*p)*2))#*rnorm(dimensions)
   beta_eff1 <- -0.5
   beta_eff2 <- 1
   # beta_eff1 <- -3
@@ -209,16 +208,17 @@ true_vals <- function(dimensions) {
                    rep(gamma_eff2, round(dimensions*p)), 
                    rep(0, dimensions - round(dimensions*p)*2))*rnorm(dimensions)
   
-  return(list(true_alphas = true_values$true_alphas,
+  return(list(true_alphas = true_alphas,
               true_betas = true_betas,
               true_gammas = true_gammas))
 }
 
 #' @export
-get_selec_meas <- function(.x, true_alpha = NULL,  threshold = 1e-4) {
+get_selec_meas <- function(.x, true_alpha = NULL,  threshold = 1e-6) {
   if(is.null(true_alpha)){
     p <- length(.x)
-    true_values <- true_vals(p)
+    true_values <- tryCatch(true_vals(p),
+                            error = function(e) browser())
     true <- true_values$true_alphas
   } else {true <- true_alpha}
   # Calculate TP, FP, TN, and FN
@@ -227,21 +227,46 @@ get_selec_meas <- function(.x, true_alpha = NULL,  threshold = 1e-4) {
   
   non_selected_vars <- which(abs(.x) <= threshold)
   
-  true_vars <- which(abs(true_values$true_alphas) > threshold)
+  true_vars <- which(abs(true) > threshold)
   
-  false_vars <- which(abs(true_values$true_alphas) <= threshold)
+  false_vars <- which(abs(true) <= threshold)
+  
   
   TP <- sum(selected_vars %in% true_vars)
   FP <- sum(selected_vars %in% false_vars)
   TN <- sum(non_selected_vars %in% false_vars)
   FN <- sum(non_selected_vars %in% true_vars)
   
+  
   # Calculate TPR, FPR, and accuracy
   TPR <- TP / (TP + FN)
   FPR <- FP / (FP + TN)
-  # avoid division by zero
-  # browser()
-  MCC <- (TP * TN - FP * FN) / 
-    sqrt((TP + FP) * (TP + FN) * (TN + FP) * (TN + FN))
+  
+  
+  # Improved Matthews Correlation Coefficient (MCC) Calculation
+  mcc_num <- TP * TN - FP * FN
+  
+  # Calculate terms for the denominator
+  sum_tp_fp <- TP + FP # Total predicted positive
+  sum_tp_fn <- TP + FN # Total actual positive
+  sum_tn_fp <- TN + FP # Total actual negative
+  sum_tn_fn <- TN + FN # Total predicted negative
+  
+  mcc_den_prod_squared <- sum_tp_fp * sum_tp_fn * sum_tn_fp * sum_tn_fn
+  
+  MCC <- if (mcc_den_prod_squared == 0) {
+    # Denominator is zero. This happens if any row or column in the 
+    # confusion matrix is all zeros. Defaulting to 0 for these cases.
+    0 
+  } else {
+    mcc_num / sqrt(mcc_den_prod_squared)
+  }
+  
+  # Ensure result is numerically stable within the [-1, 1] range
+  if (!is.na(MCC)) {
+    MCC <- max(-1, min(1, MCC))
+  }
+  
+  
   return(list(mcc = MCC, tpr = TPR, tnr = 1 - FPR))
 }
