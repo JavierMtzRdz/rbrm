@@ -101,10 +101,31 @@ step_fista <- function(alpha, beta,
                                            prob_fun, opt = "alpha")
   
   
-  if (opt == "beta") gradient <- grad_nll(alpha, y_value_new, 
-                                          x, y, va, vb,
-                                          prob_fun, opt = "beta")
+  if (opt == "beta") {
+    gradient <- grad_nll(alpha, y_value_new,
+                         x, y, va, vb,
+                         prob_fun, opt = "beta")
+  # browser()
+  # gradient <- numDeriv::grad(function(.x) {nllh(alpha, .x, va, vb, x, y,
+  #                                               prob_fun = prob_fun)},
+  #                            y_value_new)
+
+  # neg.log.likelihood = function(alpha, beta) {
+  #   
+  #   p0p1 = brm::getProbRR(va %*% alpha, vb %*% beta)
+  #   p0 = p0p1[, 1];   p1 = p0p1[, 2]
+  #   weights = rep(1, length(y))
+  #   
+  #   return((-sum((1 - y[x == 0]) * log(1 - p0[x == 0]) * weights[x == 0] + 
+  #                 (y[x == 0]) * log(p0[x == 0]) * weights[x == 0]) - sum((1 - y[x == 
+  #                                                                                 1]) * log(1 - p1[x == 1]) * weights[x == 1] + (y[x == 1]) * log(p1[x == 
+  #                                                                                                                                                      1]) * weights[x == 1]))/length(y))
+  # }
+  # gradient <- numDeriv::grad(function(.x) {neg.log.likelihood(alpha, .x)},
+  #                            y_value_new, method = "simple")
+  # browser()
   
+  }
   # Clean any NA gradients to prevent issues during computation
   if (any(is.na(gradient))) {
     cli::cli_alert_danger("NaN in gradient, replacing with 0.")
@@ -321,14 +342,17 @@ L <- function(
   # (NLL should be convex for its Hessian eigenvalues to be non-negative)
   eigenvalues <- eigen(hessian_matrix, symmetric = TRUE, only.values = TRUE)$values
   
-  L_value <- max(eigenvalues)
+  L_value <- max(c(eigenvalues, 0.25))
   
   # L must be positive for step size 1/L to be meaningful.
   # If NLL is not convex or at a saddle point, max eigenvalue could be <= 0.
   
-  # if (L_value >= 500) { # Using 1e-8 as a threshold for 
-  #   return(500)
-  # }
+  if (L_value >= 500) { # Using 1e-8 as a threshold for
+    return(500)
+  }
+  
+  # if(L_value <= 0.2) return(5)
+  
   
   if (is.na(L_value) || L_value <= 1e-8) { # Using 1e-8 as a threshold for 
     return(1)
@@ -346,7 +370,8 @@ fista_opt2 <- function(alpha_start, beta_start,
                        va, vb, x, y,
                        prob_fun = getProbRR.org,
                        opt_step = step_fista,
-                       eval_grad = T){
+                       eval_grad = T,
+                       est_l = F){
   ## Optimization
   step <- 0
   
@@ -363,7 +388,6 @@ fista_opt2 <- function(alpha_start, beta_start,
   g_betas <- matrix(0, max_step, ncol(vb))
   nllh_results <- vector("double", max_step)
   
-  
   # L_alpha <- L(alpha, beta, y, x, va, vb, prob_fun,
   #              opt = "alpha")
   # 
@@ -377,16 +401,16 @@ fista_opt2 <- function(alpha_start, beta_start,
   
   for (iter in 1:max_step) {
     step <- step + 1
-    # FISTA update for alpha
+    # FISTA upda for alpha
     
-    if(iter == 5){
+    if(iter == 10 && est_l){
+      
       L_alpha <- L(alpha, beta, y, x, va, vb, prob_fun,
                    opt = "alpha")
+      step_size_alpha <- 1/L_alpha
       
       L_beta <- L(alpha, beta, y, x, va, vb, prob_fun,
                   opt = "beta")
-      
-      step_size_alpha <- 1/L_alpha
       step_size_beta <- 1/L_beta
       
       cli::cli_alert("step_size_alpha: {step_size_alpha} | step_size_beta: {step_size_beta}")
@@ -470,7 +494,7 @@ fista_opt2 <- function(alpha_start, beta_start,
                               last_alpha = last_alpha,
                               last_beta = last_beta)
     
-    if (stop_boolean) {
+    if(stop_boolean) {
       
       alphas <- alphas[1:step,] 
       betas <- betas[1:step,] 
@@ -490,7 +514,9 @@ fista_opt2 <- function(alpha_start, beta_start,
               betas = betas,
               grad_alphas = g_alphas,
               grad_betas = g_betas,
-              nllh_results = nllh_results))
+              nllh_results = nllh_results,
+              step_size_alpha = step_size_alpha,
+              step_size_beta = step_size_beta))
 }
 
 
@@ -1702,11 +1728,7 @@ rbrm.exp2 <- function(va, vb = NULL, x, y,
   )
   
   # Call the optimizer
-  opt_result <- tryCatch({
-    do.call(opt_fun, opt_args)
-  }, error = function(e){
-    cli::cli_abort("Optimization failed: {e$message}") # Abort if optimizer itself errors
-  })
+  opt_result <- do.call(opt_fun, opt_args)
 
   # Extract Results ---
   step  <- opt_result$step

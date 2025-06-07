@@ -13,13 +13,13 @@ rbrm.exp2(
   beta_start = NULL,
   max_step = 1000,
   lambda = 0,
-  lr.alpha = 0.05,
-  lr.beta = 0.1,
+  lr.alpha = 0.5,
+  lr.beta = 1.5,
   intercept = F,
   prob_fun = getProbRR.org,
   opt_fun = fista_opt,
   save_opt = F,
-  standardize = T
+  standardize = F
 )
 }
 \arguments{
