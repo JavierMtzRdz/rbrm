@@ -18,7 +18,7 @@ cd_opt(
   y,
   prob_fun = getProbRR.org,
   nllh_fun = nllh,
-  penalized_nllh_fun = penalized_nllh,
+  penalized_nllh = penalized_nllh,
   tol = 1e-05,
   verbose = T
 )
@@ -51,8 +51,8 @@ cd_opt(
 \item{nllh_fun}{Function to compute the negative log-likelihood (without penalty).
 Its signature should be: nllh_fun(alpha, beta, va, vb, x, y, prob_fun).}
 
-\item{penalized_nllh_fun}{Function to compute the penalized negative log-likelihood.
-Its signature should be: penalized_nllh_fun(alpha, beta, va, vb, x, y, lambda, intercept, prob_fun).}
+\item{penalized_nllh}{Function to compute the penalized negative log-likelihood.
+Its signature should be: penalized_nllh(alpha, beta, va, vb, x, y, lambda, intercept, prob_fun).}
 
 \item{tol}{Tolerance for convergence.}
 
