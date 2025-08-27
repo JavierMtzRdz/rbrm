@@ -39,7 +39,10 @@
 #'
 #' @export
 getProbRR.org = function(logrr, logop = NA,
-                         clipping = T) {
+                         clipping = 1e-15) {
+  
+ 
+  
   if(is.matrix(logrr) && ncol(logrr) == 2){
     logop = logrr[,2]
     logrr = logrr[,1]
@@ -47,6 +50,7 @@ getProbRR.org = function(logrr, logop = NA,
     logop = logrr[2]
     logrr = logrr[1]
   }
+
   p0 <- ifelse((logop < (-12)) | (logop > 12) | (logrr < (-12)) | (logrr > 12),
                ## on the boundary South edge: large -ve logrr or (large -ve logop and -ve
                ## logrr)
@@ -75,12 +79,12 @@ getProbRR.org = function(logrr, logop = NA,
                               pmin(exp(logrr), 1))),
                ## not on the boundary logop = 0
                exp(logrr) * p0)
+    
   
-  
-  if (clipping) {
-    p0 <- pmin(pmax(p0, 1e-15), 1 - 1e-15)
-    p1 <- pmin(pmax(p1, 1e-15), 1 - 1e-15)
-  }
+  clipping <- ifelse(is.logical(clipping) && 
+                       isTRUE(clipping), 1e-15, clipping)
+    p0 <- pmin(pmax(p0, clipping), 1 - clipping)
+    p1 <- pmin(pmax(p1, clipping), 1 - clipping)
   
   return(structure(
     list(p0 = p0, p1 = p1), 
@@ -130,7 +134,7 @@ getProbRR.org = function(logrr, logop = NA,
 #'
 #' @export
 getProbRR.alt <- function(logrr, logop,
-                          clipping = T) {
+                          clipping = 1e-15) {
   if (is.matrix(logrr) && ncol(logrr) == 2) {
     logop <- logrr[, 2]
     logrr <- logrr[, 1]
@@ -144,10 +148,10 @@ getProbRR.alt <- function(logrr, logop,
   
   p1 <- exp(logrr) * p0
   
-  if (clipping) {
-    p0 <- pmin(pmax(p0, 1e-15), 1 - 1e-15)
-    p1 <- pmin(pmax(p1, 1e-15), 1 - 1e-15)
-  }
+  clipping <- ifelse(is.logical(clipping) && 
+                       isTRUE(clipping), 1e-15, clipping)
+  p0 <- pmin(pmax(p0, clipping), 1 - clipping)
+  p1 <- pmin(pmax(p1, clipping), 1 - clipping)
   
   attr(c(1, 2), "dim")
   

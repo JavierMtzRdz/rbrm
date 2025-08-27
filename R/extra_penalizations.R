@@ -16,28 +16,25 @@ step_fista_scad <- function(alpha, beta,
   
   # Momentum update
   t_new <- (1 + sqrt(1 + 4 * t_old^2)) / 2
-  damping_factor <- 0.8  # Reduce momentum effect
-  a_new <- damping_factor * (t_old - 1) / t_new
+  # damping_factor <- 0.8  # Reduce momentum effect
+  # a_new <- damping_factor * (t_old - 1) / t_new
   a_new <- (t_old - 1) / t_new
   y_value_new <- value + a_new * (value - value_old)
   
   # Compute gradient
-  if (opt == "alpha") gradient <- grad_nll(y_value_new, beta,
-                                           x, y, va, vb,
-                                           prob_fun, opt = "alpha")
+  if (opt == "alpha") gradient <- grad_nll(alpha = y_value_new, beta = beta,
+                                           y = y, x = x, va = va, vb = vb,
+                                           prob_fun, opt = "alpha"
+  )
   
-  
-  if (opt == "beta") gradient <- grad_nll(alpha, y_value_new, 
-                                          x, y, va, vb,
-                                          prob_fun, opt = "beta")
-  
-  
-  # Clean any NA gradients to prevent issues during computation
-  if (any(is.na(gradient))) {
-    cli::cli_alert_danger("NaN in gradient, replacing with 0.")
-    print(gradient)
-    gradient[is.na(gradient)] <- 0
+  if (opt == "beta") {
+    gradient <- grad_nll(alpha = alpha, beta = y_value_new,
+                         y = y, x = x, va = va, vb = vb,
+                         prob_fun, opt = "beta"
+    )
+    
   }
+  
   
   # Proximal gradient update with SCAD thresholding
   input <- y_value_new - step_size * gradient
@@ -56,14 +53,17 @@ scad_thres <- function(entry, lambda, a) {
   if (!(a >= 2)) cli::cli_abort("a < 2")
   
   # Vectorized Version
-  e1 <- abs(entry) <= 2 * lambda
+  e1 <- abs(entry) <= 2 * lambda & abs(entry) - lambda > 0
+  
+  e1.5 <- abs(entry) <= 2 * lambda & abs(entry) - lambda <= 0
+  
   e2 <- abs(entry) > 2 * lambda & abs(entry) <= a * lambda
   
-  entry[e1] <- ifelse(
-    abs(entry[e1]) - lambda > 0, sign(entry[e1]) * (abs(entry[e1]) - lambda), 0
-  )
+  entry[which(e1)] <-  sign(entry[which(e1)]) * (abs(entry[which(e1)]) - lambda)
   
-  entry[e2] <- ((a - 1) * entry[e2] - sign(entry[e2]) * a * lambda) / (a - 2)
+  entry[which(e1.5)] <- 0
+  
+  entry[which(e2)] <- ((a - 1) * entry[which(e2)] - sign(entry[which(e2)]) * a * lambda) / (a - 2)
   
   return(entry)
 }
@@ -90,17 +90,14 @@ step_fista_adaptive_lasso <- function(alpha, beta,
   y_value_new <- value + a_new * (value - value_old)
   
   # Compute gradient
-  if (opt == "alpha") {
-    gradient <- numDeriv::grad(function(.x) {
-      nllh(.x, beta, va, vb, x, y, prob_fun = prob_fun)
-    }, y_value_new, method = "simple")
-  }
+  if (opt == "alpha") gradient <- grad_nll(y_value_new, beta,
+                                           x, y, va, vb,
+                                           prob_fun, opt = "alpha")
   
-  if (opt == "beta") {
-    gradient <- numDeriv::grad(function(.x) {
-      nllh(alpha, .x, va, vb, x, y, prob_fun = prob_fun)
-    }, y_value_new, method = "simple")
-  }
+  
+  if (opt == "beta") gradient <- grad_nll(alpha, y_value_new, 
+                                          x, y, va, vb,
+                                          prob_fun, opt = "beta")
   
   # Clean any NA gradients to prevent issues during computation
   gradient[is.na(gradient)] <- 0

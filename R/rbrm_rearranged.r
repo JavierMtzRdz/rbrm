@@ -110,7 +110,9 @@ proximal.gd.beta.fista <- function(beta, step_size, lambda, t_old, last_beta,
 #   return(nll)
 # }
 
-nllh <- function(alpha, beta, va, vb, x, y, prob_fun = getProbRR.org, weights = rep(1, length(x))) {
+nllh <- function(alpha, beta, va, vb, x, y,
+                 prob_fun = getProbRR.org,
+                 weights = rep(1, length(x))) {
   n <- length(y)
   pa <- length(alpha) # Use length of coeff vector
   pb <- length(beta)
@@ -132,7 +134,6 @@ nllh <- function(alpha, beta, va, vb, x, y, prob_fun = getProbRR.org, weights = 
   if(length(idx1) > 0){
     nll <- nll - sum(y[idx1] * log(p1[idx1]) + (1 - y[idx1]) * log(1 - p1[idx1]))
   }
-  # browser()
   
   # nll <- -sum((1 - y[x == 0]) * log(1 - p0[x == 0]) * weights[x == 0] + 
   #               (y[x == 0]) * log(p0[x == 0]) * weights[x == 0]) - sum((1 - y[x == 

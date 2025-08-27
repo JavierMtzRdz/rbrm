@@ -31,7 +31,11 @@
 #'
 #' @importFrom magrittr %>%
 #' @export
-plot.cv_rbrm <- function(.model, type.measure = "deviance") {
+plot.cv_rbrm <- function(.model, type.measure = c("deviance", "auc", "accuracy",
+                                                  "sensitivity", "specificity",
+                                                  "precision",
+                                                  "f1_score")) {
+  type.measure <- rlang::arg_match(type.measure)
   result <- do.call(cbind, lapply(.model$cv_results,
                                    function(m) m[type.measure, ])) 
   
@@ -72,7 +76,8 @@ plot.cv_rbrm <- function(.model, type.measure = "deviance") {
     ggplot2::theme(legend.position = "top")
 }
 #' @export
-plot.cv_rbrm2 <- function(.model, type.measure = NULL, opt = "lambda") {
+plot.cv_rbrm2 <- function(.model,
+                          type.measure = NULL, opt = "lambda") {
   
   if(tolower(opt) == "lambda") {
     if(ifelse(is.null(type.measure), TRUE, tolower(type.measure) == .model$type.measure)) {
@@ -84,6 +89,13 @@ plot.cv_rbrm2 <- function(.model, type.measure = NULL, opt = "lambda") {
       means <- rowMeans(data)
       min <- names(data)[which.min(means)]
     }}
+  
+  type.measure <- rlang::arg_match0(type.measure,
+                                    c("deviance", "auc", "accuracy",
+                                      "sensitivity", "specificity",
+                                      "precision",
+                                      "f1_score"))
+  
   if(tolower(opt) %in% c("relax_factor", 
                          "gamma")) {
     data <- tibble::as_tibble(.model$relax_lsso_info$factor_cv_results$cv_results)
@@ -139,13 +151,12 @@ plot.cv_rbrm2 <- function(.model, type.measure = NULL, opt = "lambda") {
 #'   if data is unavailable.
 #' @keywords internal
 prepare_plot_data_cv_rbrm2 <- function(x, opt = "lambda", type.measure = NULL) {
-  
   # --- Validate Inputs ---
   if (!inherits(x, "cv_rbrm2")) {
     cli::cli_abort("Input object must be of class 'cv_rbrm2'.")
   }
   opt_lower <- tolower(opt)
-  if (!opt_lower %in% c("lambda", "gamma", "relax_factor")) {
+  if (!(opt_lower %in% c("lambda", "gamma", "relax_factor"))) {
     cli::cli_abort("Argument 'opt' must be 'lambda', 'gamma', or 'relax_factor'.")
   }
   

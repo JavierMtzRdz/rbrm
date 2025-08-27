@@ -217,12 +217,11 @@ true_vals <- function(dimensions) {
 get_selec_meas <- function(.x, true_alpha = NULL,  threshold = 1e-6) {
   if(is.null(true_alpha)){
     p <- length(.x)
-    true_values <- tryCatch(true_vals(p),
-                            error = function(e) browser())
+    true_values <- true_vals(p)
     true <- true_values$true_alphas
   } else {true <- true_alpha}
-  # Calculate TP, FP, TN, and FN
   
+  # Calculate TP, FP, TN, and FN
   selected_vars <- which(abs(.x) > threshold)
   
   non_selected_vars <- which(abs(.x) <= threshold)
@@ -242,7 +241,6 @@ get_selec_meas <- function(.x, true_alpha = NULL,  threshold = 1e-6) {
   TPR <- TP / (TP + FN)
   FPR <- FP / (FP + TN)
   
-  
   # Improved Matthews Correlation Coefficient (MCC) Calculation
   mcc_num <- TP * TN - FP * FN
   
@@ -252,15 +250,9 @@ get_selec_meas <- function(.x, true_alpha = NULL,  threshold = 1e-6) {
   sum_tn_fp <- TN + FP # Total actual negative
   sum_tn_fn <- TN + FN # Total predicted negative
   
-  mcc_den_prod_squared <- sum_tp_fp * sum_tp_fn * sum_tn_fp * sum_tn_fn
+  mcc_den <- sqrt(sum_tp_fp) * sqrt(sum_tp_fn) * sqrt(sum_tn_fp) * sqrt(sum_tn_fn)
   
-  MCC <- if (mcc_den_prod_squared == 0) {
-    # Denominator is zero. This happens if any row or column in the 
-    # confusion matrix is all zeros. Defaulting to 0 for these cases.
-    0 
-  } else {
-    mcc_num / sqrt(mcc_den_prod_squared)
-  }
+  MCC <- ifelse(mcc_den == 0, 0, mcc_num / mcc_den)
   
   # Ensure result is numerically stable within the [-1, 1] range
   if (!is.na(MCC)) {

@@ -6,17 +6,68 @@ dp0_theta <- function(theta, phi,
   ps_spe <- rlang::arg_match(ps_spe)
   
   if(ps_spe == "Richardson"){
-  dp0.theta <- ( -exp(phi - theta) / (2 * (exp(phi) - 1)) + exp(phi) /
-                   ((exp(phi) - 1) * sqrt(4 * exp(phi + theta) + 
-                   (exp(theta) - 1)^2 *  exp(2 * phi))) +
-                   (exp( - theta) * (1 - exp(theta)) *
-                    exp(2 * phi)) / (2 * (exp(phi) - 1)*
-                    sqrt(4 * exp(phi + theta) + (exp(theta) - 1)^2 * 
-                           exp(2*phi))) )
-  
-  # extension for continuity
-  dp0.theta[abs(phi)< ep] <- (- exp(theta[abs(phi)< ep]) /
-                                (exp(theta[abs(phi)< ep]) + 1) ^ 2)
+    
+    # dp0.theta <- ( -exp(phi - theta) / (2 * (exp(phi) - 1)) + exp(phi) /
+    #                  ((exp(phi) - 1) * sqrt(4 * exp(phi + theta) +
+    #                                           (exp(theta) - 1)^2 *  exp(2 * phi))) +
+    #                  (exp( - theta) * (1 - exp(theta)) *
+    #                     exp(2 * phi)) / (2 * (exp(phi) - 1)*
+    #                                        sqrt(4 * exp(phi + theta) + (exp(theta) - 1)^2 *
+    #                                               exp(2*phi))) )
+    
+    # Find indices for each condition.
+    is_boundary <- (phi < -12) | (phi > 12) | (theta < -12) | (theta > 12)
+    is_south_edge <- (theta < -12) | ((phi < -12) & (theta < 0))
+    is_west_edge <- (theta > 12) | ((phi < -12) & (theta > 0))
+    is_phi_zero <- same(phi, 0)
+    
+    x <- phi - theta
+    
+    dp0.theta <- rep(NA, length(theta))
+    
+    # Apply the conditions to calculate p0.
+
+    # Case 1: "on the boundary"
+    idx_south_not_ext <- (is_boundary & is_south_edge) & ((x < 17) & (x > (-500)))
+    idx_south_ext <- (is_boundary & is_south_edge) & !((x < 17) & (x > (-500)))
+    
+    if(any(is.na(idx_south_not_ext))) browser()
+    
+    dp0.theta[idx_south_not_ext] <-
+      (0.5*(1 - sqrt(4*exp(-x[idx_south_not_ext]) + 1))*sqrt(4*exp(-x[idx_south_not_ext]) + 1)*exp(x[idx_south_not_ext]) + 1.0)/sqrt(4*exp(-x[idx_south_not_ext]) + 1)
+    
+    dp0.theta[idx_south_ext] <- 0
+    dp0.theta[is_boundary & is_west_edge] <- 0
+    dp0.theta[is_boundary & !(is_south_edge | is_west_edge)] <- ifelse(-exp(-theta[is_boundary & !(is_south_edge | is_west_edge)]) < -1, 0,
+                                                                       -exp(-theta[is_boundary & !(is_south_edge | is_west_edge)]))
+      
+    
+    # Case 2: "not on the boundary"
+    not_boundary_indices <- !is_boundary
+    
+    dp0.theta[not_boundary_indices & is_phi_zero] <- -exp(theta[not_boundary_indices & is_phi_zero]) / (1 + exp(theta[not_boundary_indices & is_phi_zero]))^2
+    
+    # Calculate for the quadratic equation case
+    quadratic_indices <- not_boundary_indices & !is_phi_zero
+    
+    
+    dp0.theta[quadratic_indices] <- ( -exp(phi[quadratic_indices]  - theta[quadratic_indices]) / (2 * (exp(phi[quadratic_indices]) - 1)) + exp(phi[quadratic_indices]) /
+                                 ((exp(phi[quadratic_indices]) - 1) * sqrt(4 * exp(phi[quadratic_indices] + theta[quadratic_indices]) +
+                                                          (exp(theta[quadratic_indices]) - 1)^2 *  exp(2 * phi[quadratic_indices]))) +
+                                 (exp( - theta[quadratic_indices]) * (1 - exp(theta[quadratic_indices])) *
+                                    exp(2 * phi[quadratic_indices])) / (2 * (exp(phi[quadratic_indices]) - 1)*
+                                                       sqrt(4 * exp(phi[quadratic_indices] + theta[quadratic_indices]) + (exp(theta[quadratic_indices]) - 1)^2 *
+                                                              exp(2*phi[quadratic_indices]))) )
+    
+    if(any(is.na(dp0.theta))) browser()
+    
+    # der_prueb <- numDeriv::grad(
+    #   func = (function(theta_val)return(getProbRR.org(theta_val, phi)$p0)),
+    #   x = theta)
+    # dp0.theta[is_boundary & !(is_south_edge | is_west_edge)]
+    # der_prueb[is_boundary & !(is_south_edge | is_west_edge)]
+    # if (max(der_prueb - dp0.theta) > 0.1) browser()
+    
   return(dp0.theta)}
   
   if(ps_spe == "Pozza"){
@@ -37,17 +88,70 @@ dp0_phi <- function(theta, phi,
   ps_spe <- rlang::arg_match(ps_spe)
   
   if(ps_spe == "Richardson"){
-  dp0.phi <- ( - ((exp(theta) + 1) * exp(phi)) / 
-              (2 * exp(theta) * (exp(phi) - 1) ^ 2) + exp(phi) / 
-              ((exp(phi) - 1) ^ 2 * sqrt(4 * exp(phi + theta) + 
-              (exp(theta) - 1) ^ 2 * exp(2 * phi))) + 
-              (exp( - theta) * (exp(2 * theta) + 1) * exp(2 * phi)) /
-              (2 * (exp(phi) - 1) ^ 2 * sqrt(4 * exp(phi + theta) +
-              (exp(theta) - 1) ^ 2 * exp(2 * phi))))
+    
+    # dp0.phi <- ( - ((exp(theta) + 1) * exp(phi)) / 
+    #                (2 * exp(theta) * (exp(phi) - 1) ^ 2) + exp(phi) / 
+    #                ((exp(phi) - 1) ^ 2 * sqrt(4 * exp(phi + theta) + 
+    #                                             (exp(theta) - 1) ^ 2 * exp(2 * phi))) + 
+    #                (exp( - theta) * (exp(2 * theta) + 1) * exp(2 * phi)) /
+    #                (2 * (exp(phi) - 1) ^ 2 * sqrt(4 * exp(phi + theta) +
+    #                                                 (exp(theta) - 1) ^ 2 * exp(2 * phi))))
+    
+    # extension for continuity
+    # dp0.phi[which(abs(phi)< ep)] <- (- exp(theta[which(abs(phi)< ep)]) /
+    #                                      (exp(theta[which(abs(phi)< ep)]) + 1)^2)
+    
+    # Find indices for each condition.
+    is_boundary <- (phi < -12) | (phi > 12) | (theta < -12) | (theta > 12)
+    is_south_edge <- (theta < -12) | ((phi < -12) & (theta < 0))
+    is_west_edge <- (theta > 12) | ((phi < -12) & (theta > 0))
+    is_phi_zero <- same(phi, 0)
+    
+    x <- phi - theta
+    
+    dp0.phi <- rep(NA, length(phi))
+    
+    # Apply the conditions to calculate p0.
+    
+    # Case 1: "on the boundary"
+    idx_south_not_ext <- (is_boundary & is_south_edge) & ((x < 17) & (x > (-500)))
+    idx_south_ext <- (is_boundary & is_south_edge) & !((x < 17) & (x > (-500)))
+    
+    dp0.phi[idx_south_not_ext] <- (0.5 * exp(x[idx_south_not_ext]) * (-1 + (1 + 4 * exp(-x[idx_south_not_ext]))^0.5)*(1 + 4 * exp(-x[idx_south_not_ext]))^0.5 + 1)/(1 + 4 * exp(-x[idx_south_not_ext]))^0.5
+    
+    dp0.phi[idx_south_ext] <- 0
+    dp0.phi[is_boundary & is_west_edge] <- 0
+    dp0.phi[is_boundary & !(is_south_edge | is_west_edge)] <- 0
+    
+    # Case 2: "not on the boundary"
+    not_boundary_indices <- !is_boundary
+    
+    dp0.phi[not_boundary_indices & is_phi_zero] <- (exp(theta[not_boundary_indices & is_phi_zero]) /
+                                                      (exp(theta[not_boundary_indices & is_phi_zero]) + 1) ^ 3)
+    
+    
+    # Calculate for the quadratic equation case
+    quadratic_indices <- not_boundary_indices & !is_phi_zero
+    
+    
+    dp0.phi[quadratic_indices] <- (( - ((exp(theta) + 1) * exp(phi)) / (2 * exp(theta) *
+                                                                         (exp(phi) - 1) ^ 2) + exp(phi) / ((exp(phi) - 1) ^ 2 *
+                                                                                                               sqrt(4 * exp(phi + theta) + (exp(theta) - 1) ^ 2 * exp(2 * phi))
+                                                                         ) + (exp( - theta) * (exp(2 * theta) + 1) * exp(2 * phi)) /
+                                      (2 * (exp(phi) - 1) ^ 2 * sqrt(4 * exp(phi + theta) + (
+                                        exp(theta) - 1) ^ 2 * exp(2 * phi)))))[quadratic_indices]
+    
+    
+    
+    
+    # if(any(is.na(dp0.phi))) browser()
+    # 
+    # der_prueb <- numDeriv::grad(
+    #   func = (function(phi_val)return(getProbRR.org(theta, phi_val)$p0)),
+    #   x = phi)
+    # 
+    # if (max(der_prueb - dp0.phi) > 0.01) browser()
   
-  # extension for continuity
-  dp0.phi[abs(phi)< ep] <- (exp(theta[abs(phi)< ep]) /
-                                (exp(theta[abs(phi)< ep]) + 1) ^ 3)
   return(dp0.phi)}
   
   if(ps_spe == "Pozza"){
@@ -104,11 +208,16 @@ grad_nll <- function(alpha, beta, y, x, va, vb,
     # if(method == "analytical") dp0_dtheta <- -(1 - p0)/(1 - p0 + 1 - p1)
     if(method == "numerical") dp0_dtheta <- numDeriv::grad(
       func = (function(theta_val)return(prob_fun(theta_val, phi)$p0)),
-      x = theta)
+      x = theta,
+      method = "simple")
+    
     dp1_dtheta <- (p0 + dp0_dtheta)*exp(theta)
+    dp1_dtheta[which(same(p0 + dp0_dtheta, 0))] <- 0
+    
     grad_alpha_sum <- numeric(pa)
     inner_alpha <- (dllh_dp1*dp1_dtheta + dllh_dp0*dp0_dtheta)
     grad_alpha <- -(t(va)%*%inner_alpha)/n
+    # if(any(abs(grad_alpha) > 500)) browser()
   }
   if (opt != "alpha"){
     
@@ -117,13 +226,28 @@ grad_nll <- function(alpha, beta, y, x, va, vb,
     # if(method == "analytical") dp0_dphi <- (1 - p0) * (1 - p1)/(1 - p0 + 1 - p1)
     if(method == "numerical") dp0_dphi <- numDeriv::grad(
       func = (function(phi_val) return(prob_fun(theta, phi_val)$p0)),
-      x = phi)
-
+      x = phi,
+      method = "simple")
+    
     dp1_dphi <- dp0_dphi * exp(theta)
+    dp1_dphi[which(same(dp0_dphi, 0))] <- 0
     grad_beta_sum <- numeric(pb)
     inner_beta <- (dllh_dp1*dp1_dphi + dllh_dp0*dp0_dphi)
     grad_beta <- -t(inner_beta%*%vb)/n
+    
+    # grad_beta_check <- numDeriv::grad(function(.x) {nllh(alpha, .x, va, vb, x, y,
+    #                                               prob_fun = prob_fun)},
+    #                            beta, method = "Richardson")
 
+    # grad_beta_check2 <- pnd::Grad(function(.x) {nllh(alpha, .x, va, vb, x, y,
+    #                                                      prob_fun = prob_fun)},
+    #                                   beta)
+    # 
+    # if(max(abs(grad_beta - grad_beta_check)) > 0.001) browser()
+    # tibble(grad_beta, grad_beta_check) %>%
+    #   mutate(diff = abs(grad_beta-grad_beta_check))
+
+    
     # neg.log.likelihood.beta = function(beta){
     #   p0p1 = brm::getProbRR(va %*% alpha, vb %*% beta)
     #   p0 = p0p1[, 1];   p1 = p0p1[, 2]
@@ -138,8 +262,8 @@ grad_nll <- function(alpha, beta, y, x, va, vb,
     #                             beta)
     # 
     # if(any(abs(grad_beta-grad_beta) > 0.00001)) browser()
+  # if(any(is.na(grad_beta))) browser()
   }
-  
   if (opt == "alpha") return(grad_alpha)
   if (opt == "beta") return(grad_beta)
   if (opt == "both") return(list(grad_alpha = grad_alpha, 

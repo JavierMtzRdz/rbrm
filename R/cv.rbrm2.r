@@ -12,7 +12,85 @@
 #' @return A named vector containing deviance, mae, and mse. Returns Inf if inputs are inconsistent.
 #' @keywords internal
 #' @export
-calculate_metrics <- function(alpha, beta, va_test, vb_test, x_test, y_test, prob_fun) {
+# calculate_metrics <- function(alpha, beta, va_test, vb_test, x_test, y_test, prob_fun) {
+#   # Input validation
+#   if (is.null(prob_fun) || !is.function(prob_fun)) {
+#     cli::cli_abort("prob_fun must be a valid function for calculate_metrics.")
+#   }
+#   n_test <- length(y_test)
+#   if (nrow(va_test) != n_test || nrow(vb_test) != n_test || length(x_test) != n_test) {
+#     cli::cli_alert_warning("Inconsistent input dimensions for calculate_metrics.")
+#     return(c(deviance = Inf, mae = Inf, mse = Inf))
+#   }
+#   
+#   p_a_test <- ncol(va_test)
+#   p_b_test <- ncol(vb_test)
+#   
+#   # Check coefficient compatibility
+#   len_alpha <- length(alpha) # Handles NULL (length 0)
+#   len_beta <- length(beta)   # Handles NULL (length 0)
+#   
+#   if (len_alpha != p_a_test || len_beta != p_b_test) {
+#     cli::cli_alert_warning(sprintf("Coefficient length mismatch in calculate_metrics. Alpha: %d vs %d cols. Beta: %d vs %d cols.",
+#                                    len_alpha, p_a_test, len_beta, p_b_test))
+#     return(c(deviance = Inf, mae = Inf, mse = Inf))
+#   }
+#   
+#   # Calculate logrr and logop safely
+#   logrr <- if (p_a_test > 0) va_test %*% alpha else matrix(0, nrow = n_test, ncol = 1)
+#   logop <- if (p_b_test > 0) vb_test %*% beta else matrix(0, nrow = n_test, ncol = 1)
+#   
+#   # Get probabilities
+#   ps <- tryCatch({
+#     prob_fun(logrr, logop)
+#   }, error = function(e) {
+#     cli::cli_alert_warning(paste("prob_fun failed during metric calculation:", e$message))
+#     NULL
+#   })
+#   
+#   if (is.null(ps) || !is.list(ps) || is.null(ps$p0) || is.null(ps$p1) ||
+#       length(ps$p0) != n_test || length(ps$p1) != n_test) {
+#     cli::cli_alert_warning("prob_fun did not return expected structure or dimensions.")
+#     return(c(deviance = Inf, mae = Inf, mse = Inf))
+#   }
+#   
+#   p0 <- ps$p0
+#   p1 <- ps$p1
+#   
+#   # Separate observations based on x_test
+#   fitted.prob <- numeric(n_test)
+#   idx0 <- which(x_test == 0)
+#   idx1 <- which(x_test == 1)
+#   if(length(idx0) > 0) fitted.prob[idx0] <- p0[idx0]
+#   if(length(idx1) > 0) fitted.prob[idx1] <- p1[idx1]
+#   
+#   # Avoid log(0) issues and ensure finite probabilities
+#   epsilon <- 1e-15
+#   fitted.prob <- pmax(epsilon, pmin(1 - epsilon, fitted.prob))
+#   fitted.prob[!is.finite(fitted.prob)] <- 0.5 # Fallback for NaNs
+#   
+#   true.y <- y_test
+#   
+#   # Deviance calculation
+#   dev <- tryCatch({
+#     (-2 / n_test) * (sum(log(fitted.prob[true.y == 1])) +
+#                        sum(log1p(-fitted.prob[true.y == 0])))
+#   }, warning = function(w) Inf, error = function(e) Inf) # Catch log errors
+#   
+#   # MAE calculation
+#   mae <- mean(abs(fitted.prob - true.y))
+#   # MSE calculation
+#   mse <- mean((fitted.prob - true.y)^2)
+#   
+#   # Ensure results are finite
+#   dev <- ifelse(is.finite(dev), dev, Inf)
+#   mae <- ifelse(is.finite(mae), mae, Inf)
+#   mse <- ifelse(is.finite(mse), mse, Inf)
+#   
+#   return(c(deviance = dev, mae = mae, mse = mse))
+# }
+
+calculate_metrics <- function(alpha, beta, va_test, vb_test, x_test, y_test, prob_fun, threshold = 0.5) {
   # Input validation
   if (is.null(prob_fun) || !is.function(prob_fun)) {
     cli::cli_abort("prob_fun must be a valid function for calculate_metrics.")
@@ -20,20 +98,20 @@ calculate_metrics <- function(alpha, beta, va_test, vb_test, x_test, y_test, pro
   n_test <- length(y_test)
   if (nrow(va_test) != n_test || nrow(vb_test) != n_test || length(x_test) != n_test) {
     cli::cli_alert_warning("Inconsistent input dimensions for calculate_metrics.")
-    return(c(deviance = Inf, mae = Inf, mse = Inf))
+    return(NULL)
   }
   
   p_a_test <- ncol(va_test)
   p_b_test <- ncol(vb_test)
   
   # Check coefficient compatibility
-  len_alpha <- length(alpha) # Handles NULL (length 0)
-  len_beta <- length(beta)   # Handles NULL (length 0)
+  len_alpha <- length(alpha)
+  len_beta <- length(beta)
   
   if (len_alpha != p_a_test || len_beta != p_b_test) {
     cli::cli_alert_warning(sprintf("Coefficient length mismatch in calculate_metrics. Alpha: %d vs %d cols. Beta: %d vs %d cols.",
                                    len_alpha, p_a_test, len_beta, p_b_test))
-    return(c(deviance = Inf, mae = Inf, mse = Inf))
+    return(NULL)
   }
   
   # Calculate logrr and logop safely
@@ -51,7 +129,7 @@ calculate_metrics <- function(alpha, beta, va_test, vb_test, x_test, y_test, pro
   if (is.null(ps) || !is.list(ps) || is.null(ps$p0) || is.null(ps$p1) ||
       length(ps$p0) != n_test || length(ps$p1) != n_test) {
     cli::cli_alert_warning("prob_fun did not return expected structure or dimensions.")
-    return(c(deviance = Inf, mae = Inf, mse = Inf))
+    return(NULL)
   }
   
   p0 <- ps$p0
@@ -61,8 +139,8 @@ calculate_metrics <- function(alpha, beta, va_test, vb_test, x_test, y_test, pro
   fitted.prob <- numeric(n_test)
   idx0 <- which(x_test == 0)
   idx1 <- which(x_test == 1)
-  if(length(idx0) > 0) fitted.prob[idx0] <- p0[idx0]
-  if(length(idx1) > 0) fitted.prob[idx1] <- p1[idx1]
+  fitted.prob[idx0] <- p0[idx0]
+  fitted.prob[idx1] <- p1[idx1]
   
   # Avoid log(0) issues and ensure finite probabilities
   epsilon <- 1e-15
@@ -75,19 +153,56 @@ calculate_metrics <- function(alpha, beta, va_test, vb_test, x_test, y_test, pro
   dev <- tryCatch({
     (-2 / n_test) * (sum(log(fitted.prob[true.y == 1])) +
                        sum(log1p(-fitted.prob[true.y == 0])))
-  }, warning = function(w) Inf, error = function(e) Inf) # Catch log errors
+    
+    # mean_nll <- nllh(alpha, beta, va_test, vb_test, x_test, y_test,
+    #                  prob_fun = prob_fun)
+    # 
+    # # The deviance calculation remains the same
+    # deviance <- 2 * mean_nll * nrow(va)
+    
+  }, warning = function(w) Inf, error = function(e) Inf)
   
-  # MAE calculation
-  mae <- mean(abs(fitted.prob - true.y))
-  # MSE calculation
-  mse <- mean((fitted.prob - true.y)^2)
+  # Predicted classes based on the threshold
+  predicted.classes <- ifelse(fitted.prob > threshold, 1, 0)
   
-  # Ensure results are finite
-  dev <- ifelse(is.finite(dev), dev, Inf)
-  mae <- ifelse(is.finite(mae), mae, Inf)
-  mse <- ifelse(is.finite(mse), mse, Inf)
   
-  return(c(deviance = dev, mae = mae, mse = mse))
+  # Confusion Matrix
+  confusion_matrix <- table(Predicted = factor(predicted.classes, 
+                                               levels = c(0, 1)),
+                            Actual = true.y,
+                            deparse.level = 2)
+  
+  # Extract values from the confusion matrix
+  TN <- confusion_matrix[1, 1]
+  FN <- confusion_matrix[1, 2]
+  FP <- confusion_matrix[2, 1]
+  TP <- confusion_matrix[2, 2]
+  
+  # Classification metrics
+  accuracy <- (TP + TN) / (TP + TN + FP + FN)
+  sensitivity <- TP / (TP + FN) # Also known as Recall
+  specificity <- TN / (TN + FP)
+  precision <- TP / (TP + FP)
+  f1_score <- 2 * (precision * sensitivity) / (precision + sensitivity)
+  
+  # AUC calculation
+  roc_obj <- pROC::roc(true.y, fitted.prob, quiet = TRUE)
+  auc_val <- pROC::auc(roc_obj)
+  
+  # Ensure all metrics are finite, otherwise set to NA
+  metrics <- c(
+    deviance = dev,
+    auc = auc_val,
+    accuracy = accuracy,
+    sensitivity = sensitivity,
+    specificity = specificity,
+    precision = precision,
+    f1_score = f1_score
+  )
+  
+  metrics[!is.finite(metrics)] <- NA
+  
+  return(metrics)
 }
 
 #' Fit Relaxed Lasso Model
@@ -244,7 +359,10 @@ cv_relax_factor <- function(va, vb, x, y, fold_ids, selected_lambda, implt, prob
     }
   }
   # Ensure prob_fun is valid if metrics calculation definitely needs it
-  if (is.null(prob_fun) && type.measure %in% c("deviance", "mae", "mse")) {
+  if (is.null(prob_fun) && type.measure %in% c("deviance", "auc", "accuracy",
+                                               "sensitivity", "specificity",
+                                               "precision",
+                                               "f1_score")) {
     cli::cli_abort("prob_fun is required for calculating '%s' during relax factor CV, but it could not be determined or provided.", type.measure)
   }
   
@@ -721,7 +839,8 @@ cv_relax_factor <- function(va, vb, x, y, fold_ids, selected_lambda, implt, prob
 #' @param fold_ids A vector indicating fold membership for each observation (used if `relax_factor = NULL`).
 #' @param implt The underlying model fitting function (e.g., `rbrm`).
 #' @param prob_fun Function to calculate probabilities.
-#' @param type.measure The metric to optimize during relax factor cross-validation ("deviance" or "mae").
+#' @param type.measure The metric to optimize during relax factor cross-validation ("deviance", "auc", "accuracy", "sensitivity", "specificity",
+#' "precision", "f1_score").
 #' @param nfolds Number of folds for relax factor cross-validation (if `relax_factor = NULL`).
 #' @param p_a Number of alpha predictors in the full model.
 #' @param p_b Number of beta predictors in the full model.
@@ -858,8 +977,14 @@ complete_relax_lasso <- function(va, vb, x, y, initial_full_fit, lambda_selected
 # 1. Input Validation (Common to both functions)
 validate_cv_inputs <- function(va, vb, x, y, nfolds, type.measure) {
   if (nfolds < 2) cli::cli_abort("nfolds must be at least 2.")
-  if (!type.measure %in% c("deviance", "mae", "mse")) {
-    cli::cli_abort("type.measure must be one of 'deviance', 'mae', or 'mse'.")
+  if (!type.measure %in% c("deviance", "auc", "accuracy",
+                           "sensitivity", "specificity",
+                           "precision",
+                           "f1_score")) {
+    cli::cli_abort("type.measure must be one of 'deviance', 'auc', 'accuracy',
+                                               'sensitivity', 'specificity',
+                                               'precision',
+                                               'f1_score'.")
   }
   n <- length(y)
   if (nrow(va) != n || (!is.null(vb) && nrow(vb) != n) || length(x) != n) { # Allow vb=NULL initially
@@ -876,25 +1001,34 @@ validate_cv_inputs <- function(va, vb, x, y, nfolds, type.measure) {
 }
 
 # 2. Lambda Grid Setup
-setup_lambda_grid <- function(lambda, va, vb, y, n_lambdas, epsilon = 0.05) {
+setup_lambda_grid <- function(lambda, va, vb, y, n_lambdas, 
+                              max_lambda = 1,
+                              epsilon = 0.05) {
+  
   if (is.null(lambda)) {
+    
     lambda_grid <- tryCatch({
       # Simplified lambda max heuristic (as before)
-      X_combined <- cbind(va, vb)
-      n <- nrow(X_combined)
-      variances <- apply(X_combined, 2, var, na.rm = TRUE)
-      X_combined_valid <- X_combined[, variances > 1e-8, drop = FALSE]
-      if (ncol(X_combined_valid) == 0) stop("No variance in predictors.")
-      if(length(unique(y)) < 2) stop("Outcome y has no variation.") # Ensure variation
-      # cor_vals <- abs(stats::cor(X_combined_valid, y, use = "pairwise.complete.obs"))
-      # max_lambda_est <- max(cor_vals, na.rm = TRUE) * 1.1 # Added margin
-      
-      ## Standardize variables: (need to use n instead of (n-1) as denominator)
+        
+      if(is.null(max_lambda)){
+        
+        X_combined <- cbind(va, vb)
+        n <- nrow(X_combined)
+        variances <- apply(X_combined, 2, var, na.rm = TRUE)
+        X_combined_valid <- X_combined[, variances > 1e-8, drop = FALSE]
+        if (ncol(X_combined_valid) == 0) stop("No variance in predictors.")
+        if(length(unique(y)) < 2) stop("Outcome y has no variation.") # Ensure variation
+        # cor_vals <- abs(stats::cor(X_combined_valid, y, use = "pairwise.complete.obs"))
+        # max_lambda_est <- max(cor_vals, na.rm = TRUE) * 1.1 # Added margin
+        
+        ## Standardize variables: (need to use n instead of (n-1) as denominator)
       mysd <- function(z) sqrt(sum((z-mean(z))^2)/length(z))
       sx <- scale(X_combined, scale = apply(X_combined, 2, mysd))
       ## Calculate lambda path (first get lambda_max):
-      max_lambda_est <- max(abs(colSums(sx*y)))/n
+      max_lambda_est <- (max(abs(colSums(sx*y)))/n)*1.1
       if (!is.finite(max_lambda_est) || max_lambda_est <= 1e-6) max_lambda_est <- 1.0
+      } else {max_lambda_est <-  max_lambda}
+      
       l_max <- log(max_lambda_est)
       l_min <- log(epsilon * max_lambda_est)
       # Ensure l_min is smaller than l_max
@@ -974,8 +1108,8 @@ determine_function <- function(fun_arg, fun_name, orig_call = NULL, default_expr
 
 # 4. Fit Model Safely (Wrapper around implt)
 fit_model_on_data <- function(va, vb, x, y, lambda,
-                              implt, prob_fun = NULL, opt_fun = NULL, # Include opt_fun
-                              expected_pa, expected_pb, # Expected dimensions *for this fit*
+                              implt, prob_fun = NULL, opt_fun = NULL, 
+                              alpha_start = NULL, beta_start = NULL,
                               ...) {
   fit_args <- list(
     va = va,
@@ -983,61 +1117,85 @@ fit_model_on_data <- function(va, vb, x, y, lambda,
     x = x,
     y = y,
     lambda = lambda,
+    alpha_start = alpha_start,
+    beta_start = beta_start,
     ...
   )
   if (!is.null(prob_fun)) fit_args$prob_fun <- prob_fun
-  if (!is.null(opt_fun)) fit_args$opt_fun <- opt_fun # Pass opt_fun if available
-  
-  # cli::cli_alert_info(sprintf("Calling 'implt' with lambda=%.5f (Expected dims: %d+%d)", lambda, expected_pa, expected_pb))
+  if (!is.null(opt_fun)) fit_args$opt_fun <- opt_fun #
   
   fit <- tryCatch({
     do.call(implt, fit_args)
   }, error = function(e) {
     cli::cli_alert_warning(sprintf("Fit error lambda=%.5f: %s", lambda, e$message))
-    NULL
+  
+    return(NULL)
   })
   
-  # Validate fit structure and dimensions
-  valid_fit <- FALSE
-  if (!is.null(fit) && !is.null(fit$point.est)) {
-    actual_len <- length(fit$point.est)
-    expected_len <- expected_pa + expected_pb
-    if (actual_len == expected_len) {
-      valid_fit <- TRUE
-    } else {
-      cli::cli_alert_warning(sprintf("Coeff length mismatch lambda=%.5f: Got %d, Expected %d.", lambda, actual_len, expected_len))
-    }
-  } # else fit is NULL, already warned
-  
-  if (!valid_fit) return(NULL) # Return NULL if invalid
+  if(is.null(fit$point.est)) browser()
   return(fit)
 }
 
 
 # 6. Select Lambda
 select_lambda <- function(cv_results_matrix, lambda_grid, type.measure, nfolds, index) {
+  # Determine if the metric should be maximized (higher is better)
+  maximize_metrics <- c("auc", "accuracy", "sensitivity", "specificity", "precision", "f1_score")
+  maximize <- type.measure %in% maximize_metrics
+  
+  # --- Calculate CV Mean and Standard Error ---
   cv_mean <- colMeans(cv_results_matrix, na.rm = TRUE)
   cv_sd   <- apply(cv_results_matrix, 2, sd, na.rm = TRUE)
-  cv_mean[!is.finite(cv_mean)] <- Inf
+  
+  # Handle non-finite values based on whether we are maximizing or minimizing
+  if (maximize) {
+    cv_mean[!is.finite(cv_mean)] <- -Inf # Set to -Inf so it's never chosen as max
+  } else {
+    cv_mean[!is.finite(cv_mean)] <- Inf  # Set to +Inf so it's never chosen as min
+  }
   cv_sd[!is.finite(cv_sd)] <- 0
   cv_se <- cv_sd / sqrt(nfolds)
   
-  best_lambda_idx <- which.min(cv_mean)
+  # --- Find lambda.min ---
+  # Find the index of the best performing lambda
+  best_lambda_idx <- if (maximize) which.max(cv_mean) else which.min(cv_mean)
+  
   if (length(best_lambda_idx) == 0 || !is.finite(cv_mean[best_lambda_idx])) {
     cli::cli_abort("CV failed: No finite optimal lambda found for type.measure='{type.measure}'.")
   }
   lambda_min <- lambda_grid[best_lambda_idx]
   
-  threshold <- cv_mean[best_lambda_idx] + cv_se[best_lambda_idx]
-  valid_idx <- which(cv_mean <= threshold + 1e-8) # Add tolerance
+  # --- Find lambda.1se ---
+  # The "1se" rule finds the simplest model (largest lambda) within one standard error of the best model.
+  best_value <- cv_mean[best_lambda_idx]
+  one_se_away <- cv_se[best_lambda_idx]
+  
+  if (maximize) {
+    # For maximized metrics, the performance threshold is the best value MINUS one standard error
+    threshold <- best_value - one_se_away
+    valid_idx <- which(cv_mean >= threshold - 1e-8) # Add tolerance
+  } else {
+    # For minimized metrics, the performance threshold is the best value PLUS one standard error
+    threshold <- best_value + one_se_away
+    valid_idx <- which(cv_mean <= threshold + 1e-8) # Add tolerance
+  }
+  
+  # lambda.1se is the largest lambda within the valid performance range
   lambda_1se <- max(lambda_grid[valid_idx], na.rm = TRUE)
   
+  # --- Select Final Lambda ---
   index_lower <- tolower(index)
-  if (index_lower == "min") { lambda_selected <- lambda_min }
-  else if (index_lower == "1se") { lambda_selected <- lambda_1se }
-  else { cli::cli_alert_warning("Invalid index '{index}', using 'min'."); index_lower<-"min"; lambda_selected <- lambda_min }
+  if (index_lower == "min") {
+    lambda_selected <- lambda_min
+  } else if (index_lower == "1se") {
+    lambda_selected <- lambda_1se
+  } else {
+    cli::cli_alert_warning("Invalid index '{index}', using 'min'.")
+    index_lower <- "min"
+    lambda_selected <- lambda_min
+  }
   
-  cli::cli_alert_info("Selected lambda ({index_lower}): {signif(lambda_selected, 4)}")
+  cli::cli_alert_info("Selected lambda ({index_lower}): {signif(lambda_selected, 4)} for {type.measure}")
   
   list(
     lambda_selected = lambda_selected,
@@ -1131,61 +1289,69 @@ perform_cv_fold <- function(fold, fold_ids, va, vb, x, y, lambda_grid,
                             implt, prob_fun, opt_fun, type.measure,
                             progress_bar_id, # <-- New argument
                             alpha.start = NULL, beta.start = NULL,
-                            lr.alpha = 0.5, lr.beta = 1.5,
-                            est_l_fold = F,
+                            warm_start = T,
                             ...) {
   test_idx <- which(fold_ids == fold)
   train_idx <- which(fold_ids != fold)
   
   # Create train/test splits
-  va_train <- va[train_idx, , drop = FALSE]; p_a_train <- ncol(va_train)
-  vb_train <- vb[train_idx, , drop = FALSE]; p_b_train <- ncol(vb_train)
+  va_train <- va[train_idx, , drop = FALSE]
+  vb_train <- vb[train_idx, , drop = FALSE]
   x_train <- x[train_idx]; y_train <- y[train_idx]
   va_test <- va[test_idx, , drop = FALSE]; vb_test <- vb[test_idx, , drop = FALSE]
   x_test <- x[test_idx]; y_test <- y[test_idx]
   
   n_lambdas <- length(lambda_grid)
   lambda_names <- format(lambda_grid, digits = 4, scientific = TRUE)
-  fold_metrics_raw <- matrix(NA_real_, nrow = 3, ncol = n_lambdas,
-                             dimnames = list(c("deviance", "mae", "mse"), lambda_names))
+  
+  fold_metrics_raw <- matrix(NA_real_, nrow = 7, ncol = n_lambdas,
+                             dimnames = list(c("deviance", "auc", "accuracy",
+                                               "sensitivity", "specificity",
+                                               "precision",
+                                               "f1_score"), lambda_names))
   
   pa <- dim(va_train)[2]
   pb <- dim(vb_train)[2]
+  
+  alpha.start <- rep(0, pa)
+  beta.start <- rep(0, pb)
   
   for (i in 1:n_lambdas) {
     
     current_lambda <- lambda_grid[i]
     
-    if(est_l_fold && i == 1){
-    opt_vals <- fista_opt2(rep(0, pa), rep(0, pa),
-                           0.5, 1.5,
-                           lambda = min(lambda_grid), 
-                           intercept = F, 
-                           max_step = 10, 
-                           va_train, vb_train, x_train, y_train,
-                           prob_fun = prob_fun,
-                           eval_grad = F,
-                           est_l = T)
-    lr.alpha <- opt_vals$step_size_alpha
-    lr.beta <- opt_vals$step_size_beta
+    fit_args <- list(alpha_start = alpha.start, beta_start = beta.start,
+                     va = va_train, vb = vb_train, x = x_train, y = y_train,
+                     lambda = current_lambda,
+                     implt = implt, prob_fun = prob_fun, opt_fun = opt_fun,
+                     ...)
+    
+    fit <- do.call(fit_model_on_data, fit_args)
+    
+    if(warm_start == T){
+      
+      if(is.null(fit_args$lr.alpha)) {
+        fit_args$lr.alpha <- (lambda_grid[i+1]/lambda_grid[i])
+      } else {
+        fit_args$lr.alpha <- (lambda_grid[i+1]/lambda_grid[i])*fit_args$lr.alpha
+      }
+
+      if(is.null(fit_args$lr.beta)) {
+        fit_args$lr.beta <- (lambda_grid[i+1]/lambda_grid[i])
+      } else {
+        fit_args$lr.beta <- (lambda_grid[i+1]/lambda_grid[i])*fit_args$lr.alpha
+      }
+      fit_args$lr.alpha <-  pmax(fit_args$lr.alpha, 0.005)
+      fit_args$lr.alpha <-  pmax(fit_args$lr.alpha, 0.005)
+      alpha.start <- fit$point.est[1:pa]
+      beta.start <- fit$point.est[(pa+1):(pa+pb)]
     }
     
-    fit <- fit_model_on_data(
-      va = va_train, vb = vb_train, x = x_train, y = y_train,
-      lambda = current_lambda,
-      implt = implt, prob_fun = prob_fun, opt_fun = opt_fun,
-      expected_pa = p_a_train, expected_pb = p_b_train,
-      lr.alpha = lr.alpha, lr.beta = lr.beta,
-      ...
-    )
-    
-    alpha.start <- fit$point.est[1:pa]
-    beta.start <- fit$point.est[(pa+1):(pa+pb)]
     
     if (!is.null(fit)) {
       metrics <- calculate_metrics(
-        alpha = fit$point.est[1:p_a_train],
-        beta = fit$point.est[(p_a_train + 1):(p_a_train + p_b_train)],
+        alpha = fit$point.est[1:pa],
+        beta = fit$point.est[(pa+1):(pa+pb)],
         va_test = va_test, vb_test = vb_test,
         x_test = x_test, y_test = y_test,
         prob_fun = prob_fun
@@ -1208,20 +1374,22 @@ perform_cv_fold <- function(fold, fold_ids, va, vb, x, y, lambda_grid,
 #' @export
 cv_rbrm2 <- function(va, vb, x, y, lambda = NULL,
                      n_lambdas = 20, nfolds = 3,
-                     implt = rbrm.exp2, # Ensure defined
+                     implt = fit.rbrm, # Ensure defined
                      prob_fun = NULL,
                      relax_lsso = FALSE,
                      relax_factor = NULL,
+                     max_lambda = NULL,
+                     eps_grid = 0.05,
                      relax_factors_grid = c(0, 0.25, 0.5, 0.75, 1),
                      index = "min",
                      type.measure = "deviance",
-                     est_l_fold = F,
-                     ...) { # Captures opt_fun etc.
+                     warm_start = T,
+                     ...) {
   
   tictoc::tic("Total cv_rbrm2 time")
   # Setup complex on.exit structure carefully
   env <- environment() # Capture environment for on.exit
-  env$.pb_cv_lambda_id <- NULL # Initialize ID holder
+  env$.pb_cv_lambda_id <- NULL 
   on.exit({
     # Close progress bar if it was created
     if (!is.null(env$.pb_cv_lambda_id)) {
@@ -1229,8 +1397,6 @@ cv_rbrm2 <- function(va, vb, x, y, lambda = NULL,
     }
     # Log time
     elapsed <- tryCatch(tictoc::toc(log = FALSE, quiet = TRUE), error = function(e) list(toc=0, tic=0))
-    # Optional: print time even on error
-    # message("Elapsed time in cv_rbrm2: ", round(elapsed$toc - elapsed$tic, 4))
   }, add = TRUE)
   
   
@@ -1245,7 +1411,9 @@ cv_rbrm2 <- function(va, vb, x, y, lambda = NULL,
   else if (p_b > 0 && any(duplicated(colnames(vb)))) colnames(vb) <- make.unique(colnames(vb))
   
   # --- 2. Setup Lambda Grid ---
-  lambda_setup <- setup_lambda_grid(lambda, va, vb, y, n_lambdas)
+  lambda_setup <- setup_lambda_grid(lambda, va, vb, y, n_lambdas,
+                                    max_lambda = max_lambda,
+                                    epsilon = eps_grid)
   lambda_grid <- lambda_setup$lambda_grid
   n_lambdas <- lambda_setup$n_lambdas
   
@@ -1272,7 +1440,7 @@ cv_rbrm2 <- function(va, vb, x, y, lambda = NULL,
       implt = implt, prob_fun = prob_fun,
       type.measure = type.measure,
       progress_bar_id = env$.pb_cv_lambda_id, # <-- Pass ID
-      est_l_fold = est_l_fold,
+      warm_start = warm_start,
       ... # Pass opt_fun and other args
     )
   })
@@ -1289,7 +1457,6 @@ cv_rbrm2 <- function(va, vb, x, y, lambda = NULL,
     va = va, vb = vb, x = x, y = y,
     lambda = lambda_selected,
     implt = implt, prob_fun = prob_fun,
-    expected_pa = p_a, expected_pb = p_b,
     ... # Pass opt_fun etc.
   )
   if (is.null(initial_full_fit)) {
@@ -1340,207 +1507,147 @@ cv_rbrm2 <- function(va, vb, x, y, lambda = NULL,
   return(output)
 }
 
+perform_path <- function(va, vb, x, y, lambda_grid,
+                            implt, prob_fun, opt_fun,
+                            progress_bar_id, # <-- New argument
+                            alpha.start = NULL, beta.start = NULL,
+                            warm_start = T,
+                            ...) {
+ 
+  n_lambdas <- length(lambda_grid)
+  
+  lambda_names <- format(lambda_grid, digits = 4, scientific = TRUE)
+  
+  pa <- dim(va)[2]
+  pb <- dim(vb)[2]
+  
+  coeffs <- matrix(NA_real_, nrow = n_lambdas,
+                             ncol = pa + pb)
+  
+  rownames(coeffs) <- lambda_names
+  colnames(coeffs) <- c(colnames(va), colnames(vb))
+  alpha.start <- rep(0, pa)
+  beta.start <- rep(0, pb)
+  
+  for (i in 1:n_lambdas) {
+    
+    current_lambda <- lambda_grid[i]
+    
+    fit_args <- list(alpha_start = alpha.start, beta_start = beta.start,
+                     va = va, vb = vb, x = x, y = y,
+                     lambda = current_lambda,
+                     implt = implt, prob_fun = prob_fun, opt_fun = opt_fun,
+                     ...)
+    
+    fit <- do.call(fit_model_on_data, fit_args)
+    
+    if(warm_start == T){
+      
+      
+      if(is.null(fit_args$lr.alpha)) {
+        fit_args$lr.alpha <- (lambda_grid[i+1]/lambda_grid[i])
+      } else {
+        fit_args$lr.alpha <- (lambda_grid[i+1]/lambda_grid[i])*fit_args$lr.alpha
+      }
+
+      if(is.null(fit_args$lr.beta)) {
+        fit_args$lr.beta <- (lambda_grid[i+1]/lambda_grid[i])
+      } else {
+        fit_args$lr.beta <- (lambda_grid[i+1]/lambda_grid[i])*fit_args$lr.alpha
+      }
+      fit_args$lr.alpha <-  pmax(fit_args$lr.alpha, 0.005)
+      fit_args$lr.alpha <-  pmax(fit_args$lr.alpha, 0.005)
+      alpha.start <- fit$point.est[1:pa]
+      beta.start <- fit$point.est[(pa+1):(pa+pb)]
+    }
+    
+    
+    coeffs[i, ] <- fit$point.est
+    
+    # Update progress bar USING the passed ID
+    cli::cli_progress_update(id = progress_bar_id) 
+    
+  } # End lambda loop
+  
+  return(coeffs)
+}
 
 
-# refit.cv_rbrm2 <- function(object,
-#                            newdata_va, newdata_vb, newdata_x, newdata_y,
-#                            lambda = NULL,
-#                            only_active_vars = FALSE,
-#                            refit_lambda_on_active = FALSE,
-#                            relax_lsso = NA,
-#                            relax_factor = NULL,
-#                            implt = NULL,      # Default NULL triggers retrieval
-#                            prob_fun = NULL,   # Default NULL
-#                            opt_fun = NULL,    # Default NULL
-#                            ...) {
-#   
-#   tictoc::tic("refit.cv_rbrm2 time")
-#   on.exit(tictoc::toc(log = TRUE, quiet = TRUE))
-#   
-#   if (!inherits(object, "cv_rbrm2")) stop("'object' must be of class 'cv_rbrm2'")
-#   
-#   # --- Get Original Fit Info ---
-#   orig_call <- object$call
-#   orig_lambda_selected <- object$lambda.selected
-#   orig_relax_info <- object$relax_lsso_info
-#   orig_alpha_full <- object$alpha; orig_beta_full <- object$beta
-#   p_a_orig <- length(orig_alpha_full); p_b_orig <- length(orig_beta_full)
-#   orig_colnames_va <- names(orig_alpha_full); orig_colnames_vb <- names(orig_beta_full)
-#   
-#   # --- Determine Functions (implt, prob_fun, opt_fun) ---
-#   # Using the determine_function helper (still fragile if NULL)
-#   implt <- determine_function(implt, "implt", orig_call, required = TRUE)
-#   implt_name <- deparse1(substitute(implt))
-#   opt_fun_default_expr <- NULL # Determine opt_fun default based on implt if possible
-#   implt_formals <- formals(implt)
-#   if ("opt_fun" %in% names(implt_formals)) opt_fun_default_expr <- implt_formals$opt_fun
-#   opt_fun <- determine_function(opt_fun, "opt_fun", orig_call, default_expr_str = deparse1(opt_fun_default_expr), required = TRUE)
-#   default_prob_str <- "" # Determine prob_fun default based on implt name
-#   if (implt_name == "rbrm.experimental") {
-#     default_prob_str <- "getProbRR.org"
-#   } else if (implt_name == "rbrm" || grepl("brm::rbrm", implt_name)) {default_prob_str <- "brm::getProbRR"}
-#   prob_fun <- determine_function(prob_fun, "prob_fun", orig_call, default_expr_str = default_prob_str, required = FALSE)
-#   
-#   # --- Validate New Data ---
-#   if(missing(newdata_va) || missing(newdata_vb) || missing(newdata_x) || missing(newdata_y)){
-#     stop("Arguments 'newdata_va', 'newdata_vb', 'newdata_x', 'newdata_y' are required.")
-#   }
-#   # Use helper for basic dimension checks
-#   dim_info_new <- validate_cv_inputs(newdata_va, newdata_vb, newdata_x, newdata_y, nfolds=2, type.measure="deviance")
-#   p_a_new <- dim_info_new$p_a; p_b_new <- dim_info_new$p_b
-#   
-#   # Check compatibility with original dimensions
-#   if (p_a_new < p_a_orig || p_b_new < p_b_orig) stop("New data has fewer columns than original fit requires.")
-#   
-#   # --- Corrected Column Name Handling ---
-#   # Assign column names if missing in newdata, try using original names first
-#   if (is.null(colnames(newdata_va)) && !is.null(orig_colnames_va) && p_a_new >= p_a_orig) {
-#     # Assign original names (up to the number of columns in newdata)
-#     colnames(newdata_va) <- orig_colnames_va[1:p_a_new]
-#     # Check for duplicates *after* assigning potentially non-unique original names
-#     if (any(duplicated(colnames(newdata_va)))) {
-#       cli::cli_alert_info("Making potentially non-unique 'newdata_va' colnames unique.")
-#       colnames(newdata_va) <- make.unique(colnames(newdata_va))
-#     }
-#   } else if (is.null(colnames(newdata_va)) && p_a_new > 0) {
-#     # Assign default names if original names not available/applicable
-#     colnames(newdata_va) <- paste0("va_", 1:p_a_new)
-#   } else if (p_a_new > 0 && any(duplicated(colnames(newdata_va)))) {
-#     # Make existing names unique if duplicated
-#     cli::cli_alert_info("Making existing non-unique 'newdata_va' colnames unique.")
-#     colnames(newdata_va) <- make.unique(colnames(newdata_va))
-#   }
-#   # Repeat similar logic for newdata_vb
-#   if (is.null(colnames(newdata_vb)) && !is.null(orig_colnames_vb) && p_b_new >= p_b_orig) {
-#     colnames(newdata_vb) <- orig_colnames_vb[1:p_b_new]
-#     if (any(duplicated(colnames(newdata_vb)))) {
-#       cli::cli_alert_info("Making potentially non-unique 'newdata_vb' colnames unique.")
-#       colnames(newdata_vb) <- make.unique(colnames(newdata_vb))
-#     }
-#   } else if (is.null(colnames(newdata_vb)) && p_b_new > 0) {
-#     colnames(newdata_vb) <- paste0("vb_", 1:p_b_new)
-#   } else if (p_b_new > 0 && any(duplicated(colnames(newdata_vb)))) {
-#     cli::cli_alert_info("Making existing non-unique 'newdata_vb' colnames unique.")
-#     colnames(newdata_vb) <- make.unique(colnames(newdata_vb))
-#   }
-#   # --- End Correction ---
-#   
-#   # --- Determine Parameters for Refit ---
-#   # (Lambda, Relax setting, Relax factor logic same as previous robust version)
-#   lambda_refit <- orig_lambda_selected
-#   if (!is.null(lambda)) { # Handle lambda override
-#     if (is.character(lambda)) { lambda_char <- tolower(lambda)
-#     if (lambda_char == "lambda.min") lambda_refit <- object$lambda.min
-#     else if (lambda_char == "lambda.1se") lambda_refit <- object$lambda.1se
-#     else stop("Invalid char lambda.")
-#     } else if (is.numeric(lambda) && length(lambda) == 1 && lambda >= 0) lambda_refit <- lambda
-#     else stop("Invalid lambda value.") }
-#   cli::cli_alert_info("Target lambda for refit: {signif(lambda_refit, 4)}")
-#   
-#   relaxation_params <- determine_relaxation_params(relax_lsso, relax_factor, orig_relax_info, only_active_vars)
-#   relax_lsso_refit <- relaxation_params$perform
-#   relax_factor_refit <- relaxation_params$factor
-#   
-#   
-#   # --- Prepare Data for Fitting ---
-#   # (Same subsetting logic as previous version)
-#   va_fit <- newdata_va; vb_fit <- newdata_vb; x_fit <- newdata_x; y_fit <- newdata_y
-#   active_alpha_indices <- 1:p_a_orig; active_beta_indices <- 1:p_b_orig
-#   if (only_active_vars) {
-#     cli::cli_alert_info("Refitting using only originally active variables.")
-#     active_alpha_indices <- which(abs(orig_alpha_full) > 1e-10)
-#     active_beta_indices <- active_alpha_indices
-#     # active_beta_indices  <- which(abs(orig_beta_full) > 1e-10)
-#     if (any(active_alpha_indices > p_a_new) || any(active_beta_indices > p_b_new)) stop("Active indices invalid for newdata dimensions.")
-#     if (length(active_alpha_indices) == 0 && length(active_beta_indices) == 0) stop("No active variables in original model.")
-#     # Subset using original indices which should be valid for newdata cols
-#     va_fit <- newdata_va[, active_alpha_indices, drop = FALSE]
-#     vb_fit <- va_fit
-#     # vb_fit <- newdata_vb[, active_beta_indices, drop = FALSE]
-#   }
-#   p_a_fit <- ncol(va_fit); p_b_fit <- ncol(vb_fit)
-#   
-#   # --- Determine Final Lambda for implt ---
-#   lambda_actual_fit <- lambda_refit
-#   if (only_active_vars && !relax_lsso_refit && !refit_lambda_on_active) {
-#     cli::cli_alert_info("Performing fit (lambda={lambda_actual_fit}) on active variables.")
-#   }
-#   
-#   # --- Call Implementation Function ---
-#   # (Same logic as previous version using fit_model_on_data helper
-#   #  and inline relaxation logic, ensure helpers are defined)
-#   final_fit_details <- NULL; fit_coeffs_subset <- NULL; status <- "Failed"
-#   
-#   if (!relax_lsso_refit) {
-#     
-#     final_fit_details <- fit_model_on_data(va_fit, vb_fit, x_fit, y_fit,
-#                                            lambda_actual_fit,
-#                                            implt, prob_fun, opt_fun, p_a_fit, p_b_fit, ...)
-#     if (!is.null(final_fit_details)) { 
-#       fit_coeffs_subset <- final_fit_details$point.est; status <- "Success"
-#     }
-#     else { cli::cli_abort("Refit failed or returned invalid structure from 'implt'.") }
-#   } else {
-#     lambda_relaxed_fit <- lambda_actual_fit * relax_factor_refit
-#     if (!only_active_vars) { # Case 3: Relax All Vars
-#       initial_refit <- fit_model_on_data(va_fit, vb_fit, x_fit, y_fit, lambda_actual_fit,
-#                                          implt, prob_fun, opt_fun, p_a_fit, p_b_fit, extra_args)
-#       if (is.null(initial_refit)) cli::cli_abort("Initial fit for relaxation failed.")
-#       alpha_active_new <- which(abs(initial_refit$point.est[1:p_a_new]) > 1e-10)
-#       beta_active_new  <- which(abs(initial_refit$point.est[(p_a_new+1):(p_a_new+p_b_new)]) > 1e-10)
-#       if (length(alpha_active_new)==0 && length(beta_active_new)==0) {
-#         cli::cli_alert_warning("No active vars in initial. Using initial fit results."); final_fit_details <- initial_refit; fit_coeffs_subset <- final_fit_details$point.est
-#         active_alpha_indices <- integer(0); active_beta_indices <- integer(0); relax_factor_refit <- NA_real_; status <- "Success (Relax Skipped)"
-#       } else {
-#         va_relaxed_refit <- va_fit[, alpha_active_new, drop=FALSE]; vb_relaxed_refit <- vb_fit[, beta_active_new, drop=FALSE]
-#         active_alpha_indices <- alpha_active_new; active_beta_indices  <- beta_active_new
-#         final_fit_details <- fit_model_on_data(va_relaxed_refit, vb_relaxed_refit, x_fit, y_fit, lambda_relaxed_fit,
-#                                                implt, prob_fun, opt_fun, ncol(va_relaxed_refit), ncol(vb_relaxed_refit), extra_args)
-#         if (is.null(final_fit_details)) {
-#           cli::cli_alert_warning("Relaxed fit failed. Using initial results."); final_fit_details <- initial_refit; fit_coeffs_subset <- final_fit_details$point.est
-#           active_alpha_indices <- 1:p_a_new; active_beta_indices <- 1:p_b_new; relax_factor_refit <- NA_real_; status = "Failed (Relax Step)"
-#         } else { fit_coeffs_subset <- final_fit_details$point.est; status <- "Success"; cli::cli_alert_success("Relaxed refit successful.") }
-#       }
-#     } else { # Case 4: Relax Active Vars Only
-#       final_fit_details <- fit_model_on_data(va_fit, vb_fit, x_fit, y_fit, lambda_relaxed_fit, # va_fit/vb_fit already subsetted
-#                                              implt, prob_fun, opt_fun, p_a_fit, p_b_fit, extra_args)
-#       if (is.null(final_fit_details)) cli::cli_abort("Relaxed fit on active vars failed.")
-#       fit_coeffs_subset <- final_fit_details$point.est; status <- "Success"; cli::cli_alert_success("Relaxed refit on active successful.")
-#     }
-#   }
-#   
-#   
-#   # --- Reconstruct Full Coefficient Vector ---
-#   # (Using reconstruct_coeffs helper)
-#   recon_result <- reconstruct_coeffs(
-#     fit_coeffs = fit_coeffs_subset,
-#     p_a_orig = p_a_orig, p_b_orig = p_b_orig,
-#     alpha_indices_fit = active_alpha_indices, # Indices used relative to original data
-#     beta_indices_fit = active_beta_indices,
-#     orig_colnames_va = orig_colnames_va,
-#     orig_colnames_vb = orig_colnames_vb
-#   )
-#   
-#   # --- Prepare Output ---
-#   elapsed <- tictoc::toc(quiet = TRUE)
-#   relax_factor_out <- ifelse(relax_lsso_refit && recon_result$status != "Failed (Relax Step)" && status != "Failed (Relax Step)", relax_factor_refit, NA_real_)
-#   
-#   output <- list(
-#     alpha = recon_result$alpha,
-#     beta = recon_result$beta,
-#     lambda_used = lambda_refit, # Target lambda
-#     relax_factor_used = relax_factor_out,
-#     active_alpha_indices = active_alpha_indices,
-#     active_beta_indices = active_beta_indices,
-#     convergence = if (!is.null(final_fit_details)) final_fit_details$convergence else NA,
-#     step = if (!is.null(final_fit_details)) final_fit_details$step else NA,
-#     refit_status = status,
-#     reconstruction_status = recon_result$status,
-#     refit_call = match.call(),
-#     final_implt_fit = final_fit_details,
-#     refit_time = round(elapsed$toc - elapsed$tic, 4)
-#   )
-#   class(output) <- "refit_cv_rbrm"
-#   cli::cli_alert_success("Refit finished in: {output$refit_time} seconds (Status: {status}, Recon: {recon_result$status})")
-#   return(output)
-# }
+# --- Corrected cv_rbrm2 (Passes progress bar ID) ---
+#' @export
+rbrm_path <- function(va, vb, x, y, lambda = NULL,
+                     n_lambdas = 20,
+                     implt = fit.rbrm, 
+                     prob_fun = NULL,
+                     relax_lsso = FALSE,
+                     relax_factor = NULL,
+                     max_lambda = NULL,
+                     eps_grid = 0.05,
+                     warm_start = T,
+                     ...) {
+  
+  tictoc::tic("rbrm path")
+  # Setup complex on.exit structure carefully
+  env <- environment() # Capture environment for on.exit
+  env$.pb_cv_lambda_id <- NULL 
+  on.exit({
+    # Close progress bar if it was created
+    if (!is.null(env$.pb_cv_lambda_id)) {
+      try(cli::cli_progress_done(id = env$.pb_cv_lambda_id), silent = TRUE)
+    }
+    # Log time
+    elapsed <- tryCatch(tictoc::toc(log = FALSE, quiet = TRUE), error = function(e) list(toc=0, tic=0))
+  }, add = TRUE)
+  
+  
+  # --- 1. Validate Inputs ---
+  dim_info <- validate_cv_inputs(va, vb, x, y, 2, 'deviance')
+  p_a <- dim_info$p_a; p_b <- dim_info$p_b
+  
+  # --- Corrected Column Name Handling ---
+  if (is.null(colnames(va)) && p_a > 0) colnames(va) <- paste0("va_", 1:p_a)
+  else if (p_a > 0 && any(duplicated(colnames(va)))) colnames(va) <- make.unique(colnames(va))
+  if (is.null(colnames(vb)) && p_b > 0) colnames(vb) <- paste0("vb_", 1:p_b)
+  else if (p_b > 0 && any(duplicated(colnames(vb)))) colnames(vb) <- make.unique(colnames(vb))
+  
+  # --- 2. Setup Lambda Grid ---
+  lambda_setup <- setup_lambda_grid(lambda, va, vb, y, n_lambdas, 
+                                    max_lambda = max_lambda,
+                                    epsilon = eps_grid)
+  lambda_grid <- lambda_setup$lambda_grid
+  n_lambdas <- lambda_setup$n_lambdas
+  
+  # --- 3. Determine Probability Function ---
+  # (Same logic as before using determine_function helper)
+  default_prob_str <- ""; implt_name <- deparse1(substitute(implt))
+  if (implt_name == "rbrm.experimental") default_prob_str <- "getProbRR.org"
+  else if (implt_name == "rbrm" || grepl("brm::rbrm", implt_name)) default_prob_str <- "brm::getProbRR"
+  prob_fun <- determine_function(prob_fun, "prob_fun", default_expr_str = default_prob_str, required = prob_fun_req)
+  
+  # --- 4. Run Cross-Validation ---
+  
+  # Initialize progress bar and CAPTURE its ID
+  env$.pb_cv_lambda_id <- cli::cli_progress_bar(name = "CV for Lambda", total = n_lambdas)
+  
+  coeffs_path <- perform_path(
+    va = va, vb = vb, x = x, y = y,
+    lambda_grid = lambda_grid,
+    implt = implt, prob_fun = prob_fun,
+    progress_bar_id = env$.pb_cv_lambda_id, 
+    warm_start = warm_start,
+    ... 
+  )
+  
+  output <- list(
+    call = match.call(), 
+    lambda_grid = lambda_grid, 
+    coeffs = coeffs_path,
+    time = NA_real_
+  )
+  elapsed <- tryCatch(tictoc::toc(log = FALSE, quiet = TRUE), error = function(e) list(toc=0, tic=0))
+  output$time <- round(elapsed$toc - elapsed$tic, 4)
+  
+  class(output) <- "cv_rbrm2"
+  cli::cli_alert_success("Total cv_rbrm2 execution time: {output$time} seconds")
+  return(output)
+}
