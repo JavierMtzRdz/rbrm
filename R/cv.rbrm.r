@@ -12,83 +12,7 @@
 #' @return A named vector containing deviance, mae, and mse. Returns Inf if inputs are inconsistent.
 #' @keywords internal
 #' @export
-# calculate_metrics <- function(alpha, beta, va_test, vb_test, x_test, y_test, prob_fun) {
-#   # Input validation
-#   if (is.null(prob_fun) || !is.function(prob_fun)) {
-#     cli::cli_abort("prob_fun must be a valid function for calculate_metrics.")
-#   }
-#   n_test <- length(y_test)
-#   if (nrow(va_test) != n_test || nrow(vb_test) != n_test || length(x_test) != n_test) {
-#     cli::cli_alert_warning("Inconsistent input dimensions for calculate_metrics.")
-#     return(c(deviance = Inf, mae = Inf, mse = Inf))
-#   }
-#
-#   p_a_test <- ncol(va_test)
-#   p_b_test <- ncol(vb_test)
-#
-#   # Check coefficient compatibility
-#   len_alpha <- length(alpha) # Handles NULL (length 0)
-#   len_beta <- length(beta)   # Handles NULL (length 0)
-#
-#   if (len_alpha != p_a_test || len_beta != p_b_test) {
-#     cli::cli_alert_warning(sprintf("Coefficient length mismatch in calculate_metrics. Alpha: %d vs %d cols. Beta: %d vs %d cols.",
-#                                    len_alpha, p_a_test, len_beta, p_b_test))
-#     return(c(deviance = Inf, mae = Inf, mse = Inf))
-#   }
-#
-#   # Calculate logrr and logop safely
-#   logrr <- if (p_a_test > 0) va_test %*% alpha else matrix(0, nrow = n_test, ncol = 1)
-#   logop <- if (p_b_test > 0) vb_test %*% beta else matrix(0, nrow = n_test, ncol = 1)
-#
-#   # Get probabilities
-#   ps <- tryCatch({
-#     prob_fun(logrr, logop)
-#   }, error = function(e) {
-#     cli::cli_alert_warning(paste("prob_fun failed during metric calculation:", e$message))
-#     NULL
-#   })
-#
-#   if (is.null(ps) || !is.list(ps) || is.null(ps$p0) || is.null(ps$p1) ||
-#       length(ps$p0) != n_test || length(ps$p1) != n_test) {
-#     cli::cli_alert_warning("prob_fun did not return expected structure or dimensions.")
-#     return(c(deviance = Inf, mae = Inf, mse = Inf))
-#   }
-#
-#   p0 <- ps$p0
-#   p1 <- ps$p1
-#
-#   # Separate observations based on x_test
-#   fitted.prob <- numeric(n_test)
-#   idx0 <- which(x_test == 0)
-#   idx1 <- which(x_test == 1)
-#   if(length(idx0) > 0) fitted.prob[idx0] <- p0[idx0]
-#   if(length(idx1) > 0) fitted.prob[idx1] <- p1[idx1]
-#
-#   # Avoid log(0) issues and ensure finite probabilities
-#   epsilon <- 1e-15
-#   fitted.prob <- pmax(epsilon, pmin(1 - epsilon, fitted.prob))
-#   fitted.prob[!is.finite(fitted.prob)] <- 0.5 # Fallback for NaNs
-#
-#   true.y <- y_test
-#
-#   # Deviance calculation
-#   dev <- tryCatch({
-#     (-2 / n_test) * (sum(log(fitted.prob[true.y == 1])) +
-#                        sum(log1p(-fitted.prob[true.y == 0])))
-#   }, warning = function(w) Inf, error = function(e) Inf) # Catch log errors
-#
-#   # MAE calculation
-#   mae <- mean(abs(fitted.prob - true.y))
-#   # MSE calculation
-#   mse <- mean((fitted.prob - true.y)^2)
-#
-#   # Ensure results are finite
-#   dev <- ifelse(is.finite(dev), dev, Inf)
-#   mae <- ifelse(is.finite(mae), mae, Inf)
-#   mse <- ifelse(is.finite(mse), mse, Inf)
-#
-#   return(c(deviance = dev, mae = mae, mse = mse))
-# }
+
 
 calculate_metrics <- function(alpha, beta, va_test, vb_test, x_test, y_test, prob_fun, threshold = 0.5) {
   # Input validation
@@ -159,12 +83,6 @@ calculate_metrics <- function(alpha, beta, va_test, vb_test, x_test, y_test, pro
     {
       (-2 / n_test) * (sum(log(fitted.prob[true.y == 1])) +
         sum(log1p(-fitted.prob[true.y == 0])))
-
-      # mean_nll <- nllh(alpha, beta, va_test, vb_test, x_test, y_test,
-      #                  prob_fun = prob_fun)
-      #
-      # # The deviance calculation remains the same
-      # deviance <- 2 * mean_nll * nrow(va)
     },
     warning = function(w) Inf,
     error = function(e) Inf
@@ -173,14 +91,11 @@ calculate_metrics <- function(alpha, beta, va_test, vb_test, x_test, y_test, pro
   # Predicted classes based on the threshold
   predicted.classes <- ifelse(fitted.prob > threshold, 1, 0)
 
-
   # Confusion Matrix
   confusion_matrix <- table(
-    Predicted = factor(predicted.classes,
-      levels = c(0, 1)
-    ),
-    Actual = true.y,
-    deparse.level = 2
+    Predicted = factor(predicted.classes, levels = c(0, 1)),
+    Actual = factor(true.y, levels = c(0, 1)),
+    deparse.level = 0
   )
 
   # Extract values from the confusion matrix
@@ -191,19 +106,33 @@ calculate_metrics <- function(alpha, beta, va_test, vb_test, x_test, y_test, pro
 
   # Classification metrics
   accuracy <- (TP + TN) / (TP + TN + FP + FN)
-  sensitivity <- TP / (TP + FN) # Also known as Recall
-  specificity <- TN / (TN + FP)
-  precision <- TP / (TP + FP)
-  f1_score <- 2 * (precision * sensitivity) / (precision + sensitivity)
+  sensitivity <- if ((TP + FN) > 0) TP / (TP + FN) else NA # Recall
+  specificity <- if ((TN + FP) > 0) TN / (TN + FP) else NA
+  precision <- if ((TP + FP) > 0) TP / (TP + FP) else NA
+
+  f1_denom <- precision + sensitivity
+  f1_score <- if (!is.na(precision) && !is.na(sensitivity) && f1_denom > 0) {
+    2 * (precision * sensitivity) / f1_denom
+  } else {
+    NA
+  }
 
   # AUC calculation
   roc_obj <- pROC::roc(true.y, fitted.prob, quiet = TRUE)
   auc_val <- pROC::auc(roc_obj)
 
-  # Ensure all metrics are finite, otherwise set to NA
+  # MSE calculation
+  mse <- mean((fitted.prob - true.y)^2)
+
+  # MAE calculation
+  mae <- mean(abs(fitted.prob - true.y))
+
+  # Ensure all metrics are finite, otherwise set to NA (or handle appropriately)
   metrics <- c(
     deviance = dev,
     auc = auc_val,
+    mse = mse,
+    mae = mae,
     accuracy = accuracy,
     sensitivity = sensitivity,
     specificity = specificity,
@@ -623,8 +552,11 @@ cv_relax_factor <- function(va, vb, x, y, fold_ids, selected_lambda, implt, prob
 #     if (!is.function(prob_fun)) cli::cli_abort("Provided prob_fun is not a function.")
 #   }
 #   # Final check if prob_fun needed but unavailable
-#   if (is.null(prob_fun) && type.measure %in% c("deviance", "mae", "mse")) {
-#     cli::cli_abort("prob_fun is required for type.measure '%s', but it could not be determined or provided.", type.measure)
+#   if (is.null(prob_fun) && type.measure %in% c(
+#     "deviance", "auc", "mse", "mae",
+#     "accuracy", "sensitivity", "specificity", "precision", "f1_score"
+#   )) {
+#     cli::cli_abort("prob_fun is required for calculating '%s' during relax factor CV, but it could not be determined or provided.", type.measure)
 #   }
 #
 #
@@ -1006,15 +938,10 @@ complete_relax_lasso <- function(va, vb, x, y, initial_full_fit, lambda_selected
 validate_cv_inputs <- function(va, vb, x, y, nfolds, type.measure) {
   if (nfolds < 2) cli::cli_abort("nfolds must be at least 2.")
   if (!type.measure %in% c(
-    "deviance", "auc", "accuracy",
-    "sensitivity", "specificity",
-    "precision",
-    "f1_score"
+    "deviance", "auc", "mse", "mae",
+    "accuracy", "sensitivity", "specificity", "precision", "f1_score"
   )) {
-    cli::cli_abort("type.measure must be one of 'deviance', 'auc', 'accuracy',
-                                               'sensitivity', 'specificity',
-                                               'precision',
-                                               'f1_score'.")
+    cli::cli_abort("type.measure must be one of 'deviance', 'auc', 'mse', 'mae', 'accuracy', 'sensitivity', 'specificity', 'precision', 'f1_score'.")
   }
   n <- length(y)
   if (nrow(va) != n || (!is.null(vb) && nrow(vb) != n) || length(x) != n) { # Allow vb=NULL initially
@@ -1326,7 +1253,7 @@ reconstruct_coeffs <- function(fit_coeffs, # Coeff vector from the actual fit
 
 # --- Corrected perform_cv_fold Helper (Accepts progress bar ID) ---
 perform_cv_fold <- function(fold, fold_ids, va, vb, x, y, lambda_grid,
-                            implt, prob_fun, opt_fun, type.measure,
+                            implt, prob_fun, opt_fun = NULL, type.measure,
                             progress_bar_id, # <-- New argument
                             alpha.start = NULL, beta.start = NULL,
                             warm_start = T,
@@ -1348,12 +1275,11 @@ perform_cv_fold <- function(fold, fold_ids, va, vb, x, y, lambda_grid,
   lambda_names <- format(lambda_grid, digits = 4, scientific = TRUE)
 
   fold_metrics_raw <- matrix(NA_real_,
-    nrow = 7, ncol = n_lambdas,
+    nrow = 9, ncol = n_lambdas,
     dimnames = list(c(
-      "deviance", "auc", "accuracy",
-      "sensitivity", "specificity",
-      "precision",
-      "f1_score"
+      "deviance", "auc", "mse", "mae",
+      "accuracy", "sensitivity", "specificity",
+      "precision", "f1_score"
     ), lambda_names)
   )
 
