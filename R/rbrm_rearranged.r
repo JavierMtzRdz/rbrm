@@ -1,12 +1,12 @@
 #' Soft Thresholding Operator
-#' 
+#'
 #' Applies the soft thresholding operator to the input.
-#' 
+#'
 #' @param x A numeric vector to apply the soft threshold.
 #' @param lambda A positive numeric value representing the threshold parameter.
 #' @return A numeric vector where the soft thresholding has been applied.
 #' @examples
-#' #soft_thres(c(3, -1.5, 0.2), 0.5)
+#' # soft_thres(c(3, -1.5, 0.2), 0.5)
 #' @export
 # soft_thres <- function(x, lambda) {
 #   sx <- abs(x) - lambda*2
@@ -23,9 +23,9 @@ soft_thres <- function(x, lambda) {
 
 
 #' FISTA Proximal Gradient Descent for Alpha
-#' 
+#'
 #' Applies the FISTA algorithm for optimizing alpha with proximal gradient descent.
-#' 
+#'
 #' @param alpha A numeric vector of alpha coefficients.
 #' @param step_size A numeric value for the step size.
 #' @param lambda A numeric value for the L1 regularization parameter.
@@ -37,8 +37,11 @@ proximal.gd.alpha.fista <- function(alpha, step_size, lambda, t_old, last_alpha,
                                     intercept,
                                     beta, va, vb, x, y,
                                     prob_fun = getProbRR.org) {
-  gradient <- numDeriv::grad(function(.x){nllh(.x, beta, va, vb, x, y,
-                                               prob_fun = prob_fun)}, alpha, method = "simple")
+  gradient <- numDeriv::grad(function(.x) {
+    nllh(.x, beta, va, vb, x, y,
+      prob_fun = prob_fun
+    )
+  }, alpha, method = "simple")
   gradient[is.na(gradient)] <- 0
   input <- alpha - step_size * gradient
   alpha_new <- soft_thres(input, lambda * step_size)
@@ -51,12 +54,10 @@ proximal.gd.alpha.fista <- function(alpha, step_size, lambda, t_old, last_alpha,
 }
 
 
-
-
 #' FISTA Proximal Gradient Descent for Beta
-#' 
+#'
 #' Applies the FISTA algorithm for optimizing beta with proximal gradient descent.
-#' 
+#'
 #' @param beta A numeric vector of beta coefficients.
 #' @param step_size A numeric value for the step size.
 #' @param lambda A numeric value for the L1 regularization parameter.
@@ -68,9 +69,15 @@ proximal.gd.beta.fista <- function(beta, step_size, lambda, t_old, last_beta,
                                    intercept,
                                    alpha, va, vb, x, y,
                                    prob_fun = getProbRR.org) {
-  gradient <- numDeriv::grad(function(.x) {nllh(alpha, .x, va, vb, x, y,
-                                                prob_fun = prob_fun)},
-                             beta, method = "simple")
+  gradient <- numDeriv::grad(
+    function(.x) {
+      nllh(alpha, .x, va, vb, x, y,
+        prob_fun = prob_fun
+      )
+    },
+    beta,
+    method = "simple"
+  )
   gradient[is.na(gradient)] <- 0
   input <- beta - step_size * gradient
   beta_new <- soft_thres(input, lambda * step_size)
@@ -83,30 +90,30 @@ proximal.gd.beta.fista <- function(beta, step_size, lambda, t_old, last_beta,
 }
 
 #' Negative Log-Likelihood
-#' 
+#'
 #' Computes the negative log-likelihood for the alpha coefficients.
-#' 
+#'
 #' @param alpha Coefficients.
 #' @return The negative log-likelihood for the given alpha.
 #' @examples
-#' #alpha <- c(1, 2, 3)
-#' #nllh.alpha(alpha)
+#' # alpha <- c(1, 2, 3)
+#' # nllh.alpha(alpha)
 #' @export
 # nllh <- function(alpha, beta, va, vb, x, y,
 #                  prob_fun = getProbRR.org) {
 #   logrr <- (va %*% alpha)
 #   logop <- (vb %*% beta)
-#   
+#
 #   ps <- prob_fun(logrr, logop)
-#   
+#
 #   p0 <- ps$p0
 #   p1 <- ps$p1
-#   
-#   nll <- -sum((1 - y[x == 0]) * log1p(-p0[x == 0]) + 
+#
+#   nll <- -sum((1 - y[x == 0]) * log1p(-p0[x == 0]) +
 #                 (y[x == 0]) * log(p0[x == 0])) -
-#     sum((1 - y[x == 1]) * log1p(-p1[x == 1]) + 
+#     sum((1 - y[x == 1]) * log1p(-p1[x == 1]) +
 #           (y[x == 1]) * log(p1[x == 1]))
-#   
+#
 #   return(nll)
 # }
 
@@ -119,51 +126,51 @@ nllh <- function(alpha, beta, va, vb, x, y,
   # Safe matrix multiplication: result is 0 vector if no columns/coefficients
   if (pa > 0 && ncol(va) == pa) logrr <- va %*% alpha else logrr <- matrix(0, nrow = n, ncol = 1)
   if (pb > 0 && ncol(vb) == pb) logop <- vb %*% beta else logop <- matrix(0, nrow = n, ncol = 1)
-  
+
   ps <- prob_fun(as.vector(logrr), as.vector(logop))
   p0 <- ps$p0
   p1 <- ps$p1
-  
+
   idx0 <- which(x == 0)
   idx1 <- which(x == 1)
   nll <- 0
   # Calculate likelihood safely, avoiding issues if idx0 or idx1 are empty
-  if(length(idx0) > 0){
+  if (length(idx0) > 0) {
     nll <- nll - sum(y[idx0] * log(p0[idx0]) + (1 - y[idx0]) * log(1 - p0[idx0]))
   }
-  if(length(idx1) > 0){
+  if (length(idx1) > 0) {
     nll <- nll - sum(y[idx1] * log(p1[idx1]) + (1 - y[idx1]) * log(1 - p1[idx1]))
   }
-  
-  # nll <- -sum((1 - y[x == 0]) * log(1 - p0[x == 0]) * weights[x == 0] + 
-  #               (y[x == 0]) * log(p0[x == 0]) * weights[x == 0]) - sum((1 - y[x == 
-  #                                                                               1]) * log(1 - p1[x == 1]) * weights[x == 1] + (y[x == 1]) * log(p1[x == 
+
+  # nll <- -sum((1 - y[x == 0]) * log(1 - p0[x == 0]) * weights[x == 0] +
+  #               (y[x == 0]) * log(p0[x == 0]) * weights[x == 0]) - sum((1 - y[x ==
+  #                                                                               1]) * log(1 - p1[x == 1]) * weights[x == 1] + (y[x == 1]) * log(p1[x ==
   #                                                                                                                                                    1]) * weights[x == 1])
-  
+
   # size adjustment
-  nll <- nll/n
-  
+  nll <- nll / n
+
   return(nll)
 }
 
 
 #' Penalized Negative Log-Likelihood
-#' 
+#'
 #' Computes the penalized negative log-likelihood for alpha and beta.
-#' 
+#'
 #' @param pars A numeric vector of the concatenated alpha and beta coefficients.
 #' @return The penalized negative log-likelihood.
 #' @examples
-#' #pars <- c(alpha = 1, beta = 2)
-#' #penalized.neg.log.likelihood(pars)
+#' # pars <- c(alpha = 1, beta = 2)
+#' # penalized.neg.log.likelihood(pars)
 #' @export
 # penalized_nllh <- function(alpha, beta, va, vb, x, y,
 #                            lambda, intercept,
 #                            prob_fun = getProbRR.org) {
-#   
+#
 #   unpenalized.nllh <- nllh(alpha, beta, va, vb, x, y,
 #                            prob_fun = prob_fun)
-#   
+#
 #   # Applying the penalty term
 #   if (intercept == TRUE) {
 #     penalty <- lambda*2 * (sum(abs(alpha[-1])) + sum(abs(beta[-1]))) # Exclude intercept
@@ -173,31 +180,31 @@ nllh <- function(alpha, beta, va, vb, x, y,
 #   return(unpenalized.nllh + penalty)
 # }
 penalized_nllh <- function(alpha, beta, va, vb, x, y,
-                           lambda, 
+                           lambda,
                            lambda_beta = NULL,
                            lambda_b_prop = 1,
                            intercept = F,
                            prob_fun = getProbRR.org,
                            nllh_fun = nllh) {
-  
   if (is.null(lambda_beta)) lambda_beta <- lambda * lambda_b_prop
-  
-  unpenalized.nllh <- nllh_fun(alpha, beta, va, vb, x, y, 
-                               prob_fun = prob_fun)
-  
-  # Calculate L1 penalty 
+
+  unpenalized.nllh <- nllh_fun(alpha, beta, va, vb, x, y,
+    prob_fun = prob_fun
+  )
+
+  # Calculate L1 penalty
   l1_norm_alpha <- sum(abs(ifelse(intercept, alpha[-1], alpha)))
-  l1_norm_beta  <- sum(abs(ifelse(intercept, beta[-1], beta)))
-                       
-  penalty <- lambda*l1_norm_alpha + lambda_beta*l1_norm_beta 
-  
+  l1_norm_beta <- sum(abs(ifelse(intercept, beta[-1], beta)))
+
+  penalty <- lambda * l1_norm_alpha + lambda_beta * l1_norm_beta
+
   return(unpenalized.nllh + penalty)
 }
 
 
 #' Regularized Binary Regression Model (RBRM)
 #'
-#' Performs a regularized binary regression model (RBRM) using FISTA proximal gradient descent. 
+#' Performs a regularized binary regression model (RBRM) using FISTA proximal gradient descent.
 #' The model penalizes the negative log-likelihood and includes optional early stopping.
 #'
 #' @param va A matrix of independent variables (without an intercept) for alpha.
@@ -222,37 +229,38 @@ penalized_nllh <- function(alpha, beta, va, vb, x, y,
 #'
 #' @examples
 #' # Example usage:
-#' #va <- matrix(c(1, 1, 1, 1, 0, 0, 0, 0), ncol = 2)
-#' #vb <- matrix(c(1, 1, 0, 0, 1, 1, 0, 0), ncol = 2)
-#' #y <- c(1, 0, 1, 0)
-#' #x <- c(1, 1, 0, 0)
-#' #result <- rbrm(va, vb, y, x)
+#' # va <- matrix(c(1, 1, 1, 1, 0, 0, 0, 0), ncol = 2)
+#' # vb <- matrix(c(1, 1, 0, 0, 1, 1, 0, 0), ncol = 2)
+#' # y <- c(1, 0, 1, 0)
+#' # x <- c(1, 1, 0, 0)
+#' # result <- rbrm(va, vb, y, x)
 #'
 #' @export
 rbrm <- function(va, vb, x, y,
                  alpha.start = NULL, beta.start = NULL,
                  max.step = 3000, thres = 1e-04, lambda = 0,
                  lr.alpha = 0.06, lr.beta = 0.02,
-                 intercept = TRUE, early_stopping_rounds = 10) {
-  # 
+                 intercept = TRUE, early_stopping_rounds = 10,
+                 prob_fun = getProbRR.org) {
+  #
   # va <- v; vb <- v; alpha.start = NULL; beta.start = NULL;
   # max.step = 3000; thres = 1e-04; lambda = 0;
   # lr.alpha = 0.06; lr.beta = 0.02;
   # intercept = TRUE; early_stopping_rounds = 10
-  
+
   tictoc::tic("Total time")
-  
+
   if (is.null(vb)) {
     vb <- va
   }
   pa <- dim(va)[2]
   pb <- dim(vb)[2]
-  
+
   # sanity check for the intercept term in va, vb
   if (all(va[, 1] == 1) & all(vb[, 1] == 1)) {
     intercept <- TRUE
   }
-  
+
   ## starting values for parameter optimization
   if (is.null(alpha.start)) {
     alpha.start <- c(rep(0, pa))
@@ -260,7 +268,7 @@ rbrm <- function(va, vb, x, y,
   if (is.null(beta.start)) {
     beta.start <- c(rep(0.01, pb))
   }
-  
+
   ## Optimization
   alpha <- alpha.start
   beta <- beta.start
@@ -282,55 +290,70 @@ rbrm <- function(va, vb, x, y,
     step <- step + 1
     # FISTA update for alpha
     last_alpha <- alpha
-    res_alpha <- proximal.gd.alpha.fista(y_alpha, step_size_alpha, 
-                                         lambda, t_alpha, last_alpha,
-                                         intercept,
-                                         beta, va, vb, x, y)
-    
-    
+    res_alpha <- proximal.gd.alpha.fista(y_alpha, step_size_alpha,
+      lambda, t_alpha, last_alpha,
+      intercept,
+      beta, va, vb, x, y,
+      prob_fun = prob_fun
+    )
+
+
     alpha_new <- res_alpha$alpha_new
-    
+
     t_alpha <- res_alpha$t_alpha
     y_alpha <- res_alpha$y_alpha
-    
+
     # FISTA update for beta
     last_beta <- beta
-    res_beta <- proximal.gd.beta.fista(y_beta, step_size_beta, 
-                                       lambda, t_beta, last_beta,
-                                       intercept,
-                                       alpha, va, vb, x, y)
-    
+    res_beta <- proximal.gd.beta.fista(y_beta, step_size_beta,
+      lambda, t_beta, last_beta,
+      intercept,
+      alpha, va, vb, x, y,
+      prob_fun = prob_fun
+    )
+
     beta_new <- res_beta$beta_new
-    
+
     t_beta <- res_beta$t_beta
     y_beta <- res_beta$y_beta
-    
-    grad_alpha <- numDeriv::grad(function(.x) {nllh(.x, beta, va, vb, x, y)}, 
-                                 y_alpha, method = "simple")
-    grad_beta <- numDeriv::grad(function(.x) {nllh(alpha, .x, va, vb, x, y)}, 
-                                y_beta, method = "simple")
-    
+
+    grad_alpha <- numDeriv::grad(
+      function(.x) {
+        nllh(.x, beta, va, vb, x, y, prob_fun = prob_fun)
+      },
+      y_alpha,
+      method = "simple"
+    )
+    grad_beta <- numDeriv::grad(
+      function(.x) {
+        nllh(alpha, .x, va, vb, x, y, prob_fun = prob_fun)
+      },
+      y_beta,
+      method = "simple"
+    )
+
     if ((max(abs(grad_alpha)) < thres) & (max(abs(grad_beta)) < thres)) {
       break
     }
-    
+
     # Update alpha and beta for the next iteration
     alpha <- alpha_new
     beta <- beta_new
   }
-  
+
   time <- tictoc::toc(quiet = TRUE)
-  
+
   opt <- list(
     point.est = c(alpha, beta), convergence = (step < max.step),
-    value = penalized_nllh(alpha, beta, 
-                           va, vb, x, y,
-                           lambda, intercept),
+    value = penalized_nllh(alpha, beta,
+      va, vb, x, y,
+      lambda,
+      intercept = intercept,
+      prob_fun = prob_fun
+    ),
     step = step,
     time = round(time$toc - time$tic, 4)
   )
-  
+
   return(structure(opt, class = c("rbrm")))
 }
-
-
