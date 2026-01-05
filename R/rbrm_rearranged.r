@@ -173,10 +173,14 @@ nllh <- function(alpha, beta, va, vb, x, y,
 #   return(unpenalized.nllh + penalty)
 # }
 penalized_nllh <- function(alpha, beta, va, vb, x, y,
-                           lambda, intercept = F,
+                           lambda, 
+                           lambda_beta = NULL,
+                           lambda_b_prop = 1,
+                           intercept = F,
                            prob_fun = getProbRR.org,
-                           nllh_fun = nllh,
-                           balance = 0.5) {
+                           nllh_fun = nllh) {
+  
+  if (is.null(lambda_beta)) lambda_beta <- lambda * lambda_b_prop
   
   unpenalized.nllh <- nllh_fun(alpha, beta, va, vb, x, y, 
                                prob_fun = prob_fun)
@@ -185,7 +189,7 @@ penalized_nllh <- function(alpha, beta, va, vb, x, y,
   l1_norm_alpha <- sum(abs(ifelse(intercept, alpha[-1], alpha)))
   l1_norm_beta  <- sum(abs(ifelse(intercept, beta[-1], beta)))
                        
-  penalty <- lambda * ((balance)*l1_norm_alpha + (1-balance)*l1_norm_beta) # Assuming lambda applies to sum
+  penalty <- lambda*l1_norm_alpha + lambda_beta*l1_norm_beta 
   
   return(unpenalized.nllh + penalty)
 }
