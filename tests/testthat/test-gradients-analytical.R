@@ -96,7 +96,7 @@ test_that("Gradients handle near-zero phi correctly", {
     ana_grad_full <- rbrm::grad_nll(alpha = alpha, beta = beta, va = va, vb = vb, x = x, y = y, prob_fun = rbrm::getProbRR.org)
     ana_grad_beta <- as.vector(ana_grad_full$grad_beta)
 
-    expect_equal(ana_grad_beta, num_grad_beta, tolerance = 1e-2, label = "Beta Gradient (Small Phi)")
+    expect_equal(ana_grad_beta, num_grad_beta, tolerance = 0.01, label = "Beta Gradient (Small Phi)")
 })
 
 test_that("Gradients handle large phi boundary correctly", {
@@ -119,5 +119,5 @@ test_that("Gradients handle large phi boundary correctly", {
     ana_grad_full <- rbrm::grad_nll(alpha = alpha, beta = beta, va = va, vb = vb, x = x, y = y, prob_fun = rbrm::getProbRR.org)
     ana_grad_beta <- as.vector(ana_grad_full$grad_beta)
 
-    expect_equal(ana_grad_beta, num_grad_beta, tolerance = 1e-3, label = "Beta Gradient (Large Phi)")
+    expect_equal(ana_grad_beta, num_grad_beta, tolerance = 1e-5, label = "Beta Gradient (Large Phi)")
 })

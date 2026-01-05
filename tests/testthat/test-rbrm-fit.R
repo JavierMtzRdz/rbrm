@@ -17,8 +17,8 @@ test_that("rbrm fits successfully and returns correct structure", {
     expect_s3_class(fit, "rbrm")
     expect_named(fit, c("point.est", "value", "step", "convergence", "time"), ignore.order = TRUE)
     expect_length(fit$point.est, 2 * p)
-    # Convergence on random data is not guaranteed with default params, so we skip correct convergence check
     # expect_true(fit$convergence)
+    expect_true(is.finite(fit$value))
 })
 
 test_that("rbrm works with alternate probability function", {
@@ -38,6 +38,7 @@ test_that("rbrm works with alternate probability function", {
     )
     expect_s3_class(fit, "rbrm")
     # expect_true(fit$convergence)
+    expect_true(is.finite(fit$value))
 })
 
 test_that("fista_opt and fista_opt2 behave similarly (convergence)", {
@@ -77,5 +78,6 @@ test_that("fista_opt and fista_opt2 behave similarly (convergence)", {
 
     expect_s3_class(fit2, "rbrm")
     # expect_true(fit2$convergence)
-    # expect_lt(fit2$step, 1000)
+    expect_true(is.finite(fit2$value))
+    # expect_lt(fit2$step, 2000)
 })

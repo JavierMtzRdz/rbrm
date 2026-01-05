@@ -24,8 +24,11 @@ dp0_theta <- function(theta, phi,
     idx_south_not_ext <- (is_boundary & is_south_edge) & ((x < 17) & (x > (-500)))
     idx_south_ext <- (is_boundary & is_south_edge) & !((x < 17) & (x > (-500)))
 
+    y_val <- 4 * exp(-x[idx_south_not_ext])
+    sqrt_term <- sqrt(y_val + 1)
+    term1 <- -y_val / (1 + sqrt_term) # (1 - sqrt(1+y))
     dp0.theta[idx_south_not_ext] <-
-      (0.5 * (1 - sqrt(4 * exp(-x[idx_south_not_ext]) + 1)) * sqrt(4 * exp(-x[idx_south_not_ext]) + 1) * exp(x[idx_south_not_ext]) + 1.0) / sqrt(4 * exp(-x[idx_south_not_ext]) + 1)
+      (0.5 * term1 * sqrt_term * exp(x[idx_south_not_ext]) + 1.0) / sqrt_term
 
     dp0.theta[idx_south_ext] <- 0
     dp0.theta[is_boundary & is_west_edge] <- 0
@@ -88,7 +91,10 @@ dp0_phi <- function(theta, phi,
     idx_south_not_ext <- (is_boundary & is_south_edge) & ((x < 17) & (x > (-500)))
     idx_south_ext <- (is_boundary & is_south_edge) & !((x < 17) & (x > (-500)))
 
-    dp0.phi[idx_south_not_ext] <- (0.5 * exp(x[idx_south_not_ext]) * (1 - (1 + 4 * exp(-x[idx_south_not_ext]))^0.5) + 1) / (1 + 4 * exp(-x[idx_south_not_ext]))^0.5
+    y_val <- 4 * exp(-x[idx_south_not_ext])
+    sqrt_term <- sqrt(y_val + 1)
+    term1 <- -y_val / (1 + sqrt_term) # (1 - sqrt(1+y))
+    dp0.phi[idx_south_not_ext] <- (0.5 * exp(x[idx_south_not_ext]) * term1 + 1) / sqrt_term
 
     dp0.phi[idx_south_ext] <- 0
     dp0.phi[is_boundary & is_west_edge] <- 0

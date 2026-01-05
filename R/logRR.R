@@ -63,7 +63,7 @@ getProbRR.org <- function(logrr, logop = NA,
     ## solving a quadratic equation
     ifelse(same(logop, 0),
       1 / (1 + exp(logrr)),
-      (-(exp(logrr) + 1) * exp(logop) + sqrt(exp(2 * logop) * (exp(logrr) + 1)^2 + 4 * exp(logrr + logop) * (1 - exp(logop)))) / (2 * exp(logrr) * (1 - exp(logop)))
+      (-(exp(logrr) + 1) * exp(logop) + sqrt(exp(2 * logop) * (exp(logrr) + 1)^2 + 4 * exp(logrr + logop) * (-expm1(logop)))) / (2 * exp(logrr) * (-expm1(logop)))
     )
   )
 
