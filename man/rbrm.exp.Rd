@@ -61,10 +61,10 @@ The model penalizes the negative log-likelihood and includes optional early stop
 }
 \examples{
 # Example usage:
-#va <- matrix(c(1, 1, 1, 1, 0, 0, 0, 0), ncol = 2)
-#vb <- matrix(c(1, 1, 0, 0, 1, 1, 0, 0), ncol = 2)
-#y <- c(1, 0, 1, 0)
-#x <- c(1, 1, 0, 0)
-#result <- rbrm(va, vb, y, x)
+# va <- matrix(c(1, 1, 1, 1, 0, 0, 0, 0), ncol = 2)
+# vb <- matrix(c(1, 1, 0, 0, 1, 1, 0, 0), ncol = 2)
+# y <- c(1, 0, 1, 0)
+# x <- c(1, 1, 0, 0)
+# result <- rbrm(va, vb, y, x)
 
 }

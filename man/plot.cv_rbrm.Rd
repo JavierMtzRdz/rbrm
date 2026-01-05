@@ -2,45 +2,33 @@
 % Please edit documentation in R/plots.R
 \name{plot.cv_rbrm}
 \alias{plot.cv_rbrm}
-\title{Plot Cross-Validation Results for Regularized Models}
+\title{Plot Cross-Validation Curve from cv_rbrm Object}
 \usage{
-\method{plot}{cv_rbrm}(.model, type.measure = "deviance")
+\method{plot}{cv_rbrm}(x, type.measure = NULL, opt = "lambda", ...)
 }
 \arguments{
-\item{.model}{A list containing:
-\itemize{
-\item \code{fold_deviances}: A structure (e.g., list of numeric vectors) containing deviance values for each fold.
-\item \code{lambda_grid}: A numeric vector specifying the grid of \code{lambda} values.
-\item \code{lambda}: The optimal \code{lambda} value selected based on minimum deviance.
-}}
+\item{x}{A fitted object of class \code{cv_rbrm}.}
+
+\item{type.measure}{Optional character string: metric to plot if different
+from the one used in fitting (only applies if \code{opt = "lambda"}).}
+
+\item{opt}{Character string: Parameter to plot against. Either "lambda" (default)
+or "gamma"/"relax_factor".}
+
+\item{...}{Additional arguments (currently unused).}
 }
 \value{
-A \code{ggplot} object visualizing:
-\itemize{
-\item Mean deviance values across folds for each \code{lambda}.
-\item Standard error bars for deviance values.
-\item A vertical dashed line indicating the selected \code{lambda}.
-}
+A \code{ggplot} object.
 }
 \description{
-Generates a plot to visualize cross-validation results for a regularized model.
-Displays the mean deviance with standard errors for a grid of regularization
-parameters (\code{lambda}) and marks the optimal \code{lambda} value with a dashed line.
+Creates a plot of the cross-validation curve(s) showing the mean performance
+metric versus the tuning parameter (lambda or relax factor).
 }
 \examples{
-#library(rbrm)
-## Example model
-#model <- list(
-#  fold_deviances = list(
-#    c(1.2, 1.35, 1.3, 1.3, 1.1),
-#    c(1.4, 1.20, 1.2, 1.2, 1.3),
-#    c(1.1, 1.05, 1.0, 1.05, 1.2)
-#  ),
-#  lambda_grid = c(0.01, 0.03, 0.1, 0.3, 1),
-#  lambda = 0.1
-#)
-#
-## Plot cross-validation results
-#plot.cv_rbrm(model)
-
+\dontrun{
+# Assuming 'cv_fit' is a result from cv_rbrm
+plot(cv_fit)
+plot(cv_fit, opt = "gamma") # If relaxation CV was performed
+plot(cv_fit, type.measure = "mae") # Plot MAE instead of original metric (if lambda)
+}
 }

@@ -12,10 +12,11 @@ penalized_nllh(
   x,
   y,
   lambda,
+  lambda_beta = NULL,
+  lambda_b_prop = 1,
   intercept = F,
   prob_fun = getProbRR.org,
-  nllh_fun = nllh,
-  balance = 0.5
+  nllh_fun = nllh
 )
 }
 \arguments{

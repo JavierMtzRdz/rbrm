@@ -8,14 +8,6 @@ dp0_theta <- function(theta, phi,
   expm1_phi <- expm1(phi)
 
   if (ps_spe == "Richardson") {
-    # dp0.theta <- ( -exp(phi - theta) / (2 * (exp(phi) - 1)) + exp(phi) /
-    #                  ((exp(phi) - 1) * sqrt(4 * exp(phi + theta) +
-    #                                           (exp(theta) - 1)^2 *  exp(2 * phi))) +
-    #                  (exp( - theta) * (1 - exp(theta)) *
-    #                     exp(2 * phi)) / (2 * (exp(phi) - 1)*
-    #                                        sqrt(4 * exp(phi + theta) + (exp(theta) - 1)^2 *
-    #                                               exp(2*phi))) )
-
     # Find indices for each condition.
     is_boundary <- (phi < -12) | (phi > 12) | (theta < -12) | (theta > 12)
     is_south_edge <- (theta < -12) | ((phi < -12) & (theta < 0))
@@ -31,8 +23,6 @@ dp0_theta <- function(theta, phi,
     # Case 1: "on the boundary"
     idx_south_not_ext <- (is_boundary & is_south_edge) & ((x < 17) & (x > (-500)))
     idx_south_ext <- (is_boundary & is_south_edge) & !((x < 17) & (x > (-500)))
-
-    if (any(is.na(idx_south_not_ext))) browser()
 
     dp0.theta[idx_south_not_ext] <-
       (0.5 * (1 - sqrt(4 * exp(-x[idx_south_not_ext]) + 1)) * sqrt(4 * exp(-x[idx_south_not_ext]) + 1) * exp(x[idx_south_not_ext]) + 1.0) / sqrt(4 * exp(-x[idx_south_not_ext]) + 1)
@@ -57,15 +47,6 @@ dp0_theta <- function(theta, phi,
       (expm1_phi * sqrt(4 * exp(phi + theta) + expm1_theta^2 * exp(2 * phi))) + (exp(-theta) * (-expm1_theta) *
       exp(2 * phi)) / (2 * expm1_phi * sqrt(4 * exp(phi +
       theta) + expm1_theta^2 * exp(2 * phi))))[quadratic_indices]
-
-    if (any(is.na(dp0.theta))) browser()
-
-    # der_prueb <- numDeriv::grad(
-    #   func = (function(theta_val)return(getProbRR.org(theta_val, phi)$p0)),
-    #   x = theta)
-    # dp0.theta[is_boundary & !(is_south_edge | is_west_edge)]
-    # der_prueb[is_boundary & !(is_south_edge | is_west_edge)]
-    # if (max(der_prueb - dp0.theta) > 0.1) browser()
 
     return(dp0.theta)
   }
@@ -92,18 +73,6 @@ dp0_phi <- function(theta, phi,
   expm1_phi <- expm1(phi)
 
   if (ps_spe == "Richardson") {
-    # dp0.phi <- ( - ((exp(theta) + 1) * exp(phi)) /
-    #                (2 * exp(theta) * (exp(phi) - 1) ^ 2) + exp(phi) /
-    #                ((exp(phi) - 1) ^ 2 * sqrt(4 * exp(phi + theta) +
-    #                                             (exp(theta) - 1) ^ 2 * exp(2 * phi))) +
-    #                (exp( - theta) * (exp(2 * theta) + 1) * exp(2 * phi)) /
-    #                (2 * (exp(phi) - 1) ^ 2 * sqrt(4 * exp(phi + theta) +
-    #                                                 (exp(theta) - 1) ^ 2 * exp(2 * phi))))
-
-    # extension for continuity
-    # dp0.phi[which(abs(phi)< ep)] <- (- exp(theta[which(abs(phi)< ep)]) /
-    #                                      (exp(theta[which(abs(phi)< ep)]) + 1)^2)
-
     # Find indices for each condition.
     is_boundary <- (phi < -12) | (phi > 12) | (theta < -12) | (theta > 12)
     is_south_edge <- (theta < -12) | ((phi < -12) & (theta < 0))
@@ -140,15 +109,6 @@ dp0_phi <- function(theta, phi,
       sqrt(4 * exp(phi + theta) + expm1_theta^2 * exp(2 * phi))
     ) + (exp(-theta) * (exp(2 * theta) + 1) * exp(2 * phi)) /
       (2 * expm1_phi^2 * sqrt(4 * exp(phi + theta) + expm1_theta^2 * exp(2 * phi))))[quadratic_indices]
-
-
-    # if(any(is.na(dp0.phi))) browser()
-    #
-    # der_prueb <- numDeriv::grad(
-    #   func = (function(phi_val)return(getProbRR.org(theta, phi_val)$p0)),
-    #   x = phi)
-    #
-    # if (max(der_prueb - dp0.phi) > 0.01) browser()
 
     return(dp0.phi)
   }
@@ -198,8 +158,6 @@ grad_nll <- function(alpha, beta, y, x, va, vb,
   # Derivatives of log-likelihood_i w.r.t p1_i and p0_i
   dllh_dp1 <- (y * x) / p1 - ((1 - y) * x) / (1 - p1)
   dllh_dp0 <- (y * (1 - x)) / p0 - ((1 - y) * (1 - x)) / (1 - p0)
-  # dllh_dp1 <- -((x * (y - p1)) / (p1 * (1 - p1) + ep))
-  # dllh_dp0 <- -(((1 - x) * (y - p0)) / (p0 * (1 - p0) + ep))
 
   if (opt != "beta") {
     if (method == "analytical") {
@@ -207,7 +165,6 @@ grad_nll <- function(alpha, beta, y, x, va, vb,
         ps_spe = class(ps)
       )
     }
-    # if(method == "analytical") dp0_dtheta <- -(1 - p0)/(1 - p0 + 1 - p1)
     if (method == "numerical") {
       dp0_dtheta <- numDeriv::grad(
         func = function(theta_val) prob_fun(theta_val, phi)$p0,
@@ -222,16 +179,6 @@ grad_nll <- function(alpha, beta, y, x, va, vb,
     grad_alpha_sum <- numeric(pa)
     inner_alpha <- (dllh_dp1 * dp1_dtheta + dllh_dp0 * dp0_dtheta)
     grad_alpha <- -(t(va) %*% inner_alpha) / n
-
-    # grad_alpha <- pmin(pmax(grad_alpha, -1), 1)
-
-    # if(max(grad_alpha) > 1e4) browser()
-
-    # grad_alpha_check <- numDeriv::grad(function(.x) {nllh(.x, beta, va, vb, x, y,
-    #                                                      prob_fun = prob_fun)},
-    #                                    alpha, method = "Richardson")
-    #
-    # if(max(abs(grad_alpha-grad_alpha_check)) > 0.1) browser()
   }
   if (opt != "alpha") {
     if (method == "analytical") {
@@ -239,7 +186,6 @@ grad_nll <- function(alpha, beta, y, x, va, vb,
         ps_spe = class(ps)
       )
     }
-    # if(method == "analytical") dp0_dphi <- (1 - p0) * (1 - p1)/(1 - p0 + 1 - p1)
     if (method == "numerical") {
       dp0_dphi <- numDeriv::grad(
         func = (function(phi_val) prob_fun(theta, phi_val)$p0),
@@ -254,26 +200,6 @@ grad_nll <- function(alpha, beta, y, x, va, vb,
     inner_beta <- (dllh_dp1 * dp1_dphi + dllh_dp0 * dp0_dphi)
     # grad_beta <- -t(inner_beta%*%vb)/n
     grad_beta <- -(t(vb) %*% inner_beta) / n
-
-    # grad_beta <- pmin(pmax(grad_beta, -1), 1)
-
-
-    # if(max(grad_beta) > 1e4) browser()
-
-    # grad_beta_check <- numDeriv::grad(function(.x) {nllh(alpha, .x, va, vb, x, y,
-    #                                               prob_fun = prob_fun)},
-    #                            beta, method = "Richardson")
-    #
-    # if(max(abs(grad_beta-grad_beta_check)) > 0.1) browser()
-    # if(any(is.na(grad_beta))) browser()
-
-    # grad_beta_check2 <- pnd::Grad(function(.x) {nllh(alpha, .x, va, vb, x, y,
-    #                                                      prob_fun = prob_fun)},
-    #                                   beta)
-    #
-    # if(max(abs(grad_beta - grad_beta_check)) > 0.001) browser()
-    # tibble(grad_beta, grad_beta_check) %>%
-    #   mutate(diff = abs(grad_beta-grad_beta_check))
   }
   if (opt == "alpha") {
     return(grad_alpha)
@@ -316,10 +242,6 @@ grad_nll_k <- function(alpha, beta, y, x, va, vb,
   # Derivatives of log-likelihood_i w.r.t p1_i and p0_i
   dllh_dp1 <- (y * x) / p1 - ((1 - y) * x) / (1 - p1)
   dllh_dp0 <- (y * (1 - x)) / p0 - ((1 - y) * (1 - x)) / (1 - p0)
-
-  # Handle cases where terms are not applicable to avoid NaN
-  # dllh_dp1[x == 0] <- 0
-  # dllh_dp0[x == 1] <- 0
 
 
   # Initialize the required gradient component

@@ -14,7 +14,7 @@ grad_nll(
   vb,
   prob_fun,
   opt = c("both", "alpha", "beta"),
-  method = c("analytical", "numerical")
+  method = c("numerical", "analytical")
 )
 }
 \arguments{

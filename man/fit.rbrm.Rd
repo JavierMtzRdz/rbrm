@@ -17,11 +17,11 @@ fit.rbrm(
   lambda_b_prop = 1,
   lr.alpha = 1,
   lr.beta = 1,
-  intercept = F,
+  intercept = FALSE,
   prob_fun = getProbRR.org,
   opt_fun = fista_opt,
-  save_opt = F,
-  standardize = T
+  save_opt = FALSE,
+  standardize = TRUE
 )
 }
 \arguments{

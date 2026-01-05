@@ -12,12 +12,16 @@ cv_rbrm(
   lambda = NULL,
   n_lambdas = 20,
   nfolds = 3,
-  implt = rbrm,
+  implt = fit.rbrm,
   prob_fun = NULL,
   relax_lsso = FALSE,
   relax_factor = NULL,
+  max_lambda = NULL,
+  eps_grid = 0.05,
+  relax_factors_grid = c(0, 0.25, 0.5, 0.75, 1),
   index = "min",
   type.measure = "deviance",
+  warm_start = T,
   ...
 )
 }
@@ -32,35 +36,42 @@ cv_rbrm(
 
 \item{lambda}{Optional. A vector of lambda values for regularization. If NULL, a grid of values will be generated.}
 
-\item{n_lambdas}{The number of lambda values to generate if lambda is NULL. Default is 50.}
+\item{n_lambdas}{The number of lambda values to generate if lambda is NULL. Default is 20.}
 
 \item{nfolds}{The number of folds for cross-validation. Default is 3. Must be at least 2.}
 
-\item{...}{Additional arguments passed to the \code{rbrm} function.}
+\item{implt}{The underlying model fitting function. Defaults to \code{fit.rbrm}.}
+
+\item{prob_fun}{Function to calculate probabilities.}
+
+\item{relax_lsso}{Logical. Whether to perform a relaxed lasso step. Default is FALSE.}
+
+\item{relax_factor}{Optional. Factor for relaxation (gamma). If NULL and relax_lsso is TRUE, it is tuned via CV.}
+
+\item{max_lambda}{Optional. Maximum lambda value for grid generation.}
+
+\item{eps_grid}{Epsilon for lambda grid generation.}
+
+\item{relax_factors_grid}{Grid of relax factors to try if tuning.}
+
+\item{index}{"min" or "1se" for lambda selection.}
+
+\item{type.measure}{Metric to optimize ("deviance", "auc", "mae", "mse", etc.).}
+
+\item{warm_start}{Logical. Whether to use warm starts for lambda path. Default is TRUE.}
+
+\item{...}{Additional arguments passed to the \code{implt} function.}
 }
 \value{
-A list containing:
-\item{lambda}{The best lambda value selected based on cross-validation.}
-\item{alpha}{The estimated alpha coefficients from the best fit model.}
-\item{beta}{The estimated beta coefficients from the best fit model.}
-\item{convergence}{Logical indicating whether convergence was achieved.}
-\item{step}{The number of steps taken for convergence.}
-\item{cv_mean_deviance}{The mean deviance across all folds for each lambda.}
-\item{fold_deviances}{A list of deviances for each fold.}
-\item{best_lambda_idx}{The index of the best lambda in the lambda grid.}
-\item{model_history}{An array storing the coefficients for each lambda across folds.}
-\item{lambda_grid}{The grid of lambda values used in cross-validation.}
+A list of class \code{cv_rbrm} containing:
+\item{lambda.selected}{The best lambda value selected.}
+\item{alpha}{Estimated alpha coefficients.}
+\item{beta}{Estimated beta coefficients.}
+\item{cv_results_matrix}{Matrix of CV metrics.}
+\item{relax_lsso_info}{Information about relaxation step if performed.}
 }
 \description{
-This function performs k-fold cross-validation to tune the regularization parameter (lambda)
-for the RBRM model. The optimal lambda is selected based on the minimum deviance.
-}
-\examples{
-# Example usage:
-#va <- matrix(c(1, 1, 1, 1, 0, 0, 0, 0), ncol = 2)
-#vb <- matrix(c(1, 1, 0, 0, 1, 1, 0, 0), ncol = 2)
-#y <- c(1, 0, 1, 0)
-#x <- c(1, 1, 0, 0)
-#cv_result <- cv_rbrm(va, vb, x, y, nfolds = 3)
-
+Performs k-fold cross-validation to tune the regularization parameter (lambda)
+for the RBRM model. Can also perform a "relaxed lasso" step where the
+regularization is relaxed on the active set of variables.
 }

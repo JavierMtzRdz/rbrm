@@ -4,7 +4,7 @@
 \alias{getProbRR.org}
 \title{Compute Probabilities for Robinson's Relative Risk Model specification}
 \usage{
-getProbRR.org(logrr, logop = NA, clipping = T)
+getProbRR.org(logrr, logop = NA, clipping = 1e-15)
 }
 \arguments{
 \item{logrr}{A numeric vector or matrix representing the log-relative risk. If \code{logrr} is
@@ -28,8 +28,8 @@ under an alternative specification of the relative risk regression model.
 }
 \details{
 The probabilities are computed using the following formulas:
-\deqn{p_0 = \frac{-\left(1 + \exp(\text{logop}) \cdot (1 + \exp(\text{logrr}))\right) 
-  + \sqrt{\left(1 + \exp(\text{logop}) \cdot (1 + \exp(\text{logrr}))\right)^2 
+\deqn{p_0 = \frac{-\left(1 + \exp(\text{logop}) \cdot (1 + \exp(\text{logrr}))\right)
+  + \sqrt{\left(1 + \exp(\text{logop}) \cdot (1 + \exp(\text{logrr}))\right)^2
   - 4 \cdot \exp(\text{logrr} + 2 \cdot \text{logop})}}{2 \cdot \exp(\text{logrr} + \text{logop})}}
 
 \deqn{p_1 = \exp(\text{logrr}) \cdot p_0}

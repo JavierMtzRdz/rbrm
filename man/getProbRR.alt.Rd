@@ -4,7 +4,7 @@
 \alias{getProbRR.alt}
 \title{Compute Probabilities for Alternative Relative Risk Model}
 \usage{
-getProbRR.alt(logrr, logop, clipping = T)
+getProbRR.alt(logrr, logop, clipping = 1e-15)
 }
 \arguments{
 \item{logrr}{A numeric vector or matrix representing the log-relative risk. If \code{logrr} is
@@ -28,8 +28,8 @@ under an alternative specification of the relative risk regression model.
 }
 \details{
 The probabilities are computed using the following formulas:
-\deqn{p_0 = \frac{-\left(1 + \exp(\text{logop}) \cdot (1 + \exp(\text{logrr}))\right) 
-  + \sqrt{\left(1 + \exp(\text{logop}) \cdot (1 + \exp(\text{logrr}))\right)^2 
+\deqn{p_0 = \frac{-\left(1 + \exp(\text{logop}) \cdot (1 + \exp(\text{logrr}))\right)
+  + \sqrt{\left(1 + \exp(\text{logop}) \cdot (1 + \exp(\text{logrr}))\right)^2
   - 4 \cdot \exp(\text{logrr} + 2 \cdot \text{logop})}}{2 \cdot \exp(\text{logrr} + \text{logop})}}
 
 \deqn{p_1 = \exp(\text{logrr}) \cdot p_0}

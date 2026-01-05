@@ -25,14 +25,13 @@ stop_crit <- function(eval_grad = TRUE,
                       beta = NULL,
                       last_alpha = NULL,
                       last_beta = NULL,
-                      stop_on_nonfinite = TRUE, 
+                      stop_on_nonfinite = TRUE,
                       message = FALSE,
                       message_true = FALSE) {
-  
   grad_stop <- FALSE
   rel_change_stop <- FALSE
-  nonfinite_stop <- FALSE 
-  
+  nonfinite_stop <- FALSE
+
   # Check for non-finite parameters  ---
   if (stop_on_nonfinite) {
     if (any(!is.finite(alpha)) || any(!is.finite(beta))) {
@@ -42,13 +41,13 @@ stop_crit <- function(eval_grad = TRUE,
       }
     }
   }
-  
+
   # Evaluate Gradient Norm ---
   if (eval_grad) {
     if (is.null(grad_alpha) || is.null(grad_beta)) {
       cli::cli_abort("Gradient vectors `grad_alpha` and `grad_beta` must be provided when `eval_grad = TRUE`.")
     }
-    
+
     if (any(!is.finite(grad_alpha)) || any(!is.finite(grad_beta))) {
       nonfinite_stop <- TRUE
       if (message || message_true) {
@@ -57,48 +56,48 @@ stop_crit <- function(eval_grad = TRUE,
     } else {
       grad_norm_alpha <- norm(grad_alpha, type = "2")
       grad_norm_beta <- norm(grad_beta, type = "2")
-      
+
       grad_stop <- (grad_norm_alpha < grad_thres && grad_norm_beta < grad_thres)
-      
+
       if (message || (message_true && grad_stop)) {
         cli::cli_alert_info("Gradient Norms || alpha: {round(grad_norm_alpha, 8)}, beta: {round(grad_norm_beta, 8)}")
       }
     }
   }
-  
+
   # --- 3. Evaluate Relative Change in Parameters ---
   if (eval_rel_change) {
     if (is.null(alpha) || is.null(beta) || is.null(last_alpha) || is.null(last_beta)) {
       cli::cli_abort("Current and last parameters must be provided when `eval_rel_change = TRUE`.")
     }
-    
+
     stabilizer <- sqrt(.Machine$double.eps)
-    
+
     # Calculate relative change using the squared L2 norm
     rel_change_alpha <- sum((alpha - last_alpha)^2) / (sum(last_alpha^2) + stabilizer)
     rel_change_beta <- sum((beta - last_beta)^2) / (sum(last_beta^2) + stabilizer)
-    
+
     max_rel_change <- max(rel_change_alpha, rel_change_beta, na.rm = TRUE)
     rel_change_stop <- (max_rel_change < rel_change_thres)
-    
+
     if (message || (message_true && rel_change_stop)) {
       cli::cli_alert_info("Relative Change || alpha: {round(rel_change_alpha, 8)}, beta: {round(rel_change_beta, 8)}")
     }
   }
-  
+
   final_decision <- grad_stop || rel_change_stop || nonfinite_stop
-  
+
   if (message_true && final_decision) cli::cli_alert_success("Stopping criterion met.")
-  
+
   return(final_decision)
 }
 
 
 #' FISTA Proximal Gradient Descent for Alpha and beta
-#' 
-#' Applies the FISTA algorithm for optimizing alpha and beta with 
+#'
+#' Applies the FISTA algorithm for optimizing alpha and beta with
 #' proximal gradient descent.
-#' 
+#'
 #' @param alpha A numeric vector of alpha coefficients.
 #' @param step_size A numeric value for the step size.
 #' @param lambda A numeric value for the L1 regularization parameter.
@@ -112,63 +111,53 @@ step_fista <- function(alpha, beta,
                        step_size, lambda, t_old,
                        intercept, va, vb, x, y,
                        prob_fun = getProbRR.org) {
-  
   opt <- rlang::arg_match(opt)
-  
+
   value <- switch(opt,
-                  "alpha" = alpha,
-                  "beta" = beta)
-  
+    "alpha" = alpha,
+    "beta" = beta
+  )
+
   # Momentum update
   t_new <- (1 + sqrt(1 + 4 * t_old^2)) / 2
-  
-  a_new <- (t_old-1)/t_new
-  
-  y_value_new <- value + a_new * (value - value_old)
-  
-  if (opt == "alpha") gradient <- grad_nll(alpha = y_value_new, beta = beta,
-                                           y = y, x = x, va = va, vb = vb,
-                                           prob_fun, opt = "alpha"
-                                           # method = method
-                                           )
-  
-  if (opt == "beta") {
-    gradient <- grad_nll(alpha = alpha, beta = y_value_new,
-                         y = y, x = x, va = va, vb = vb,
-                         prob_fun, opt = "beta"
-                         # method = method
-                         )
-    
-    # gradient_check <- numDeriv::grad(function(.x) {nllh(alpha = alpha,
-    #                                                     beta = .x,
-    #                                                     va = va,
-    #                                                     vb = vb,
-    #                                                     x = x,
-    #                                                     y = y,
-    #                                               prob_fun = prob_fun)},
-    #                            y_value_new, method = "Richardson")
-    # gradient[1:10]
-    # gradient_check[1:10]
-    # 
-    # if(sum(abs(gradient - gradient_check)) > 0.01) browser()
 
+  a_new <- (t_old - 1) / t_new
+
+  y_value_new <- value + a_new * (value - value_old)
+
+  if (opt == "alpha") {
+    gradient <- grad_nll(
+      alpha = y_value_new, beta = beta,
+      y = y, x = x, va = va, vb = vb,
+      prob_fun, opt = "alpha"
+      # method = method
+    )
   }
-  
+
+  if (opt == "beta") {
+    gradient <- grad_nll(
+      alpha = alpha, beta = y_value_new,
+      y = y, x = x, va = va, vb = vb,
+      prob_fun, opt = "beta"
+      # method = method
+    )
+  }
+
   # Proximal gradient update with soft-thresholding
   input <- y_value_new - step_size * gradient
   value_new <- soft_thres(input, lambda * step_size)
-  
+
   # Maintain intercept term if specified
   if (intercept) value_new[1] <- input[1]
-  
-  
-  # Return updated values 
-  return(list(value_new = value_new,
-              t_value = t_new,
-              gradient = gradient)) 
+
+
+  # Return updated values
+  return(list(
+    value_new = value_new,
+    t_value = t_new,
+    gradient = gradient
+  ))
 }
-
-
 
 
 #' @export
@@ -182,84 +171,88 @@ fista_opt <- function(alpha_start, beta_start,
                       opt_step = step_fista,
                       eval_grad = TRUE,
                       lambda_beta = NULL) {
-  
   if (is.null(lambda_beta)) lambda_beta <- lambda
-  
+
   ## Initialization
   step <- 0
   alpha <- last_alpha <- alpha_start
   beta <- last_beta <- beta_start
   t_alpha <- t_beta <- 1
-  
+
   ## Pre-allocate memory for results
   alphas <- matrix(0, max_step, ncol(va))
   betas <- matrix(0, max_step, ncol(vb))
   g_alphas <- matrix(0, max_step, ncol(va))
   g_betas <- matrix(0, max_step, ncol(vb))
   nllh_results <- vector("double", max_step)
-  
+
   for (iter in 1:max_step) {
-    
     step <- step + 1
-    # if(step == 180) browser()
-    # FISTA update for alpha 
-    res_alpha <- opt_step(alpha = alpha, beta = beta,
-                          value_old = last_alpha,
-                          opt = "alpha",
-                          step_size = step_size_alpha,
-                          lambda = lambda,
-                          t_old = t_alpha,
-                          intercept = intercept,
-                          va = va, vb = vb, x = x, y = y,
-                          prob_fun = prob_fun)
-    
+
+    # FISTA update for alpha
+    res_alpha <- opt_step(
+      alpha = alpha, beta = beta,
+      value_old = last_alpha,
+      opt = "alpha",
+      step_size = step_size_alpha,
+      lambda = lambda,
+      t_old = t_alpha,
+      intercept = intercept,
+      va = va, vb = vb, x = x, y = y,
+      prob_fun = prob_fun
+    )
+
     # Efficiently get gradient from the step function
-    grad_alpha <- res_alpha$gradient 
+    grad_alpha <- res_alpha$gradient
     last_alpha <- alpha
     alpha <- res_alpha$value_new
     t_alpha <- res_alpha$t_value
-    
-    #FISTA update for beta
-    res_beta <- opt_step(alpha = alpha, beta = beta,
-                         value_old = last_beta,
-                         opt = "beta",
-                         step_size = step_size_beta,
-                         lambda = lambda_beta, t_old = t_beta,
-                         intercept = intercept,
-                         va = va, vb = vb, x = x, y = y,
-                         prob_fun = prob_fun)
-    
+
+    # FISTA update for beta
+    res_beta <- opt_step(
+      alpha = alpha, beta = beta,
+      value_old = last_beta,
+      opt = "beta",
+      step_size = step_size_beta,
+      lambda = lambda_beta, t_old = t_beta,
+      intercept = intercept,
+      va = va, vb = vb, x = x, y = y,
+      prob_fun = prob_fun
+    )
+
     # Efficiently get gradient from the step function
-    grad_beta <- res_beta$gradient 
+    grad_beta <- res_beta$gradient
     last_beta <- beta
     beta <- res_beta$value_new
     t_beta <- res_beta$t_value
-    
+
     # --- Store results and check stopping criteria ---
     nllh_iter <- penalized_nllh(alpha, beta, va, vb, x, y,
-                                lambda = lambda, intercept = intercept,
-                                prob_fun = prob_fun)
-    
+      lambda = lambda, intercept = intercept,
+      prob_fun = prob_fun
+    )
+
     alphas[step, ] <- alpha
     betas[step, ] <- beta
     g_alphas[step, ] <- grad_alpha
     g_betas[step, ] <- grad_beta
     nllh_results[step] <- nllh_iter
-    
-    stop_boolean <- stop_crit(eval_grad = eval_grad,
-                              grad_alpha = grad_alpha,
-                              grad_beta = grad_beta,
-                              alpha = alpha,
-                              beta = beta,
-                              last_alpha = last_alpha,
-                              last_beta = last_beta)
-    
+
+    stop_boolean <- stop_crit(
+      eval_grad = eval_grad,
+      grad_alpha = grad_alpha,
+      grad_beta = grad_beta,
+      alpha = alpha,
+      beta = beta,
+      last_alpha = last_alpha,
+      last_beta = last_beta
+    )
+
     if (stop_boolean) {
-      browser()
       break # Exit loop if criteria are met
     }
   }
-  
+
   # Trim results to the actual number of steps taken
   if (step < max_step) {
     alphas <- alphas[1:step, , drop = FALSE]
@@ -268,15 +261,17 @@ fista_opt <- function(alpha_start, beta_start,
     g_betas <- g_betas[1:step, , drop = FALSE]
     nllh_results <- nllh_results[1:step]
   }
-  
-  return(list(alpha = alpha,
-              beta = beta,
-              steps_taken = step,
-              alphas = alphas,
-              betas = betas,
-              grad_alphas = g_alphas,
-              grad_betas = g_betas,
-              nllh_results = nllh_results))
+
+  return(list(
+    alpha = alpha,
+    beta = beta,
+    steps_taken = step,
+    alphas = alphas,
+    betas = betas,
+    grad_alphas = g_alphas,
+    grad_betas = g_betas,
+    nllh_results = nllh_results
+  ))
 }
 
 #' @export
@@ -288,44 +283,46 @@ L <- function(alpha,
               vb,
               prob_fun,
               opt = c("alpha", "beta"),
-              L_min = 1e-3, 
-              L_max = 500) { 
-  
+              L_min = 1e-3,
+              L_max = 500) {
   opt <- rlang::arg_match(opt)
   hessian_matrix <- NULL
-  
+
   #  Hessian Calculati
   if (opt == "alpha") {
-    if (length(alpha) == 0) return(L_min)
-    
+    if (length(alpha) == 0) {
+      return(L_min)
+    }
+
     get_alpha_gradient <- function(alpha_vec) {
       grad_nll(alpha = alpha_vec, beta = beta, y = y, x = x, va = va, vb = vb, prob_fun = prob_fun, opt = "alpha")
     }
     hessian_matrix <- numDeriv::jacobian(func = get_alpha_gradient, x = alpha)
-    
-  } else { 
-    if (length(beta) == 0) return(L_min)
-    
+  } else {
+    if (length(beta) == 0) {
+      return(L_min)
+    }
+
     get_beta_gradient <- function(beta_vec) {
       grad_nll(alpha = alpha, beta = beta_vec, y = y, x = x, va = va, vb = vb, prob_fun = prob_fun, opt = "beta")
     }
     hessian_matrix <- numDeriv::jacobian(func = get_beta_gradient, x = beta)
   }
-  
-  
+
+
   hessian_matrix <- (hessian_matrix + t(hessian_matrix)) / 2
-  
+
   eigenvalues <- eigen(hessian_matrix, symmetric = TRUE, only.values = TRUE)$values
-  
+
   L_value <- max(abs(eigenvalues))
-  
-  # Return a Stabilized Value 
-  
+
+  # Return a Stabilized Value
+
   L_final <- pmax(L_min, pmin(L_value, L_max))
-  
+
   return(L_final)
 }
-  
+
 
 #' @export
 fista_opt2 <- function(alpha_start, beta_start,
@@ -339,100 +336,105 @@ fista_opt2 <- function(alpha_start, beta_start,
                        eval_grad = TRUE,
                        est_l = FALSE,
                        lambda_beta = NULL) {
-  
   if (is.null(lambda_beta)) lambda_beta <- lambda
-  
+
   # --- Initialization ---
   step <- 0
   alpha <- last_alpha <- alpha_start
   beta <- last_beta <- beta_start
   t_alpha <- t_beta <- 1
   convergence <- FALSE
-  
+
   # Pre-allocate memory
   alphas <- matrix(0, max_step, ncol(va))
   betas <- matrix(0, max_step, ncol(vb))
   g_alphas <- matrix(0, max_step, ncol(va))
   g_betas <- matrix(0, max_step, ncol(vb))
   nllh_results <- vector("double", max_step)
-  
+
   for (iter in 1:max_step) {
     step <- step + 1
-    
+
     # Adaptive Step Size
     if (est_l) {
       L_alpha <- L(alpha, beta, y, x, va, vb, prob_fun, opt = "alpha")
       step_size_alpha <- 1 / L_alpha
     }
-    
+
     # FISTA update for alpha
-    res_alpha <- opt_step(alpha = alpha, beta = beta,
-                          value_old = last_alpha,
-                          opt = "alpha",
-                          step_size = step_size_alpha, lambda = lambda,
-                          t_old = t_alpha, intercept = intercept,
-                          va = va, vb = vb, x = x, y = y, prob_fun = prob_fun)
-    
+    res_alpha <- opt_step(
+      alpha = alpha, beta = beta,
+      value_old = last_alpha,
+      opt = "alpha",
+      step_size = step_size_alpha, lambda = lambda,
+      t_old = t_alpha, intercept = intercept,
+      va = va, vb = vb, x = x, y = y, prob_fun = prob_fun
+    )
+
     alpha_new <- res_alpha$value_new
-    
+
     if (est_l) {
       L_beta <- L(alpha_new, beta, y, x, va, vb, prob_fun, opt = "beta")
       step_size_beta <- 1 / L_beta
     }
-    
+
     # FISTA update for beta using the new alpha
-    res_beta <- opt_step(alpha = alpha_new, beta = beta,
-                         value_old = last_beta,
-                         opt = "beta",
-                         step_size = step_size_beta, lambda = lambda_beta,
-                         t_old = t_beta, intercept = intercept,
-                         va = va, vb = vb, x = x, y = y, prob_fun = prob_fun)
-    
+    res_beta <- opt_step(
+      alpha = alpha_new, beta = beta,
+      value_old = last_beta,
+      opt = "beta",
+      step_size = step_size_beta, lambda = lambda_beta,
+      t_old = t_beta, intercept = intercept,
+      va = va, vb = vb, x = x, y = y, prob_fun = prob_fun
+    )
+
     # Get gradients from results
     grad_alpha <- res_alpha$gradient
     grad_beta <- res_beta$gradient
-    
+
     last_alpha <- alpha
     alpha <- alpha_new
     t_alpha <- res_alpha$t_value
-    
+
     last_beta <- beta
     beta <- res_beta$value_new
     t_beta <- res_beta$t_value
-    
+
     # Store results
     nllh_iter <- penalized_nllh(alpha, beta, va, vb, x, y,
-                                lambda = lambda, intercept = intercept,
-                                prob_fun = prob_fun)
-    
+      lambda = lambda, intercept = intercept,
+      prob_fun = prob_fun
+    )
+
     alphas[step, ] <- as.vector(alpha)
     betas[step, ] <- as.vector(beta)
     g_alphas[step, ] <- grad_alpha
     g_betas[step, ] <- grad_beta
     nllh_results[step] <- nllh_iter
-    
+
     # Check stopping criteria
-    stop_boolean <- stop_crit(grad_alpha = grad_alpha, grad_beta = grad_beta,
-                              alpha = alpha, beta = beta,
-                              last_alpha = last_alpha, last_beta = last_beta)
-    
+    stop_boolean <- stop_crit(
+      grad_alpha = grad_alpha, grad_beta = grad_beta,
+      alpha = alpha, beta = beta,
+      last_alpha = last_alpha, last_beta = last_beta
+    )
+
     if (stop_boolean && (step >= 3)) {
-      
       convergence <- TRUE
-      
+
       if (any(is.infinite(alpha)) || any(is.infinite(beta)) ||
-          any(is.na(alpha)) || any(is.na(beta))) {
+        any(is.na(alpha)) || any(is.na(beta))) {
         convergence <- FALSE
       }
-      
+
       break
     }
     if (step == max_step) {
       convergence <- FALSE
     }
   }
-  
-  
+
+
   # Trim results to the actual number of steps taken
   if (step > 0 && step < max_step) {
     alphas <- alphas[1:step, , drop = FALSE]
@@ -441,181 +443,189 @@ fista_opt2 <- function(alpha_start, beta_start,
     g_betas <- g_betas[1:step, , drop = FALSE]
     nllh_results <- nllh_results[1:step]
   }
-  
-  
-  return(list(alpha = alpha, beta = beta, step = step,
-              alphas = alphas, betas = betas, grad_alphas = g_alphas,
-              grad_betas = g_betas, nllh_results = nllh_results,
-              step_size_alpha = step_size_alpha, step_size_beta = step_size_beta,
-              convergence = convergence))
+
+
+  return(list(
+    alpha = alpha, beta = beta, step = step,
+    alphas = alphas, betas = betas, grad_alphas = g_alphas,
+    grad_betas = g_betas, nllh_results = nllh_results,
+    step_size_alpha = step_size_alpha, step_size_beta = step_size_beta,
+    convergence = convergence
+  ))
 }
 
 double_fista_opt <- function(alpha_start, beta_start,
-                       step_size_alpha, step_size_beta,
-                       lambda, 
-                       intercept, 
-                       max_step, 
-                       va, vb, x, y,
-                       prob_fun = getProbRR.org,
-                       opt_step = step_fista,
-                       cont_opt = 10,
-                       eval_grad = T,
-                       est_l = F,
-                       lambda_beta = NULL){
-  
+                             step_size_alpha, step_size_beta,
+                             lambda,
+                             intercept,
+                             max_step,
+                             va, vb, x, y,
+                             prob_fun = getProbRR.org,
+                             opt_step = step_fista,
+                             cont_opt = 10,
+                             eval_grad = T,
+                             est_l = F,
+                             lambda_beta = NULL) {
   if (is.null(lambda_beta)) lambda_beta <- lambda
-  
+
   ## Optimization
   step <- 0
-  
+
   last_alpha <- alpha_start + 1
   last_beta <- beta_start + 1
-  
+
   alpha <- y_alpha <- alpha_start
   beta <- y_beta <- beta_start
   t_alpha <- t_beta <- 1
-  
+
   alphas <- matrix(0, max_step, ncol(va))
   betas <- matrix(0, max_step, ncol(vb))
   g_alphas <- matrix(0, max_step, ncol(va))
   g_betas <- matrix(0, max_step, ncol(vb))
   nllh_results <- vector("double", max_step)
-  
-  
+
+
   for (iter in 1:max_step) {
     step <- step + 1
     # FISTA upda for alpha
-    
-    if(est_l){
-      
+
+    if (est_l) {
       L_alpha <- L(alpha, beta, y, x, va, vb, prob_fun,
-                   opt = "alpha")
-      step_size_alpha <- 1/L_alpha
-      
+        opt = "alpha"
+      )
+      step_size_alpha <- 1 / L_alpha
+
       L_beta <- L(alpha, beta, y, x, va, vb, prob_fun,
-                  opt = "beta")
-      step_size_beta <- 1/L_beta
-      
+        opt = "beta"
+      )
+      step_size_beta <- 1 / L_beta
+
       cli::cli_alert("step_size_alpha: {step_size_alpha} | step_size_beta: {step_size_beta}")
     }
-    
+
     for (i in 1:cont_opt) {
-      res_alpha <- opt_step(alpha = alpha, beta = beta, 
-                            value_old = last_alpha,
-                            opt = "alpha",
-                            step_size = step_size_alpha, 
-                            lambda = lambda, 
-                            t_old = t_alpha,
-                            intercept = intercept,
-                            va = va, vb = vb, x = x, y = y,
-                            prob_fun = prob_fun)
-      
+      res_alpha <- opt_step(
+        alpha = alpha, beta = beta,
+        value_old = last_alpha,
+        opt = "alpha",
+        step_size = step_size_alpha,
+        lambda = lambda,
+        t_old = t_alpha,
+        intercept = intercept,
+        va = va, vb = vb, x = x, y = y,
+        prob_fun = prob_fun
+      )
     }
-    
+
     # FISTA update for beta
-    
+
     for (i in 1:cont_opt) {
-      res_beta <- opt_step(alpha = alpha, beta = beta, 
-                           value_old = last_beta,
-                           opt = "beta",
-                           step_size = step_size_beta, 
-                           lambda = lambda_beta, t_old = t_beta,
-                           intercept = intercept,
-                           va = va, vb = vb, x = x, y = y,
-                           prob_fun = prob_fun)
-      
+      res_beta <- opt_step(
+        alpha = alpha, beta = beta,
+        value_old = last_beta,
+        opt = "beta",
+        step_size = step_size_beta,
+        lambda = lambda_beta, t_old = t_beta,
+        intercept = intercept,
+        va = va, vb = vb, x = x, y = y,
+        prob_fun = prob_fun
+      )
     }
-    
-    
+
+
     # Update alpha and beta for the next iteration
-    
-    if(eval_grad){
-      grad <- grad_nll(res_alpha$value_new, res_beta$value_new,
-                       x, y, va, vb,
-                       prob_fun)
+
+    if (eval_grad) {
+      grad <- grad_nll(
+        res_alpha$value_new, res_beta$value_new,
+        x, y, va, vb,
+        prob_fun
+      )
       grad_alpha <- grad$grad_alpha
       grad_beta <- grad$grad_beta
-      
     } else {
       grad_alpha <- grad_beta <- 99
     }
-    
-    if(!(any(is.nan(grad_alpha)) ||
-         any(is.nan(grad_beta)) ||
-         any(is.na(grad_alpha)) ||
-         any(is.na(grad_beta))||
-         any(is.infinite(grad_alpha)) ||
-         any(is.infinite(grad_beta)))){
-      # Update values 
+
+    if (!(any(is.nan(grad_alpha)) ||
+      any(is.nan(grad_beta)) ||
+      any(is.na(grad_alpha)) ||
+      any(is.na(grad_beta)) ||
+      any(is.infinite(grad_alpha)) ||
+      any(is.infinite(grad_beta)))) {
+      # Update values
       last_alpha <- alpha
-      step_size_alpha <- ifelse(is.null(res_alpha$step_size), 
-                                step_size_alpha, res_alpha$step_size)
-      
+      step_size_alpha <- ifelse(is.null(res_alpha$step_size),
+        step_size_alpha, res_alpha$step_size
+      )
+
       alpha <- res_alpha$value_new
       t_alpha <- res_alpha$t_value
       last_y_alpha <- y_alpha
       y_alpha <- res_alpha$y_value
-      
+
       last_beta <- beta
-      
-      step_size_beta <- ifelse(is.null(res_beta$step_size), 
-                               step_size_beta, res_beta$step_size)
+
+      step_size_beta <- ifelse(is.null(res_beta$step_size),
+        step_size_beta, res_beta$step_size
+      )
       beta <- res_beta$value_new
       t_beta <- res_beta$t_value
       last_y_beta <- y_beta
       y_beta <- res_beta$y_value
-      
-      nllh_iter <- penalized_nllh(alpha, beta, va, vb, x, y, 
-                                  lambda = lambda, intercept = intercept,
-                                  prob_fun = prob_fun)
-      
-      alphas[step,] <- as.vector(alpha)
-      betas[step,] <- as.vector(beta)
-      g_alphas[step,] <- grad_alpha
-      g_betas[step,] <- grad_beta
+
+      nllh_iter <- penalized_nllh(alpha, beta, va, vb, x, y,
+        lambda = lambda, intercept = intercept,
+        prob_fun = prob_fun
+      )
+
+      alphas[step, ] <- as.vector(alpha)
+      betas[step, ] <- as.vector(beta)
+      g_alphas[step, ] <- grad_alpha
+      g_betas[step, ] <- grad_beta
       nllh_results[step] <- nllh_iter
-      
-      stop_boolean <- stop_crit(grad_alpha = grad_alpha,
-                                grad_beta = grad_beta,
-                                alpha = alpha,
-                                beta = beta,
-                                last_alpha = last_alpha,
-                                last_beta = last_beta)
-      
+
+      stop_boolean <- stop_crit(
+        grad_alpha = grad_alpha,
+        grad_beta = grad_beta,
+        alpha = alpha,
+        beta = beta,
+        last_alpha = last_alpha,
+        last_beta = last_beta
+      )
+
       convergence <- step < max_step
-      
     } else {
       step <- step - 1
       stop_boolean <- T
       convergence <- F
     }
-    
-    # if(is.na(stop_boolean)) browser()
-    
-    if(stop_boolean && (step >= 2)) {
-      
-      alphas <- alphas[1:step,] 
-      betas <- betas[1:step,] 
-      g_alphas <- g_alphas[1:step,] 
-      g_betas <- g_betas[1:step,] 
+
+
+    if (stop_boolean && (step >= 2)) {
+      alphas <- alphas[1:step, ]
+      betas <- betas[1:step, ]
+      g_alphas <- g_alphas[1:step, ]
+      g_betas <- g_betas[1:step, ]
       nllh_results <- nllh_results[1:step]
-      
+
       break
-    } 
-    
+    }
   }
-  
-  return(list(alpha = alpha,
-              beta = beta,
-              step = step,
-              alphas = alphas,
-              betas = betas,
-              grad_alphas = g_alphas,
-              grad_betas = g_betas,
-              nllh_results = nllh_results,
-              step_size_alpha = step_size_alpha,
-              step_size_beta = step_size_beta,
-              convergence = convergence))
+
+  return(list(
+    alpha = alpha,
+    beta = beta,
+    step = step,
+    alphas = alphas,
+    betas = betas,
+    grad_alphas = g_alphas,
+    grad_betas = g_betas,
+    nllh_results = nllh_results,
+    step_size_alpha = step_size_alpha,
+    step_size_beta = step_size_beta,
+    convergence = convergence
+  ))
 }
 
 
@@ -645,7 +655,6 @@ double_fista_opt <- function(alpha_start, beta_start,
 #' @return A list with the optimized alpha, beta, number of iterations, and history.
 
 
-
 #' @export
 cd_opt <- function(alpha_start, beta_start,
                    step_size_alpha, step_size_beta,
@@ -654,66 +663,68 @@ cd_opt <- function(alpha_start, beta_start,
                    max_step,
                    va, vb, x, y,
                    prob_fun = getProbRR.org,
-                   nllh_fun = nllh,  
-                   penalized_nllh = penalized_nllh, 
+                   nllh_fun = nllh,
+                   penalized_nllh = penalized_nllh,
                    tol = 1e-5,
-                   verbose = T)  {
-  
+                   verbose = T) {
   alpha <- alpha_start
   beta <- beta_start
   p_alpha <- length(alpha)
   p_beta <- length(beta)
-  
+
   # History storage
   alphas_hist <- matrix(NA, nrow = max_step, ncol = p_alpha)
   betas_hist <- matrix(NA, nrow = max_step, ncol = p_beta)
   grad_alphas_hist <- matrix(NA, nrow = max_step, ncol = p_alpha)
   grad_betas_hist <- matrix(NA, nrow = max_step, ncol = p_beta)
   pen_nllh_values_hist <- numeric(max_step) # Stores penalized NLLH
-  
+
   iter_count <- 0
-  
+
   for (current_iter in 1:max_step) {
     iter_count <- current_iter
     alpha_old_iter <- alpha
     beta_old_iter <- beta
-    
+
     # --- Update alpha coefficients ---
     for (k in 1:p_alpha) {
-      
       grad_ak <- grad_nll_k(alpha, beta,
-                          x, y, va, vb,
-                          prob_fun, opt = "alpha",
-                          k_index = k)
+        x, y, va, vb,
+        prob_fun,
+        opt = "alpha",
+        k_index = k
+      )
       grad_alphas_hist[iter_count, k] <- grad_ak
       alpha_k_unreg_update <- alpha[k] - step_size_alpha * grad_ak
       alpha[k] <- soft_thres(alpha_k_unreg_update, lambda * step_size_alpha)
-      
-      grad_bk <- grad_nll_k(alpha, beta, 
-                          x, y, va, vb,
-                          prob_fun, opt = "beta",
-                          k_index = k)
+
+      grad_bk <- grad_nll_k(alpha, beta,
+        x, y, va, vb,
+        prob_fun,
+        opt = "beta",
+        k_index = k
+      )
       grad_betas_hist[iter_count, k] <- grad_bk
       beta_k_unreg_update <- beta[k] - step_size_beta * grad_bk
       beta[k] <- soft_thres(beta_k_unreg_update, lambda * step_size_beta)
     }
-    
+
     # --- Store history for this iteration ---
-    if(p_alpha > 0) alphas_hist[current_iter, ] <- alpha
-    if(p_beta > 0) betas_hist[current_iter, ] <- beta
-    
-    
+    if (p_alpha > 0) alphas_hist[current_iter, ] <- alpha
+    if (p_beta > 0) betas_hist[current_iter, ] <- beta
+
+
     current_pen_nllh <- penalized_nllh(alpha, beta, va, vb, x, y, lambda, intercept, prob_fun)
     pen_nllh_values_hist[current_iter] <- current_pen_nllh
-    
+
     if (verbose && (current_iter %% 10 == 0)) {
       cat("Iter: ", current_iter, ", Penalized NLLH: ", current_pen_nllh, "\n")
     }
-    
+
     # --- Check convergence ---
     delta_alpha <- max(abs(alpha - alpha_old_iter))
     delta_beta <- max(abs(beta - beta_old_iter))
-    
+
     # Ensure there's at least one parameter to check for change
     if (delta_alpha < tol && delta_beta < tol) {
       if (verbose) cat("Converged: Max coefficient change below tolerance at iteration ", current_iter, "\n")
@@ -728,34 +739,36 @@ cd_opt <- function(alpha_start, beta_start,
       }
     }
   }
-  
+
   if (iter_count == max_step && verbose && max_step > 0) {
     cat("Reached max iterations (", max_step, ").\n")
   }
-  
+
   # Truncate history to actual number of iterations
   actual_iters <- iter_count
-  alphas_hist_out <- if(p_alpha > 0) alphas_hist[1:actual_iters, , drop = FALSE] else matrix(NA, nrow=actual_iters, ncol=0)
-  betas_hist_out <- if(p_beta > 0) betas_hist[1:actual_iters, , drop = FALSE] else matrix(NA, nrow=actual_iters, ncol=0)
+  alphas_hist_out <- if (p_alpha > 0) alphas_hist[1:actual_iters, , drop = FALSE] else matrix(NA, nrow = actual_iters, ncol = 0)
+  betas_hist_out <- if (p_beta > 0) betas_hist[1:actual_iters, , drop = FALSE] else matrix(NA, nrow = actual_iters, ncol = 0)
   grad_alphas_hist_out <- grad_alphas_hist[1:actual_iters, , drop = FALSE]
-  grad_betas_hist_out <- grad_betas_hist[1:actual_iters, , drop = FALSE] 
+  grad_betas_hist_out <- grad_betas_hist[1:actual_iters, , drop = FALSE]
   nllh_results_out <- pen_nllh_values_hist[1:actual_iters]
-  
-  
-  return(list(alpha = alpha,
-              beta = beta,
-              step = iter_count, 
-              alphas = alphas_hist_out,
-              betas = betas_hist_out,
-              grad_alphas = grad_alphas_hist_out,
-              grad_betas = grad_betas_hist_out,
-              nllh_results = nllh_results_out)) 
+
+
+  return(list(
+    alpha = alpha,
+    beta = beta,
+    step = iter_count,
+    alphas = alphas_hist_out,
+    betas = betas_hist_out,
+    grad_alphas = grad_alphas_hist_out,
+    grad_betas = grad_betas_hist_out,
+    nllh_results = nllh_results_out
+  ))
 }
 
 
 #' Regularized Binary Regression Model experimental (RBRM)
 #'
-#' Performs a regularized binary regression model (RBRM) using FISTA proximal gradient descent. 
+#' Performs a regularized binary regression model (RBRM) using FISTA proximal gradient descent.
 #' The model penalizes the negative log-likelihood and includes optional early stopping.
 #'
 #' @param va A matrix of independent variables (without an intercept) for alpha.
@@ -780,152 +793,150 @@ cd_opt <- function(alpha_start, beta_start,
 #'
 #' @examples
 #' # Example usage:
-#' #va <- matrix(c(1, 1, 1, 1, 0, 0, 0, 0), ncol = 2)
-#' #vb <- matrix(c(1, 1, 0, 0, 1, 1, 0, 0), ncol = 2)
-#' #y <- c(1, 0, 1, 0)
-#' #x <- c(1, 1, 0, 0)
-#' #result <- rbrm(va, vb, y, x)
+#' # va <- matrix(c(1, 1, 1, 1, 0, 0, 0, 0), ncol = 2)
+#' # vb <- matrix(c(1, 1, 0, 0, 1, 1, 0, 0), ncol = 2)
+#' # y <- c(1, 0, 1, 0)
+#' # x <- c(1, 1, 0, 0)
+#' # result <- rbrm(va, vb, y, x)
 #'
 #' @export
 rbrm.exp <- function(va, vb, x, y,
-                              alpha_start = NULL, beta_start = NULL,
-                              max_step = 1000, lambda = 0,
-                              lr.alpha = 1, lr.beta = 1,
-                              intercept = FALSE,
-                              prob_fun = getProbRR.org,
-                              opt_fun = fista, save_opt = T) {
-  
-  # va <- v; vb <- v; alpha_start = NULL; beta_start = NULL;
-  # max_step = 1000;  lambda = 0;
-  # lr.alpha = 0.06; lr.beta = 0.02;
+                     alpha_start = NULL, beta_start = NULL,
+                     max_step = 1000, lambda = 0,
+                     lr.alpha = 1, lr.beta = 1,
+                     intercept = FALSE,
+                     prob_fun = getProbRR.org,
+                     opt_fun = fista, save_opt = T) {
   # intercept = TRUE;  prob_fun = getProbRR.org;
   # opt_fun = fista
-  
+
   tictoc::tic("Total time")
-  
+
   if (is.null(vb)) {
     vb <- va
   }
-  
+
   va <- as.matrix(va)
   vb <- as.matrix(vb)
-  
+
   # Add intercept column if not already present
-  # if (intercept) {
-  #   va <- cbind(1, va)
-  #   vb <- cbind(1, vb)
-  # }
-  
-  
+
+
   pa <- dim(va)[2]
   pb <- dim(vb)[2]
-  
+
   # sanity check for the intercept term in va, vb
-  
+
   if (all(va[, 1] == 1) & all(vb[, 1] == 1)) {
     intercept <- TRUE
   }
   ## starting values for parameter optimization
   if (is.null(alpha_start)) alpha_start <- c(rep(0, pa))
   if (length(alpha_start) < pa) alpha_start <- c(rep(alpha_start[1], pa))
-  
+
   if (is.null(beta_start)) beta_start <- c(rep(0, pb))
   if (length(beta_start) < pa) beta_start <- c(rep(beta_start[1], pa))
-  
-  
+
+
   ## Optimization
-  
-  opt_result <- opt_fun(alpha_start, beta_start,
-                        lr.alpha, lr.beta,
-                        lambda, 
-                        intercept, 
-                        max_step,
-                        va, vb, x, y,
-                        prob_fun)
-  
+
+  opt_result <- opt_fun(
+    alpha_start, beta_start,
+    lr.alpha, lr.beta,
+    lambda,
+    intercept,
+    max_step,
+    va, vb, x, y,
+    prob_fun
+  )
+
   step <- opt_result$step
   alpha <- opt_result$alpha
   beta <- opt_result$beta
-  
-  if(!save_opt) opt_result <- NULL
-  
+
+  if (!save_opt) opt_result <- NULL
+
   time <- tictoc::toc(quiet = TRUE)
-  
+
   opt <- list(
-    point.est = c(alpha, beta), 
+    point.est = c(alpha, beta),
     optimizer_details = opt_result,
     convergence = (step < max_step),
-    value = penalized_nllh(alpha, beta, 
-                           va, vb, x, y,
-                           lambda, intercept),
+    value = penalized_nllh(
+      alpha, beta,
+      va, vb, x, y,
+      lambda, intercept
+    ),
     step = step,
     time = round(time$toc - time$tic, 4)
   )
-  
+
   return(structure(opt, class = c("rbrm")))
 }
 
 
 #' @export
 step_bp <- function(alpha, beta,
-                       value_old,
-                       opt,
-                       step_size, lambda, t_old,
-                       intercept, va, vb, x, y,
-                       prob_fun = getProbRR.org) {
-  
-  if (!(opt %in% c("alpha","beta"))) {
+                    value_old,
+                    opt,
+                    step_size, lambda, t_old,
+                    intercept, va, vb, x, y,
+                    prob_fun = getProbRR.org) {
+  if (!(opt %in% c("alpha", "beta"))) {
     cli::cli_abort("Option 'opt' must be either 'alpha' or 'beta'.")
   }
-  
+
   if (opt == "alpha") value <- alpha
   if (opt == "beta") value <- beta
-  
+
   # Momentum update
   t_new <- (1 + sqrt(1 + 4 * t_old^2)) / 2
-  
-  a_new <- (t_old-1)/t_new
-  
+
+  a_new <- (t_old - 1) / t_new
+
   y_value_new <- value + a_new * (value - value_old)
-  
+
   if (opt == "alpha") {
-    # browser()
     gradient <- grad_nll(y_value_new, beta,
-                         x, y, va, vb,
-                         prob_fun, opt = "alpha")
-    
-    lambda_step <- ((sum(abs(alpha))+ 1e-10)/(sum(abs(beta), 
-                                                 abs(alpha))+2e-10))*lambda*2
+      x, y, va, vb,
+      prob_fun,
+      opt = "alpha"
+    )
+
+    lambda_step <- ((sum(abs(alpha)) + 1e-10) / (sum(
+      abs(beta),
+      abs(alpha)
+    ) + 2e-10)) * lambda * 2
   }
-  
+
   if (opt == "beta") {
-    # browser()
-    gradient <- grad_nll(alpha, y_value_new, 
-                         x, y, va, vb,
-                         prob_fun, opt = "beta")
-    
-    lambda_step <- ((sum(abs(beta))+ 1e-10)/(sum(abs(beta), 
-                                                   abs(alpha))+2e-10))*lambda*2
+    gradient <- grad_nll(alpha, y_value_new,
+      x, y, va, vb,
+      prob_fun,
+      opt = "beta"
+    )
+
+    lambda_step <- ((sum(abs(beta)) + 1e-10) / (sum(
+      abs(beta),
+      abs(alpha)
+    ) + 2e-10)) * lambda * 2
   }
-  
+
   # Clean any NA gradients to prevent issues during computation
   if (any(is.na(gradient))) {
     cli::cli_alert_danger("NaN in gradient, replacing with 0.")
-    print(gradient)
+
     gradient[is.na(gradient)] <- 0
   }
-  
+
   # Proximal gradient update with soft-thresholding
   input <- y_value_new - step_size * gradient
   # value_new <- soft_thres(input, lambda_step * step_size)
-  value_new <-  try(soft_thres(input, lambda_step * step_size))
-  
-  if(any(class(value_new) == "try-error")) browser()
-  # if(any(abs(value_new) > 3)) browser()
-  
+  value_new <- soft_thres(input, lambda_step * step_size)
+
   # Maintain intercept term if specified
   if (intercept) value_new[1] <- input[1]
-  
+
   # Return updated values in a structured list
   return(list(value_new = value_new, t_value = t_new, y_value = y_value_new))
 }
@@ -933,154 +944,158 @@ step_bp <- function(alpha, beta,
 
 #' @export
 double_fista_opt <- function(alpha_start, beta_start,
-                      step_size_alpha, step_size_beta,
-                      lambda, 
-                      intercept, 
-                      max_step, 
-                      va, vb, x, y,
-                      prob_fun = getProbRR.org,
-                      opt_step = step_fista,
-                      cont_opt = 2,
-                      eval_grad = T,
-                      lambda_beta = NULL){
-  
+                             step_size_alpha, step_size_beta,
+                             lambda,
+                             intercept,
+                             max_step,
+                             va, vb, x, y,
+                             prob_fun = getProbRR.org,
+                             opt_step = step_fista,
+                             cont_opt = 2,
+                             eval_grad = T,
+                             lambda_beta = NULL) {
   if (is.null(lambda_beta)) lambda_beta <- lambda
-  
+
   ## Optimization
   step <- 0
   alpha <- y_alpha <- last_alpha <- alpha_start
   beta <- y_beta <- last_beta <- beta_start
   t_alpha <- t_beta <- 1
-  
-  max_step <- ceiling(max_step/cont_opt)
-  
+
+  max_step <- ceiling(max_step / cont_opt)
+
   alphas <- matrix(0, max_step, ncol(va))
   betas <- matrix(0, max_step, ncol(va))
   g_alphas <- matrix(0, max_step, ncol(va))
   g_betas <- matrix(0, max_step, ncol(va))
   nllh_results <- vector("double", max_step)
-  
+
   for (iter in 1:max_step) {
     step <- step + 1
-    
+
     # FISTA update for beta
     for (i in 1:cont_opt) {
-      res_beta <- opt_step(alpha = alpha, beta = beta, 
-                           value_old = last_beta,
-                           opt = "beta",
-                           step_size = step_size_beta, 
-                           lambda = lambda, t_old = t_beta,
-                           intercept = intercept,
-                           va = va, vb = vb, x = x, y = y,
-                           prob_fun = prob_fun)
-      
+      res_beta <- opt_step(
+        alpha = alpha, beta = beta,
+        value_old = last_beta,
+        opt = "beta",
+        step_size = step_size_beta,
+        lambda = lambda, t_old = t_beta,
+        intercept = intercept,
+        va = va, vb = vb, x = x, y = y,
+        prob_fun = prob_fun
+      )
+
       last_beta <- beta
-      
-      step_size_beta <- ifelse(is.null(res_beta$step_size), 
-                               step_size_beta, res_beta$step_size)
+
+      step_size_beta <- ifelse(is.null(res_beta$step_size),
+        step_size_beta, res_beta$step_size
+      )
       beta <- res_beta$value_new
       t_beta <- res_beta$t_value
       y_beta <- res_beta$y_value
-      
     }
-    
-    
+
+
     # FISTA update for alpha
-    
+
     for (i in 1:cont_opt) {
-    res_alpha <- opt_step(alpha = alpha, beta = beta, 
-                          value_old = last_alpha,
-                          opt = "alpha",
-                          step_size = step_size_alpha, 
-                          lambda = lambda_beta, 
-                          t_old = t_alpha,
-                          intercept = intercept,
-                          va = va, vb = vb, x = x, y = y,
-                          prob_fun = prob_fun)
-    last_alpha <- alpha
-    step_size_alpha <- ifelse(is.null(res_alpha$step_size), 
-                              step_size_alpha, res_alpha$step_size)
-    alpha <- res_alpha$value_new
-    t_alpha <- res_alpha$t_value
-    y_alpha <- res_alpha$y_value
+      res_alpha <- opt_step(
+        alpha = alpha, beta = beta,
+        value_old = last_alpha,
+        opt = "alpha",
+        step_size = step_size_alpha,
+        lambda = lambda_beta,
+        t_old = t_alpha,
+        intercept = intercept,
+        va = va, vb = vb, x = x, y = y,
+        prob_fun = prob_fun
+      )
+      last_alpha <- alpha
+      step_size_alpha <- ifelse(is.null(res_alpha$step_size),
+        step_size_alpha, res_alpha$step_size
+      )
+      alpha <- res_alpha$value_new
+      t_alpha <- res_alpha$t_value
+      y_alpha <- res_alpha$y_value
     }
-    
-    
-    
-    
+
+
     # Update alpha and beta for the next iteration
-    if(eval_grad){
-      grad <- grad_nll(alpha, beta, x, y, va, vb,
-                       prob_fun)
+    if (eval_grad) {
+      grad <- grad_nll(
+        alpha, beta, x, y, va, vb,
+        prob_fun
+      )
       grad_alpha <- grad$grad_alpha
       grad_beta <- grad$grad_beta
-      
     } else {
       grad_alpha <- grad_beta <- 99
     }
-    
-    
-    nllh_iter <- penalized_nllh(alpha, beta, va, vb, x, y, 
-                                lambda = lambda, intercept = intercept,
-                                prob_fun = prob_fun)
-    
-    
+
+
+    nllh_iter <- penalized_nllh(alpha, beta, va, vb, x, y,
+      lambda = lambda, intercept = intercept,
+      prob_fun = prob_fun
+    )
+
+
     # Stopping criteria based on gradient norm, relative change in objective, and relative change in parameters
     # grad_norm_alpha <- max(abs(grad_alpha))
     # grad_norm_beta <- max(abs(grad_beta))
-    
+
     # Clean any NA gradients to prevent issues during computation
     grad_alpha[is.na(grad_alpha)] <- 0
     grad_beta[is.na(grad_beta)] <- 0
-    
-    
-    
+
+
     # pmax()
     # Break if all conditions are met
-    alphas[step,] <- alpha
-    betas[step,] <- beta
-    g_alphas[step,] <- grad_alpha
-    g_betas[step,] <- grad_beta
+    alphas[step, ] <- alpha
+    betas[step, ] <- beta
+    g_alphas[step, ] <- grad_alpha
+    g_betas[step, ] <- grad_beta
     nllh_results[step] <- nllh_iter
-    
-    
-    stop_boolean <- stop_crit(grad_alpha = grad_alpha,
-                              grad_beta = grad_beta,
-                              alpha = alpha,
-                              beta = beta,
-                              last_alpha = last_alpha,
-                              last_beta = last_beta)
-    
+
+
+    stop_boolean <- stop_crit(
+      grad_alpha = grad_alpha,
+      grad_beta = grad_beta,
+      alpha = alpha,
+      beta = beta,
+      last_alpha = last_alpha,
+      last_beta = last_beta
+    )
+
     if (stop_boolean) {
-      
-      alphas <- alphas[1:step,] 
-      betas <- betas[1:step,] 
-      g_alphas <- g_alphas[1:step,] 
-      g_betas <- g_betas[1:step,] 
+      alphas <- alphas[1:step, ]
+      betas <- betas[1:step, ]
+      g_alphas <- g_alphas[1:step, ]
+      g_betas <- g_betas[1:step, ]
       nllh_results <- nllh_results[1:step]
-      
+
       break
     }
-    
   }
-  
-  return(list(alpha = alpha,
-              beta = beta,
-              step = step*cont_opt,
-              alphas = alphas,
-              betas = betas,
-              grad_alphas = g_alphas,
-              grad_betas = g_betas,
-              nllh_results = nllh_results))
+
+  return(list(
+    alpha = alpha,
+    beta = beta,
+    step = step * cont_opt,
+    alphas = alphas,
+    betas = betas,
+    grad_alphas = g_alphas,
+    grad_betas = g_betas,
+    nllh_results = nllh_results
+  ))
 }
 
 
-
 #' FISTA Proximal Gradient Descent for Alpha and beta
-#' 
-#' Applies the FISTA algorithm for optimizing alpha and beta with 
+#'
+#' Applies the FISTA algorithm for optimizing alpha and beta with
 #' proximal gradient descent.
-#' 
+#'
 #' @param alpha A numeric vector of alpha coefficients.
 #' @param step_size A numeric value for the step size.
 #' @param lambda A numeric value for the L1 regularization parameter.
@@ -1093,58 +1108,67 @@ proximal.gd.fista <- function(alpha, beta, last_y,
                               step_size, lambda, t_old,
                               intercept, va, vb, x, y,
                               prob_fun = getProbRR.org) {
-  
-  if (!(opt %in% c("alpha","beta"))) {
+  if (!(opt %in% c("alpha", "beta"))) {
     cli::cli_abort("Option 'opt' must be either 'alpha' or 'beta'.")
   }
-  
+
   if (opt == "alpha") {
-    
     value <- alpha
-    
-    gradient <- numDeriv::grad(function(.x){nllh(.x, beta, va, vb, x, y,
-                                                 prob_fun = prob_fun)}, 
-                               last_y, method = "simple")
+
+    gradient <- numDeriv::grad(
+      function(.x) {
+        nllh(.x, beta, va, vb, x, y,
+          prob_fun = prob_fun
+        )
+      },
+      last_y,
+      method = "simple"
+    )
   }
   if (opt == "beta") {
-    
     value <- beta
-    
-    gradient <- numDeriv::grad(function(.x) {nllh(alpha, .x, va, vb, x, y,
-                                                  prob_fun = prob_fun)},
-                               last_y, method = "simple")
+
+    gradient <- numDeriv::grad(
+      function(.x) {
+        nllh(alpha, .x, va, vb, x, y,
+          prob_fun = prob_fun
+        )
+      },
+      last_y,
+      method = "simple"
+    )
   }
-  
-  
+
+
   # Clean any NA gradients to prevent issues during computation
   gradient[is.na(gradient)] <- 0
-  
+
   # Proximal gradient update with soft-thresholding
   input <- last_y - step_size * gradient
   value_new <- soft_thres(input, lambda * step_size)
-  
+
   # Maintain intercept term if specified
   if (intercept) value_new[1] <- input[1]
-  
-  
+
+
   # FISTA momentum update
   t_new <- (1 + sqrt(1 + 4 * t_old^2)) / 2
   y_value_new <- value_new + (t_old - 1) / t_new * (value_new - value)
-  
+
   # Return updated values in a structured list
   return(list(value_new = value_new, t_value = t_new, y_value = y_value_new))
 }
 
 #' Adaptive Step-Size FISTA Proximal Gradient Descent for Alpha and Beta
-#' 
-#' This function applies the FISTA (Fast Iterative Shrinkage-Thresholding Algorithm) 
-#' for optimizing either `alpha` or `beta` parameters using proximal gradient descent 
+#'
+#' This function applies the FISTA (Fast Iterative Shrinkage-Thresholding Algorithm)
+#' for optimizing either `alpha` or `beta` parameters using proximal gradient descent
 #' with adaptive step size via backtracking line search.
-#' 
-#' The adaptive step size dynamically adjusts during each iteration to improve convergence 
-#' by using backtracking line search. When a step size produces a sufficient objective decrease, 
+#'
+#' The adaptive step size dynamically adjusts during each iteration to improve convergence
+#' by using backtracking line search. When a step size produces a sufficient objective decrease,
 #' it is increased in future iterations to accelerate convergence.
-#' 
+#'
 #' @param alpha A numeric vector of alpha coefficients.
 #' @param beta A numeric vector of beta coefficients.
 #' @param last_value A numeric vector representing the coefficients from the previous iteration.
@@ -1157,35 +1181,34 @@ proximal.gd.fista <- function(alpha, beta, last_y,
 #' @param max_backtrack Integer, maximum number of backtracking iterations for adaptive step size.
 #' @param backtrack_factor A numeric factor by which the step size is reduced when backtracking.
 #' @param beta_increase A numeric factor by which the step size is increased if backtracking succeeds.
-#' 
+#'
 #' @return A list with the following components:
 #'   \item{value_new}{A numeric vector of updated coefficients for the specified parameter (alpha or beta).}
 #'   \item{t_value}{Updated t parameter for the next FISTA iteration.}
 #'   \item{y_value}{A numeric vector of coefficients adjusted with FISTA momentum for the next iteration.}
 #'   \item{step_size}{The adapted step size for use in subsequent iterations.}
-#' 
+#'
 #' @details
-#' The algorithm performs a backtracking line search to find an adaptive step size that 
+#' The algorithm performs a backtracking line search to find an adaptive step size that
 #' satisfies the Armijo condition (sufficient decrease condition), ensuring stable convergence.
-#' If the condition is met, the step size is increased by a factor (`beta_increase`) 
-#' to speed up future iterations. If not, the step size is decreased progressively 
+#' If the condition is met, the step size is increased by a factor (`beta_increase`)
+#' to speed up future iterations. If not, the step size is decreased progressively
 #' (by `backtrack_factor`) until a satisfactory objective decrease is achieved.
-#' 
+#'
 #' @export
-proximal.gd.asfista <- function(alpha, beta, last_y, 
-                                opt, 
+proximal.gd.asfista <- function(alpha, beta, last_y,
+                                opt,
                                 step_size, lambda, t_old,
                                 intercept, va, vb, x, y,
-                                max_backtrack = 10,  # Max backtracking iterations
-                                backtrack_factor = 0.6,  # Step size reduction factor
-                                beta_increase = 1.2,  # Factor to increase step size
+                                max_backtrack = 10, # Max backtracking iterations
+                                backtrack_factor = 0.6, # Step size reduction factor
+                                beta_increase = 1.2, # Factor to increase step size
                                 prob_fun = getProbRR.org) {
-  
   # Ensure the optimization option is valid
   if (!(opt %in% c("alpha", "beta"))) {
     cli::cli_abort("Option 'opt' must be either 'alpha' or 'beta'.")
   }
-  
+
   # Initialize based on the optimization target ('alpha' or 'beta')
   if (opt == "alpha") {
     value <- alpha
@@ -1198,56 +1221,58 @@ proximal.gd.asfista <- function(alpha, beta, last_y,
       nllh(alpha, .x, va, vb, x, y, prob_fun = prob_fun)
     }, last_y, method = "simple")
   }
-  
+
   prev_step_size <- step_size
   # Handle NA gradients
   gradient[is.na(gradient)] <- 0
-  
+
   # Proximal gradient update
   input <- last_y - step_size * gradient
-  
+
   value_new <- soft_thres(input, lambda * step_size)
-  
+
   # Preserve intercept if specified
   if (intercept) {
     value_new[1] <- input[1]
   }
-  
+
   # FISTA momentum update
-  t_new <- (1 + sqrt(1 + (step_size/prev_step_size)*4 * t_old^2)) / 2
-  
-  y_value_new <- value_new + ((t_old - 1) / t_new )* (value_new - value)
-  
+  t_new <- (1 + sqrt(1 + (step_size / prev_step_size) * 4 * t_old^2)) / 2
+
+  y_value_new <- value_new + ((t_old - 1) / t_new) * (value_new - value)
+
   # Compute the initial objective value
-  # obj_old <- penalized_nllh(alpha, beta, va, vb, x, y, 
+  # obj_old <- penalized_nllh(alpha, beta, va, vb, x, y,
   #                           lambda, intercept,
   #                           prob_fun = prob_fun)
-  
+
   # Backtracking line search
   for (bt_iter in 1:max_backtrack) {
     if (opt == "alpha") {
       obj_new <- nllh(value_new, beta, va, vb, x, y,
-                      # lambda, intercept,
-                      prob_fun = prob_fun)
+        # lambda, intercept,
+        prob_fun = prob_fun
+      )
     } else if (opt == "beta") {
-      
       obj_new <- nllh(alpha, value_new, va, vb, x, y,
-                      # lambda, intercept,
-                      prob_fun = prob_fun)
+        # lambda, intercept,
+        prob_fun = prob_fun
+      )
     }
-    
-    
+
+
     obj_old <- nllh(alpha, beta, va, vb, x, y,
-                    # lambda, intercept,
-                    prob_fun = prob_fun)
-    
-    
+      # lambda, intercept,
+      prob_fun = prob_fun
+    )
+
+
     # Check Armijo condition for sufficient decrease
     # purrr::walk(value_new, cli::cli_li)
     # cli::cli_ol(step_size)
     # cli::cli_ol(obj_new)
     # cli::cli_ol(obj_old - 0.5 * step_size * sum(gradient^2))
-    
+
     if (obj_new <= obj_old - 0.5 * step_size * sum(gradient^2)) {
       # Successful line search: increase step size for the next iteration
       step_size <- step_size * backtrack_factor
@@ -1257,37 +1282,38 @@ proximal.gd.asfista <- function(alpha, beta, last_y,
       step_size <- step_size * beta_increase
       # Proximal gradient update
       input <- last_y - step_size * gradient
-      
+
       value_new <- soft_thres(input, lambda * step_size)
-      
+
       # Preserve intercept if specified
       if (intercept) {
         value_new[1] <- input[1]
       }
-      
+
       # FISTA momentum update
       t_new <- (1 + sqrt(1 + 4 * t_old^2)) / 2
-      
-      y_value_new <- value_new + ((t_old - 1) / t_new )*(value_new - value)
+
+      y_value_new <- value_new + ((t_old - 1) / t_new) * (value_new - value)
     }
   }
-  
-  
-  
+
+
   # Return updated values and adapted step size
-  return(list(value_new = value_new, 
-              t_value = t_new, 
-              y_value = y_value_new, 
-              step_size = step_size,
-              gradient = gradient))
+  return(list(
+    value_new = value_new,
+    t_value = t_new,
+    y_value = y_value_new,
+    step_size = step_size,
+    gradient = gradient
+  ))
 }
 
 
 #' FISTA
-#' 
-#' Applies the FISTA algorithm for optimizing alpha and beta with 
+#'
+#' Applies the FISTA algorithm for optimizing alpha and beta with
 #' proximal gradient descent.
-#' 
+#'
 #' @param alpha A numeric vector of alpha coefficients.
 #' @param step_size A numeric value for the step size.
 #' @param lambda A numeric value for the L1 regularization parameter.
@@ -1297,13 +1323,13 @@ proximal.gd.asfista <- function(alpha, beta, last_y,
 #' @export
 fista <- function(alpha_start, beta_start,
                   step_size_alpha, step_size_beta,
-                  lambda, 
-                  intercept, 
-                  max_step, 
+                  lambda,
+                  intercept,
+                  max_step,
                   va, vb, x, y,
                   prob_fun = getProbRR.org,
                   opt_step = proximal.gd.fista,
-                  grad_alpha = T){
+                  grad_alpha = T) {
   ## Optimization
   step <- 0
   alpha <- y_alpha <- alpha_start
@@ -1313,80 +1339,101 @@ fista <- function(alpha_start, beta_start,
     step <- step + 1
     # FISTA update for alpha
     last_alpha <- alpha
-    res_alpha <- opt_step(alpha = alpha, beta = beta, 
-                         last_y = y_alpha,
-                         opt = "alpha",
-                         step_size = step_size_alpha, 
-                         lambda = lambda, 
-                         t_old = t_alpha,
-                         intercept = intercept,
-                         va = va, vb = vb, x = x, y = y,
-                         prob_fun = prob_fun)
-    
-    step_size_alpha <- ifelse(is.null(res_alpha$step_size), 
-                              step_size_alpha, res_alpha$step_size)
+    res_alpha <- opt_step(
+      alpha = alpha, beta = beta,
+      last_y = y_alpha,
+      opt = "alpha",
+      step_size = step_size_alpha,
+      lambda = lambda,
+      t_old = t_alpha,
+      intercept = intercept,
+      va = va, vb = vb, x = x, y = y,
+      prob_fun = prob_fun
+    )
+
+    step_size_alpha <- ifelse(is.null(res_alpha$step_size),
+      step_size_alpha, res_alpha$step_size
+    )
     alpha <- res_alpha$value_new
     t_alpha <- res_alpha$t_value
     y_alpha <- res_alpha$y_value
-    
-    
+
+
     # FISTA update for beta
     last_beta <- beta
-    res_beta <- opt_step(alpha = alpha, beta = beta, 
-                        last_y = y_beta,
-                        opt = "beta",
-                        step_size = step_size_beta, 
-                        lambda = lambda, t_old = t_beta,
-                        intercept = intercept,
-                        va = va, vb = vb, x = x, y = y,
-                        prob_fun = prob_fun)
-    
-    
-    step_size_beta <- ifelse(is.null(res_beta$step_size), 
-                             step_size_beta, res_beta$step_size)
+    res_beta <- opt_step(
+      alpha = alpha, beta = beta,
+      last_y = y_beta,
+      opt = "beta",
+      step_size = step_size_beta,
+      lambda = lambda, t_old = t_beta,
+      intercept = intercept,
+      va = va, vb = vb, x = x, y = y,
+      prob_fun = prob_fun
+    )
+
+
+    step_size_beta <- ifelse(is.null(res_beta$step_size),
+      step_size_beta, res_beta$step_size
+    )
     beta <- res_beta$value_new
     t_beta <- res_beta$t_value
     y_beta <- res_beta$y_value
-    
+
     # Update alpha and beta for the next iteration
     # beta <- beta_new
-    
-    if(eval_grad){
-      grad_alpha <- numDeriv::grad(function(.x) {nllh(.x, beta, va, vb, x, y,
-                                                      prob_fun = prob_fun)}, 
-                                   alpha, method = "simple")
-      
-      grad_beta <- numDeriv::grad(function(.x) {nllh(alpha, .x, va, vb, x, y,
-                                                     prob_fun = prob_fun)}, 
-                                  beta, method = "simple")
+
+    if (eval_grad) {
+      grad_alpha <- numDeriv::grad(
+        function(.x) {
+          nllh(.x, beta, va, vb, x, y,
+            prob_fun = prob_fun
+          )
+        },
+        alpha,
+        method = "simple"
+      )
+
+      grad_beta <- numDeriv::grad(
+        function(.x) {
+          nllh(alpha, .x, va, vb, x, y,
+            prob_fun = prob_fun
+          )
+        },
+        beta,
+        method = "simple"
+      )
     } else {
       grad_alpha <- grad_beta <- 99
     }
-    
-    
-    stop_boolean <- stop_crit(grad_alpha = grad_alpha,
-                              grad_beta = grad_beta,
-                              alpha = alpha,
-                              beta = beta,
-                              last_alpha = last_alpha,
-                              last_beta = last_beta)
-    
+
+
+    stop_boolean <- stop_crit(
+      grad_alpha = grad_alpha,
+      grad_beta = grad_beta,
+      alpha = alpha,
+      beta = beta,
+      last_alpha = last_alpha,
+      last_beta = last_beta
+    )
+
     if (stop_boolean) {
       break
     }
-    
   }
-  
-  return(list(alpha = alpha,
-              beta = beta,
-              step = step))
+
+  return(list(
+    alpha = alpha,
+    beta = beta,
+    step = step
+  ))
 }
 
 #' ASFISTA
-#' 
-#' Applies the FISTA algorithm for optimizing alpha and beta with 
+#'
+#' Applies the FISTA algorithm for optimizing alpha and beta with
 #' proximal gradient descent.
-#' 
+#'
 #' @param alpha A numeric vector of alpha coefficients.
 #' @param step_size A numeric value for the step size.
 #' @param lambda A numeric value for the L1 regularization parameter.
@@ -1400,44 +1447,51 @@ step_asfista <- function(alpha, beta,
                          step_size, lambda, t_old,
                          intercept, va, vb, x, y,
                          prob_fun = getProbRR.org,
-                         max_backtrack = 20,  # Max backtracking iterations
-                         backtrack_factor = .95,  # Step size reduction factor
-                         beta_increase = 1.5  # Factor to increase step size
+                         max_backtrack = 20, # Max backtracking iterations
+                         backtrack_factor = .95, # Step size reduction factor
+                         beta_increase = 1.5 # Factor to increase step size
 ) {
-  
   if (!(opt %in% c("alpha", "beta"))) {
     cli::cli_abort("Option 'opt' must be either 'alpha' or 'beta'.")
   }
-  
+
   if (opt == "alpha") value <- alpha
   if (opt == "beta") value <- beta
-  
+
   # Momentum update
   t_new <- (1 + sqrt(1 + 4 * t_old^2)) / 2
   a_new <- (t_old - 1) / t_new
   y_value_new <- value + a_new * (value - value_old)
-  
+
   # Compute gradient based on the chosen parameter (alpha or beta)
-  if (opt == "alpha") gradient <- grad_nll(y_value_new, beta,
-                                           x, y, va, vb,
-                                           prob_fun, opt = "alpha")
-  
-  
-  if (opt == "beta") gradient <- grad_nll(alpha, y_value_new, 
-                                          x, y, va, vb,
-                                          prob_fun, opt = "beta")
-  
+  if (opt == "alpha") {
+    gradient <- grad_nll(y_value_new, beta,
+      x, y, va, vb,
+      prob_fun,
+      opt = "alpha"
+    )
+  }
+
+
+  if (opt == "beta") {
+    gradient <- grad_nll(alpha, y_value_new,
+      x, y, va, vb,
+      prob_fun,
+      opt = "beta"
+    )
+  }
+
   # Clean any NA gradients to prevent computation issues
   gradient[is.na(gradient)] <- 0
-  
+
   # Proximal gradient update with soft-thresholding
   step_size <- step_size * beta_increase
   input <- y_value_new - step_size * gradient
   value_new <- soft_thres(input, lambda * step_size)
-  
+
   # Maintain intercept term if specified
   if (intercept) value_new[1] <- input[1]
-  
+
   # Backtracking to ensure sufficient decrease
   for (bt_iter in 1:max_backtrack) {
     if (opt == "alpha") {
@@ -1447,36 +1501,30 @@ step_asfista <- function(alpha, beta,
       loss_new <- nllh(alpha, value_new, va, vb, x, y, prob_fun = prob_fun)
       loss_old <- nllh(alpha, value, va, vb, x, y, prob_fun = prob_fun)
     }
-    
-    # Armijo-like condition
-    sufficient_adj <- loss_new <= loss_old - 
-      (sum((value_new - y_value_new)^2) / (2 * step_size))
-    
-    if (is.na(sufficient_adj)) {
-    cli::cli_alert_success("loss_new {loss_new} || loss_old {loss_old} || step_size: {step_size}")
-      sufficient_adj <- T
-      }
-    
-    
-    if (sufficient_adj) {
 
+    # Armijo-like condition
+    sufficient_adj <- loss_new <= loss_old -
+      (sum((value_new - y_value_new)^2) / (2 * step_size))
+
+    if (is.na(sufficient_adj)) {
+      cli::cli_alert_success("loss_new {loss_new} || loss_old {loss_old} || step_size: {step_size}")
+      sufficient_adj <- T
+    }
+
+
+    if (sufficient_adj) {
       break
-      
-      } else {
-      
+    } else {
       step_size <- step_size * backtrack_factor
       if (step_size > 0.5) step_size <- 0.5
-      
+
       input <- y_value_new - step_size * gradient
-      
+
       value_new <- soft_thres(input, lambda * step_size)
-    
     }
-    
-    
   }
   # cli::cli_alert_info("{step_size}")
-  
+
   # Return updated values in a structured list
   return(list(
     value_new = value_new,
@@ -1490,141 +1538,160 @@ step_asfista <- function(alpha, beta,
 #' @export
 asfista <- function(alpha_start, beta_start,
                     step_size_alpha, step_size_beta,
-                    lambda, 
-                    intercept, 
-                    max_step, 
+                    lambda,
+                    intercept,
+                    max_step,
                     va, vb, x, y,
                     prob_fun = getProbRR.org,
                     opt_step = step_asfista,
-                    eval_grad = T){
+                    eval_grad = T) {
   ## Optimization
   step <- 0
   alpha <- y_alpha <- last_alpha <- alpha_start
   beta <- y_beta <- last_beta <- beta_start
   t_alpha <- t_beta <- 1
-  
+
   alphas <- matrix(0, max_step, ncol(v))
   betas <- matrix(0, max_step, ncol(v))
   g_alphas <- matrix(0, max_step, ncol(v))
   g_betas <- matrix(0, max_step, ncol(v))
   nllh_results <- vector("double", max_step)
-  
-  step_size_alpha_loop <- step_size_alpha 
-  step_size_beta_loop <- step_size_beta 
-  
-  
+
+  step_size_alpha_loop <- step_size_alpha
+  step_size_beta_loop <- step_size_beta
+
+
   for (iter in 1:max_step) {
     step <- step + 1
     # FISTA update for alpha
-    
+
     # cli::cli_alert_success("step_size_alpha {step_size_alpha} || step_size_beta {step_size_beta}")
-    
-    res_alpha <- opt_step(alpha = alpha, beta = beta, 
-                          value_old = last_alpha,
-                          opt = "alpha",
-                          step_size = step_size_alpha_loop, 
-                          lambda = lambda, 
-                          t_old = t_alpha,
-                          intercept = intercept,
-                          va = va, vb = vb, x = x, y = y,
-                          prob_fun = prob_fun)
+
+    res_alpha <- opt_step(
+      alpha = alpha, beta = beta,
+      value_old = last_alpha,
+      opt = "alpha",
+      step_size = step_size_alpha_loop,
+      lambda = lambda,
+      t_old = t_alpha,
+      intercept = intercept,
+      va = va, vb = vb, x = x, y = y,
+      prob_fun = prob_fun
+    )
     last_alpha <- alpha
     step_size_alpha_loop <- ifelse(is.null(res_alpha$step_size),
-                                   step_size_alpha_loop, res_alpha$step_size)
+      step_size_alpha_loop, res_alpha$step_size
+    )
     alpha <- res_alpha$value_new
     t_alpha <- res_alpha$t_value
     y_alpha <- res_alpha$y_value
-    
-    
+
+
     # FISTA update for beta
-    res_beta <- opt_step(alpha = alpha, beta = beta, 
-                         value_old = last_beta,
-                         opt = "beta",
-                         step_size = step_size_beta_loop, 
-                         lambda = lambda, t_old = t_beta,
-                         intercept = intercept,
-                         va = va, vb = vb, x = x, y = y,
-                         prob_fun = prob_fun)
-    
+    res_beta <- opt_step(
+      alpha = alpha, beta = beta,
+      value_old = last_beta,
+      opt = "beta",
+      step_size = step_size_beta_loop,
+      lambda = lambda, t_old = t_beta,
+      intercept = intercept,
+      va = va, vb = vb, x = x, y = y,
+      prob_fun = prob_fun
+    )
+
     last_beta <- beta
-    
-    
+
+
     step_size_beta_loop <- ifelse(is.null(res_beta$step_size),
-                                  step_size_beta_loop, res_beta$step_size)
-    
+      step_size_beta_loop, res_beta$step_size
+    )
+
     beta <- res_beta$value_new
     t_beta <- res_beta$t_value
     y_beta <- res_beta$y_value
-    
+
     # Update alpha and beta for the next iteration
     # beta <- beta_new
-    
-    if(eval_grad){
-      grad_alpha <- numDeriv::grad(function(.x) {nllh(.x, beta, va, vb, x, y,
-                                                      prob_fun = prob_fun)}, 
-                                   alpha, method = "simple")
-      
-      grad_beta <- numDeriv::grad(function(.x) {nllh(alpha, .x, va, vb, x, y,
-                                                     prob_fun = prob_fun)}, 
-                                  beta, method = "simple")
+
+    if (eval_grad) {
+      grad_alpha <- numDeriv::grad(
+        function(.x) {
+          nllh(.x, beta, va, vb, x, y,
+            prob_fun = prob_fun
+          )
+        },
+        alpha,
+        method = "simple"
+      )
+
+      grad_beta <- numDeriv::grad(
+        function(.x) {
+          nllh(alpha, .x, va, vb, x, y,
+            prob_fun = prob_fun
+          )
+        },
+        beta,
+        method = "simple"
+      )
     } else {
       grad_alpha <- grad_beta <- 99
     }
-    
-    nllh_iter <- penalized_nllh(alpha, beta, va, vb, x, y, 
-                                lambda = lambda, intercept = intercept,
-                                prob_fun = prob_fun)
-    
-    alphas[step,] <- alpha
-    betas[step,] <- beta
-    g_alphas[step,] <- grad_alpha
-    g_betas[step,] <- grad_beta
+
+    nllh_iter <- penalized_nllh(alpha, beta, va, vb, x, y,
+      lambda = lambda, intercept = intercept,
+      prob_fun = prob_fun
+    )
+
+    alphas[step, ] <- alpha
+    betas[step, ] <- beta
+    g_alphas[step, ] <- grad_alpha
+    g_betas[step, ] <- grad_beta
     nllh_results[step] <- nllh_iter
-    
-    stop_boolean <- stop_crit(grad_alpha = grad_alpha,
-                              grad_beta = grad_beta,
-                              alpha = alpha,
-                              beta = beta,
-                              last_alpha = last_alpha,
-                              last_beta = last_beta)
-    
+
+    stop_boolean <- stop_crit(
+      grad_alpha = grad_alpha,
+      grad_beta = grad_beta,
+      alpha = alpha,
+      beta = beta,
+      last_alpha = last_alpha,
+      last_beta = last_beta
+    )
+
     # if (norm(grad_alpha , type="2") > 1e-2 &
     #     (step_size_alpha_loop < (step_size_alpha))) step_size_alpha_loop <- step_size_alpha #/ ceiling(step/100)
     # if (norm(grad_beta , type="2") > 1e-2 &
     #     (step_size_beta_loop < (step_size_beta))) step_size_beta_loop <- step_size_beta #/ ceiling(step/100)
-  
-      
-  
-    
+
+
     if (stop_boolean) {
-      
-      alphas <- alphas[1:step,] 
-      betas <- betas[1:step,] 
-      g_alphas <- g_alphas[1:step,] 
-      g_betas <- g_betas[1:step,] 
+      alphas <- alphas[1:step, ]
+      betas <- betas[1:step, ]
+      g_alphas <- g_alphas[1:step, ]
+      g_betas <- g_betas[1:step, ]
       nllh_results <- nllh_results[1:step]
-      
+
       break
     }
-    
   }
-  
-  return(list(alpha = alpha,
-              beta = beta,
-              step = step,
-              alphas = alphas,
-              betas = betas,
-              grad_alphas = g_alphas,
-              grad_betas = g_betas,
-              nllh_results = nllh_results))
+
+  return(list(
+    alpha = alpha,
+    beta = beta,
+    step = step,
+    alphas = alphas,
+    betas = betas,
+    grad_alphas = g_alphas,
+    grad_betas = g_betas,
+    nllh_results = nllh_results
+  ))
 }
 
 
 #' Greedy FISTA
-#' 
-#' Applies the Greedy FISTA algorithm for optimizing alpha and beta with 
+#'
+#' Applies the Greedy FISTA algorithm for optimizing alpha and beta with
 #' proximal gradient descent.
-#' 
+#'
 #' @param alpha A numeric vector of alpha coefficients.
 #' @param step_size A numeric value for the step size.
 #' @param lambda A numeric value for the L1 regularization parameter.
@@ -1632,15 +1699,16 @@ asfista <- function(alpha_start, beta_start,
 #' @param last_alpha A numeric vector representing the alpha coefficients from the previous iteration.
 #' @return A list with the updated alpha, t, and y_alpha values.
 #' @export
-greedy_fista <- function(alpha_start, beta_start,
-    step_size_alpha, step_size_beta,
-    lambda, 
-    intercept, 
-    max_step, thres,
-    va, vb, x, y,
-    prob_fun = getProbRR.org,
-    opt_step = proximal.gd.fista,
-    safeguard_factor = 10, gamma_shrink = 0.9
+greedy_fista <- function(
+  alpha_start, beta_start,
+  step_size_alpha, step_size_beta,
+  lambda,
+  intercept,
+  max_step, thres,
+  va, vb, x, y,
+  prob_fun = getProbRR.org,
+  opt_step = proximal.gd.fista,
+  safeguard_factor = 10, gamma_shrink = 0.9
 ) {
   # Initialize variables
   step <- 0
@@ -1650,15 +1718,15 @@ greedy_fista <- function(alpha_start, beta_start,
   t_alpha <- t_beta <- 1
   for (iter in 1:max_step) {
     step <- step + 1
-    
+
     # FISTA update for alpha
     last_alpha <- alpha
     res_alpha <- opt_step(
-      alpha = alpha, beta = beta, 
+      alpha = alpha, beta = beta,
       last_y = y_alpha,
       opt = "alpha",
-      step_size = step_size_alpha, 
-      lambda = lambda, 
+      step_size = step_size_alpha,
+      lambda = lambda,
       t_old = t_alpha,
       intercept = intercept,
       va = va, vb = vb, x = x, y = y,
@@ -1668,15 +1736,15 @@ greedy_fista <- function(alpha_start, beta_start,
     alpha <- res_alpha$value_new
     t_alpha <- res_alpha$t_value
     y_alpha <- res_alpha$y_value
-    
+
     # FISTA update for beta
     last_beta <- beta
     res_beta <- opt_step(
-      alpha = alpha, beta = beta, 
+      alpha = alpha, beta = beta,
       last_y = y_beta,
       opt = "beta",
-      step_size = step_size_beta, 
-      lambda = lambda, 
+      step_size = step_size_beta,
+      lambda = lambda,
       t_old = t_beta,
       intercept = intercept,
       va = va, vb = vb, x = x, y = y,
@@ -1686,7 +1754,7 @@ greedy_fista <- function(alpha_start, beta_start,
     beta <- res_beta$value_new
     t_beta <- res_beta$t_value
     y_beta <- res_beta$y_value
-    
+
     # Safeguard mechanism: Check if update diverges
     current_diff <- sqrt(sum((alpha - last_alpha)^2 + (beta - last_beta)^2))
     if (is.null(initial_diff)) initial_diff <- current_diff
@@ -1694,38 +1762,37 @@ greedy_fista <- function(alpha_start, beta_start,
       step_size_alpha <- max(step_size_alpha * gamma_shrink, 1e-10)
       step_size_beta <- max(step_size_beta * gamma_shrink, 1e-10)
     }
-    
+
     # Restarting mechanism
     alpha_diff <- alpha - last_alpha
     beta_diff <- beta - last_beta
     if ((y_alpha - alpha) %*% alpha_diff >= 0) y_alpha <- alpha
     if ((y_beta - beta) %*% beta_diff >= 0) y_beta <- beta
-    
+
     # Gradient calculations for stopping criteria
     grad_alpha <- numDeriv::grad(function(.x) {
       nllh(.x, beta, va, vb, x, y, prob_fun = prob_fun)
     }, alpha, method = "simple")
-    
+
     grad_beta <- numDeriv::grad(function(.x) {
       nllh(alpha, .x, va, vb, x, y, prob_fun = prob_fun)
     }, beta, method = "simple")
-    
+
     grad_norm_alpha <- max(abs(grad_alpha))
     grad_norm_beta <- max(abs(grad_beta))
-    
+
     # Relative change for alpha and beta
     rel_param_change_alpha <- max(abs(alpha - last_alpha) / pmax(1e-15, abs(last_alpha)))
     rel_param_change_beta <- max(abs(beta - last_beta) / pmax(1e-15, abs(last_beta)))
-    
+
     # Convergence check
     if (grad_norm_alpha < thres && grad_norm_beta < thres) {
       break
     }
   }
-  
+
   return(list(alpha = alpha, beta = beta, step = step))
 }
-
 
 
 #' Experimental RBRM Model Fitting Function
@@ -1771,28 +1838,33 @@ fit.rbrm <- function(va, vb = NULL, x, y,
                      opt_fun = fista_opt,
                      save_opt = FALSE,
                      standardize = TRUE) {
-  
   tictoc::tic("rbrm_experimental time")
-  
+
   # Argument Setup
   if (is.null(lambda_beta)) lambda_beta <- lambda * lambda_b_prop
-  if (lambda < 0) { cli::cli_warn("lambda is negative ({lambda}), using 0 instead."); lambda <- 0 }
-  if (lambda_beta < 0) { cli::cli_warn("lambda beta is negative ({lambda_beta}), using 0 instead."); lambda_beta <- 0 }
+  if (lambda < 0) {
+    cli::cli_warn("lambda is negative ({lambda}), using 0 instead.")
+    lambda <- 0
+  }
+  if (lambda_beta < 0) {
+    cli::cli_warn("lambda beta is negative ({lambda_beta}), using 0 instead.")
+    lambda_beta <- 0
+  }
   if (is.null(vb)) vb <- va
-  
+
   va <- tryCatch(as.matrix(va), error = function(e) cli::cli_abort("Failed to coerce 'va' to matrix: {e$message}"))
   vb <- tryCatch(as.matrix(vb), error = function(e) cli::cli_abort("Failed to coerce 'vb' to matrix: {e$message}"))
-  
+
   n <- length(y)
   pa <- ncol(va)
   pb <- ncol(vb)
-  
+
   # --- Standardization ---
   va_scaled <- va
   vb_scaled <- vb
   va_scal_info <- NULL
   vb_scal_info <- NULL
-  
+
   if (standardize) {
     intercept_col_va <- NULL
     predictors_va <- va
@@ -1800,103 +1872,107 @@ fit.rbrm <- function(va, vb = NULL, x, y,
       intercept_col_va <- va[, 1, drop = FALSE]
       predictors_va <- va[, -1, drop = FALSE]
     }
-    
+
     intercept_col_vb <- NULL
     predictors_vb <- vb
     if (intercept) {
       intercept_col_vb <- vb[, 1, drop = FALSE]
       predictors_vb <- vb[, -1, drop = FALSE]
     }
-    
+
     # Scale
     scaled_preds_va <- scale(predictors_va)
     scaled_preds_vb <- scale(predictors_vb)
-    
+
     va_scal_info <- list(
-      center = attr(scaled_preds_va, 'scaled:center'),
-      scale = attr(scaled_preds_va, 'scaled:scale')
+      center = attr(scaled_preds_va, "scaled:center"),
+      scale = attr(scaled_preds_va, "scaled:scale")
     )
     vb_scal_info <- list(
-      center = attr(scaled_preds_vb, 'scaled:center'),
-      scale = attr(scaled_preds_vb, 'scaled:scale')
+      center = attr(scaled_preds_vb, "scaled:center"),
+      scale = attr(scaled_preds_vb, "scaled:scale")
     )
-    
+
     # Recombine intercept
     va_scaled <- if (intercept) cbind(intercept_col_va, scaled_preds_va) else scaled_preds_va
     vb_scaled <- if (intercept) cbind(intercept_col_vb, scaled_preds_vb) else scaled_preds_vb
   }
-  
+
   # Initialize Starting Values
   if (is.null(alpha_start)) alpha_start <- rep(0, pa)
   if (is.null(beta_start)) beta_start <- rep(0, pb)
-  
-  # Optimizer 
-  opt_args <- list(alpha_start = alpha_start, beta_start = beta_start,
-                   step_size_alpha = lr.alpha, step_size_beta = lr.beta,
-                   lambda = lambda, lambda_beta = lambda_beta, intercept = intercept,
-                   max_step = max_step, va = va_scaled, vb = vb_scaled,
-                   x = x, y = y, prob_fun = prob_fun)
+
+  # Optimizer
+  opt_args <- list(
+    alpha_start = alpha_start, beta_start = beta_start,
+    step_size_alpha = lr.alpha, step_size_beta = lr.beta,
+    lambda = lambda, lambda_beta = lambda_beta, intercept = intercept,
+    max_step = max_step, va = va_scaled, vb = vb_scaled,
+    x = x, y = y, prob_fun = prob_fun
+  )
   opt_result <- do.call(opt_fun, opt_args)
-  
+
   # --- Extract and Back-Transform Results ---
   alpha_std <- opt_result$alpha
   beta_std <- opt_result$beta
-  
+
   alphas_std <- opt_result$alphas
   betas_std <- opt_result$betas
-  
+
   if (standardize) {
     alpha <- alpha_std
     beta <- beta_std
-    
+
     alphas <- alphas_std
     betas <- betas_std
-    
+
     # Back-transform slope coefficients
     slope_indices_a <- ifelse(intercept, list(2:pa), list(1:pa))[[1]]
     slope_indices_b <- ifelse(intercept, list(2:pa), list(1:pa))[[1]]
-    
-    alpha[slope_indices_a] <- alpha_std[slope_indices_a, drop=FALSE] / va_scal_info$scale
-    beta[slope_indices_b] <- beta_std[slope_indices_b, drop=FALSE] / vb_scal_info$scale
-    
+
+    alpha[slope_indices_a] <- alpha_std[slope_indices_a, drop = FALSE] / va_scal_info$scale
+    beta[slope_indices_b] <- beta_std[slope_indices_b, drop = FALSE] / vb_scal_info$scale
+
     alphas[, slope_indices_a] <- alphas_std[, slope_indices_a] / va_scal_info$scale
     betas[, slope_indices_b] <- betas_std[, slope_indices_b] / vb_scal_info$scale
-    
+
     opt_result$alphas <- alphas
     opt_result$betas <- betas
-    
+
     # Adjust intercept if it exists
     if (intercept) {
-      intercept_adjustment_a <- sum((alpha_std[slope_indices_a, drop=FALSE] * va_scal_info$center) / va_scal_info$scale)
-      intercept_adjustment_b <- sum((beta_std[slope_indices_b, drop=FALSE] * vb_scal_info$center) / vb_scal_info$scale)
-      
+      intercept_adjustment_a <- sum((alpha_std[slope_indices_a, drop = FALSE] * va_scal_info$center) / va_scal_info$scale)
+      intercept_adjustment_b <- sum((beta_std[slope_indices_b, drop = FALSE] * vb_scal_info$center) / vb_scal_info$scale)
+
       intercept_adjustment_as <- rowSums((alphas_std[, slope_indices_a] * va_scal_info$center) / va_scal_info$scale)
-      intercept_adjustment_bs <- rowSums((betas_std[,slope_indices_b] * vb_scal_info$center) / vb_scal_info$scale)
-      
+      intercept_adjustment_bs <- rowSums((betas_std[, slope_indices_b] * vb_scal_info$center) / vb_scal_info$scale)
+
       alpha[1] <- alpha_std[1] - intercept_adjustment_a
       beta[1] <- beta_std[1] - intercept_adjustment_b
-      alphas[,1] <- alphas_std[,1] - intercept_adjustment_as
-      betas[,1] <- betas_std[,1] - intercept_adjustment_bs
+      alphas[, 1] <- alphas_std[, 1] - intercept_adjustment_as
+      betas[, 1] <- betas_std[, 1] - intercept_adjustment_bs
     }
   } else {
     alpha <- alpha_std
     beta <- beta_std
   }
-  
+
   # --- Structure Output ---
   step <- opt_result$step
   convergence <- ifelse(is.null(opt_result$convergence), step < max_step, opt_result$convergence)
-  
+
   time_info <- tictoc::toc(quiet = TRUE)
   run_time <- round(time_info$toc - time_info$tic, 4)
   if (!save_opt) opt_result <- NULL
-  
-  result <- list(call = match.call(), point.est = c(alpha, beta), alpha = alpha,
-                 beta = beta, convergence = convergence, step = step,
-                 optimizer_details = opt_result, lambda = lambda, intercept = intercept,
-                 va_scale_info = va_scal_info, vb_scale_info = vb_scal_info,
-                 dimensions = list(n = n, p_a = pa, p_b = pb), time = run_time)
-  
+
+  result <- list(
+    call = match.call(), point.est = c(alpha, beta), alpha = alpha,
+    beta = beta, convergence = convergence, step = step,
+    optimizer_details = opt_result, lambda = lambda, intercept = intercept,
+    va_scale_info = va_scal_info, vb_scale_info = vb_scal_info,
+    dimensions = list(n = n, p_a = pa, p_b = pb), time = run_time
+  )
+
   return(structure(result, class = c("rbrm")))
 }
 # fit.rbrm <- function(va, vb = NULL, x, y,
@@ -1906,21 +1982,21 @@ fit.rbrm <- function(va, vb = NULL, x, y,
 #                       lambda_b_prop = 1,
 #                       lr.alpha = 1, lr.beta = 1,
 #                       intercept = F,
-#                       prob_fun = getProbRR.org,    
-#                       opt_fun = fista_opt, 
+#                       prob_fun = getProbRR.org,
+#                       opt_fun = fista_opt,
 #                       save_opt = F,
 #                       standardize  = T) {
-#   
+#
 #   tictoc::tic("rbrm_experimental time")
-#   
+#
 #   if (is.null(lambda_beta)) {
 #     lambda_beta <- lambda*lambda_b_prop
 #     # cli::cli_warn("lambda beta is {lambda_beta}.")
-#     
+#
 #   }
 #   if (lambda < 0) { cli::cli_warn("lambda is negative ({lambda}), using 0 instead."); lambda <- 0 }
 #   if (lambda_beta < 0) { cli::cli_warn("lambda beta is negative ({lambda_beta}), using 0 instead."); lambda_beta <- 0 }
-#   
+#
 #   if (is.null(vb)) {
 #     cli::cli_alert_info("vb is NULL, using va for beta predictors.")
 #     vb <- va
@@ -1928,43 +2004,43 @@ fit.rbrm <- function(va, vb = NULL, x, y,
 #   # Ensure matrix format
 #   va <- tryCatch(as.matrix(va), error = function(e) cli::cli_abort("Failed to coerce 'va' to matrix: {e$message}"))
 #   vb <- tryCatch(as.matrix(vb), error = function(e) cli::cli_abort("Failed to coerce 'vb' to matrix: {e$message}"))
-#   
+#
 #   n <- length(y)
 #   pa <- ncol(va)
 #   pb <- ncol(vb)
-#   
+#
 #   # Check intercept column based on user flag (guidance only)
-#   has_intercept_col <- isTRUE(all(va[, 1] == 1)) 
+#   has_intercept_col <- isTRUE(all(va[, 1] == 1))
 #   if (intercept && !has_intercept_col) {
 #     cli::cli_warn("intercept=TRUE but a column of 1s was not detected as the first column of 'va'. Ensure data includes intercept if needed.")
 #   }
 #   if (!intercept && has_intercept_col) {
 #     cli::cli_warn("intercept=FALSE but a column of 1s was detected as the first column of 'va'. Ensure data excludes intercept if not desired.")
 #   }
-#   
+#
 #   # --- Standardization ---
-#   
+#
 #   va_scal_info <- NULL
 #   vb_scal_info <- NULL
-#   
+#
 #   if(standardize){
 #     va_scaled <- scale(va)
 #     vb_scaled <- scale(vb)
-#     
-#     va_scal_info <- cbind(scale = attr(va_scaled, 'scaled:scale'), 
+#
+#     va_scal_info <- cbind(scale = attr(va_scaled, 'scaled:scale'),
 #                           center = attr(va_scaled, 'scaled:center'))
-#     vb_scal_info <- cbind(scale = attr(vb_scaled, 'scaled:scale'), 
+#     vb_scal_info <- cbind(scale = attr(vb_scaled, 'scaled:scale'),
 #                           center = attr(vb_scaled, 'scaled:center'))
 #   } else {
 #     va_scaled <- va
 #     vb_scaled <- vb
 #   }
-#   
+#
 #   # Initialize Starting Values ---
 #   if (is.null(alpha_start)) alpha_start = rep(0, pa)
 #   if (is.null(beta_start)) beta_start = rep(0, pb)
-#   
-#   
+#
+#
 #   # Prepare arguments list
 #   opt_args <- list(
 #     alpha_start = alpha_start,
@@ -1973,16 +2049,16 @@ fit.rbrm <- function(va, vb = NULL, x, y,
 #     step_size_beta = lr.beta,
 #     lambda = lambda,
 #     lambda_beta = lambda_beta,
-#     intercept = intercept, 
+#     intercept = intercept,
 #     max_step = max_step,
 #     va = va_scaled, vb = vb_scaled,
 #     x = x, y = y,
 #     prob_fun = prob_fun
 #   )
-#   
+#
 #   # Call the optimizer
 #   opt_result <- do.call(opt_fun, opt_args)
-#   
+#
 #   # Extract Results ---
 #   step  <- opt_result$step
 #   alpha <- opt_result$alpha
@@ -1990,31 +2066,31 @@ fit.rbrm <- function(va, vb = NULL, x, y,
 #   convergence <- ifelse(is.null(opt_result$convergence),
 #                         step < max_step,
 #                         opt_result$convergence)
-#   
+#
 #   if(standardize){
-#     
+#
 #     alpha <- alpha/va_scal_info[,1]
 #     beta <- beta/vb_scal_info[,1]
-#     
+#
 #     opt_result$alphas <- opt_result$alphas/va_scal_info[,1]
 #     opt_result$betas <- opt_result$betas/va_scal_info[,1]
 #   }
-#   
+#
 #   # Objective Value
 #   final_value <- penalized_nllh(alpha, beta, va, vb, x, y, lambda, intercept, prob_fun = prob_fun)
-#   
+#
 #   # Structure Output ---
 #   time_info <- tictoc::toc(quiet = TRUE)
 #   run_time <- round(time_info$toc - time_info$tic, 4)
-#   
+#
 #   if(!save_opt)  opt_result <- NULL
-#   
+#
 #   result <- list(
-#     call = match.call(), 
+#     call = match.call(),
 #     point.est = c(alpha, beta),
 #     alpha = alpha,
 #     beta = beta,
-#     convergence = convergence, 
+#     convergence = convergence,
 #     step = step,
 #     optimizer_details = opt_result,
 #     lambda = lambda,
@@ -2032,16 +2108,15 @@ fit.rbrm <- function(va, vb = NULL, x, y,
 #' @export
 opt_mle <- function(alpha_start, beta_start,
                     step_size_alpha, step_size_beta,
-                    lambda, 
-                    intercept, 
+                    lambda,
+                    intercept,
                     max_step,
                     va, vb, x, y,
                     prob_fun = getProbRR.org,
                     thres = 1e-10,
-                    lambda_beta = NULL){
-  
+                    lambda_beta = NULL) {
   if (is.null(lambda_beta)) lambda_beta <- lambda
-  
+
   pa <- length(va)
   # max_step = min(pa * 20, 2000)
   alphas <- matrix(0, max_step, ncol(va))
@@ -2049,90 +2124,80 @@ opt_mle <- function(alpha_start, beta_start,
   g_alphas <- matrix(0, max_step, ncol(va))
   g_betas <- matrix(0, max_step, ncol(vb))
   nllh_results <- vector("double", max_step)
-  weights <-  rep(1, length(x))
-  
-  # neg.log.likelihood.alpha = function(alpha){
-  #   # p0p1 = brm::getProbRR(va %*% alpha, vb %*% beta)
-  #   # p0    = p0p1[,1];  p1 = p0p1[,2]
-  #   p0p1 = prob_fun(va %*% alpha, vb %*% beta)
-  #   p0    = p0p1$p0;  p1 = p0p1$p1
-  #   
-  #   return(-sum((1-y[x==0])*log(1-p0[x==0])*weights[x==0] +
-  #                 (y[x==0])*log(p0[x==0])*weights[x==0]) -
-  #            sum((1-y[x==1])*log(1-p1[x==1])*weights[x==1] +
-  #                  (y[x==1])*log(p1[x==1])*weights[x==1]))  
-  # }
-  
-  # neg.log.likelihood.beta = function(beta){
-  #   # p0p1 = brm::getProbRR(va %*% alpha, vb %*% beta)
-  #   # p0    = p0p1[,1];  p1 = p0p1[,2]
-  #   p0p1 = prob_fun(va %*% alpha, vb %*% beta)
-  #   p0    = p0p1$p0;  p1 = p0p1$p1
-  #   
-  #   return(-sum((1-y[x==0])*log(1-p0[x==0])*weights[x==0] +
-  #                 (y[x==0])*log(p0[x==0])*weights[x==0]) -
-  #            sum((1-y[x==1])*log(1-p1[x==1])*weights[x==1] +
-  #                  (y[x==1])*log(p1[x==1])*weights[x==1]))  
-  # }
-  
-  Diff = function(x,y) sum((x-y)^2)/sum(x^2+thres)
-  alpha = alpha_start; beta = beta_start
-  diff = thres + 1; step = 0
-  
-  while(diff > thres & step < max_step){
-    step = step + 1
-    opt1 = stats::optim(alpha,
-                        function(.x){penalized_nllh(.x, beta, va, vb, x, y,
-                                       lambda = lambda,
-                                       # intercept = intercept,
-                                       prob_fun = prob_fun)},
-                        control=list(maxit=max(100,max_step/10)))
+  weights <- rep(1, length(x))
+
+
+  Diff <- function(x, y) sum((x - y)^2) / sum(x^2 + thres)
+  alpha <- alpha_start
+  beta <- beta_start
+  diff <- thres + 1
+  step <- 0
+
+  while (diff > thres & step < max_step) {
+    step <- step + 1
+    opt1 <- stats::optim(alpha,
+      function(.x) {
+        penalized_nllh(.x, beta, va, vb, x, y,
+          lambda = lambda,
+          # intercept = intercept,
+          prob_fun = prob_fun
+        )
+      },
+      control = list(maxit = max(100, max_step / 10))
+    )
     # opt1 = stats::optim(alpha,neg.log.likelihood.alpha,control=list(maxit=max(100,max_step/10)))
-    diff1 = Diff(opt1$par,alpha)
-    alpha = opt1$par
-    opt2 = stats::optim(beta,
-                        function(.x){penalized_nllh(alpha, .x, va, vb, x, y,
-                                                    lambda = lambda_beta,
-                                                    # intercept = intercept,
-                                                    prob_fun = prob_fun)},
-                        ,control=list(maxit=max(100,max_step/10)))
+    diff1 <- Diff(opt1$par, alpha)
+    alpha <- opt1$par
+    opt2 <- stats::optim(beta,
+      function(.x) {
+        penalized_nllh(alpha, .x, va, vb, x, y,
+          lambda = lambda_beta,
+          # intercept = intercept,
+          prob_fun = prob_fun
+        )
+      }, ,
+      control = list(maxit = max(100, max_step / 10))
+    )
     # opt2 = stats::optim(beta,neg.log.likelihood.beta,control=list(maxit=max(100,max_step/10)))
-    diff  = max(diff1,Diff(opt2$par,beta))
-    beta = opt2$par
-    nllh_iter <- penalized_nllh(alpha, beta, va, vb, x, y, 
-                      lambda = lambda,
-                      # intercept = intercept,
-                      prob_fun = prob_fun)
-    
-    alphas[step,] <- alpha
-    betas[step,] <- beta
-    g_alphas[step,] <- 0
-    g_betas[step,] <- 0
+    diff <- max(diff1, Diff(opt2$par, beta))
+    beta <- opt2$par
+    nllh_iter <- penalized_nllh(alpha, beta, va, vb, x, y,
+      lambda = lambda,
+      # intercept = intercept,
+      prob_fun = prob_fun
+    )
+
+    alphas[step, ] <- alpha
+    betas[step, ] <- beta
+    g_alphas[step, ] <- 0
+    g_betas[step, ] <- 0
     nllh_results[step] <- nllh_iter
   }
-  
-  alphas <- alphas[1:step,] 
-  betas <- betas[1:step,] 
-  g_alphas <- g_alphas[1:step,] 
-  g_betas <- g_betas[1:step,] 
+
+  alphas <- alphas[1:step, ]
+  betas <- betas[1:step, ]
+  g_alphas <- g_alphas[1:step, ]
+  g_betas <- g_betas[1:step, ]
   nllh_results <- nllh_results[1:step]
-  
-  return(list(alpha = alpha,
-              beta = beta,
-              step = step,
-              alphas = alphas,
-              betas = betas,
-              grad_alphas = g_alphas,
-              grad_betas = g_betas,
-              nllh_results = nllh_results))
+
+  return(list(
+    alpha = alpha,
+    beta = beta,
+    step = step,
+    alphas = alphas,
+    betas = betas,
+    grad_alphas = g_alphas,
+    grad_betas = g_betas,
+    nllh_results = nllh_results
+  ))
 }
 
 
 #' @export
 step_fista_ls <- function(current_param_val, # Current value of param being optimized (alpha_k or beta_k)
-                          other_param_val,   # The other param (beta_k or updated alpha_{k+1})
-                          param_val_old,     # Param value from iter k-1 (alpha_{k-1} or beta_{k-1})
-                          opt_target,        # "alpha" or "beta"
+                          other_param_val, # The other param (beta_k or updated alpha_{k+1})
+                          param_val_old, # Param value from iter k-1 (alpha_{k-1} or beta_{k-1})
+                          opt_target, # "alpha" or "beta"
                           initial_step_size, # Starting step size for line search
                           lambda,
                           t_old,
@@ -2141,13 +2206,12 @@ step_fista_ls <- function(current_param_val, # Current value of param being opti
                           prob_fun,
                           shrink_factor = 0.5,
                           max_ls_iter = 20) {
-  
   # 1. FISTA Momentum update
   t_new <- (1 + sqrt(1 + 4 * t_old^2)) / 2
   momentum_coeff <- (t_old - 1) / t_new
   # y_k = x_k + w_k * (x_k - x_{k-1})
   y_extrapolated <- current_param_val + momentum_coeff * (current_param_val - param_val_old)
-  
+
   # 2. Gradient of the smooth part (NLL) at the extrapolated point y_extrapolated
   grad_f_at_y <- NULL
   if (opt_target == "alpha") {
@@ -2155,9 +2219,11 @@ step_fista_ls <- function(current_param_val, # Current value of param being opti
   } else { # opt_target == "beta"
     grad_f_at_y <- grad_nll(other_param_val, y_extrapolated, y, x, va, vb, prob_fun, opt = "beta")
   }
-  
-  if (any(is.na(grad_f_at_y))) { grad_f_at_y[is.na(grad_f_at_y)] <- 0 } # Simplified NA handling
-  
+
+  if (any(is.na(grad_f_at_y))) {
+    grad_f_at_y[is.na(grad_f_at_y)] <- 0
+  } # Simplified NA handling
+
   # 3. NLL value at y_extrapolated ( f(y_k) )
   f_val_at_y <- NULL
   if (opt_target == "alpha") {
@@ -2165,17 +2231,19 @@ step_fista_ls <- function(current_param_val, # Current value of param being opti
   } else {
     f_val_at_y <- nllh(other_param_val, y_extrapolated, va, vb, x, y, prob_fun)
   }
-  
+
   # 4. Line search loop
   current_s <- initial_step_size
   param_new_accepted <- NULL
-  
+
   for (ls_iter in 1:max_ls_iter) {
     # Candidate update: x_{k+1} = prox_{s*g}(y_k - s * grad_f(y_k))
     prox_arg <- y_extrapolated - current_s * grad_f_at_y
     param_candidate <- soft_thres(prox_arg, lambda * current_s)
-    if (intercept) { param_candidate[1] <- prox_arg[1] }
-    
+    if (intercept) {
+      param_candidate[1] <- prox_arg[1]
+    }
+
     # NLL value at param_candidate ( f(x_{k+1}) )
     f_val_at_candidate <- NULL
     if (opt_target == "alpha") {
@@ -2183,30 +2251,34 @@ step_fista_ls <- function(current_param_val, # Current value of param being opti
     } else {
       f_val_at_candidate <- nllh(other_param_val, param_candidate, va, vb, x, y, prob_fun)
     }
-    
+
     # Backtracking condition: f(x_new) <= f(y) + <grad_f(y), x_new-y> + (1/(2s))||x_new-y||^2
     # This is the standard condition for proximal gradient methods.
     rhs_condition <- f_val_at_y +
       sum(grad_f_at_y * (param_candidate - y_extrapolated)) +
       (1 / (2 * current_s)) * sum((param_candidate - y_extrapolated)^2)
-    
+
     if (f_val_at_candidate <= rhs_condition + 1e-9) { # Added small tolerance
       param_new_accepted <- param_candidate
       break
     }
     current_s <- current_s * shrink_factor
   }
-  
+
   if (is.null(param_new_accepted)) { # Line search failed to satisfy condition
     # Default to using the smallest step tried, or could issue a warning/error
-    prox_arg <- y_extrapolated - current_s * grad_f_at_y 
+    prox_arg <- y_extrapolated - current_s * grad_f_at_y
     param_new_accepted <- soft_thres(prox_arg, lambda * current_s)
-    if (intercept) { param_new_accepted[1] <- prox_arg[1] }
+    if (intercept) {
+      param_new_accepted[1] <- prox_arg[1]
+    }
     # warning(paste("Line search for", opt_target, "may not have converged; using step_size =", current_s))
   }
-  
-  return(list(value_new = param_new_accepted, t_value = t_new, 
-              y_value = y_extrapolated, step_size = current_s))
+
+  return(list(
+    value_new = param_new_accepted, t_value = t_new,
+    y_value = y_extrapolated, step_size = current_s
+  ))
 }
 
 #' @export
@@ -2214,47 +2286,46 @@ fista_opt2_ls <- function(alpha_start, beta_start,
                           step_size_alpha, step_size_beta,
                           lambda, intercept, max_step,
                           va, vb, x, y,
-                          prob_fun, 
+                          prob_fun,
                           eval_grad = TRUE,
                           ls_shrink_factor = 0.5,
                           ls_max_iter = 20,
-                          lambda_beta = NULL){
-  
+                          lambda_beta = NULL) {
   if (is.null(lambda_beta)) lambda_beta <- lambda
   alpha <- alpha_start
   beta <- beta_start
-  
+
   last_alpha <- alpha_start # alpha_{k-1} for the first iteration (k=0)
-  last_beta <- beta_start   # beta_{k-1} for the first iteration (k=0)
-  
+  last_beta <- beta_start # beta_{k-1} for the first iteration (k=0)
+
   t_alpha <- 1.0
   t_beta <- 1.0
-  
+
   current_s_alpha <- step_size_alpha
   current_s_beta <- step_size_beta
-  
+
   # History storage
   p_alpha <- length(alpha_start)
   p_beta <- length(beta_start)
   alphas_hist <- matrix(NA_real_, nrow = max_step, ncol = p_alpha)
   betas_hist <- matrix(NA_real_, nrow = max_step, ncol = p_beta)
   grad_alphas_hist_sc <- matrix(NA_real_, nrow = max_step, ncol = p_alpha) # For stopping criteria
-  grad_betas_hist_sc <- matrix(NA_real_, nrow = max_step, ncol = p_beta)   # For stopping criteria
+  grad_betas_hist_sc <- matrix(NA_real_, nrow = max_step, ncol = p_beta) # For stopping criteria
   nllh_results_hist <- vector("double", max_step)
-  
+
   final_iter <- 0
-  
+
   for (iter in 1:max_step) {
     final_iter <- iter
-    
+
     alpha_k_start <- alpha # Value of alpha at the beginning of iteration k
-    beta_k_start <- beta   # Value of beta at the beginning of iteration k
-    
+    beta_k_start <- beta # Value of beta at the beginning of iteration k
+
     # FISTA update for alpha
     res_alpha <- step_fista_ls(
-      current_param_val = alpha_k_start,    # x_k
-      other_param_val = beta_k_start,     # beta_k (used to calculate grad NLL for alpha)
-      param_val_old = last_alpha,         # x_{k-1}
+      current_param_val = alpha_k_start, # x_k
+      other_param_val = beta_k_start, # beta_k (used to calculate grad NLL for alpha)
+      param_val_old = last_alpha, # x_{k-1}
       opt_target = "alpha",
       initial_step_size = current_s_alpha,
       lambda = lambda, t_old = t_alpha, intercept = intercept,
@@ -2262,12 +2333,12 @@ fista_opt2_ls <- function(alpha_start, beta_start,
       shrink_factor = ls_shrink_factor, max_ls_iter = ls_max_iter
     )
     alpha_next <- res_alpha$value_new # This is x_{k+1} for alpha
-    
+
     # FISTA update for beta
     res_beta <- step_fista_ls(
-      current_param_val = beta_k_start,     # x_k for beta
-      other_param_val = alpha_next,       # Use updated alpha for beta's gradient calc
-      param_val_old = last_beta,          # x_{k-1} for beta
+      current_param_val = beta_k_start, # x_k for beta
+      other_param_val = alpha_next, # Use updated alpha for beta's gradient calc
+      param_val_old = last_beta, # x_{k-1} for beta
       opt_target = "beta",
       initial_step_size = current_s_beta,
       lambda = lambda, t_old = t_beta, intercept = intercept,
@@ -2275,48 +2346,49 @@ fista_opt2_ls <- function(alpha_start, beta_start,
       shrink_factor = ls_shrink_factor, max_ls_iter = ls_max_iter
     )
     beta_next <- res_beta$value_new # This is x_{k+1} for beta
-    
+
     # Update values for the next iteration (k becomes k-1, k+1 becomes k)
     last_alpha <- alpha_k_start
     last_beta <- beta_k_start
-    
+
     alpha <- alpha_next
     beta <- beta_next
-    
+
     t_alpha <- res_alpha$t_value
     t_beta <- res_beta$t_value
-    
+
     current_s_alpha <- res_alpha$step_size
     current_s_beta <- res_beta$step_size
-    
+
     # Store results
-    if(p_alpha > 0) alphas_hist[iter, ] <- alpha
-    if(p_beta > 0) betas_hist[iter, ] <- beta
+    if (p_alpha > 0) alphas_hist[iter, ] <- alpha
+    if (p_beta > 0) betas_hist[iter, ] <- beta
     nllh_results_hist[iter] <- penalized_nllh(alpha, beta, va, vb, x, y,
-                                                  lambda = lambda, intercept = intercept,
-                                                  prob_fun = prob_fun)
-    
+      lambda = lambda, intercept = intercept,
+      prob_fun = prob_fun
+    )
+
     # Gradient for stopping criterion
-    
+
     if (eval_grad) {
       # If not precomputed, calculate them now based on *updated* alpha and beta
       grads_sc <- grad_nll(alpha, beta, x, y, va, vb, prob_fun)
       g_alpha_sc <- grads_sc$grad_alpha
       g_beta_sc <- grads_sc$grad_beta
     }
-    
-    if(eval_grad){
+
+    if (eval_grad) {
       grad_alphas_hist_sc[iter, ] <- g_alpha_sc
       grad_betas_hist_sc[iter, ] <- g_beta_sc
     }
-    
+
     # Check stopping criterion
     # Pass current alpha/beta and alpha/beta from start of this iteration
     # (alpha_k_start, beta_k_start act as "last_alpha", "last_beta" for change calculation)
     if (iter > 0) { # iter > 1 if stop_crit needs change from previous iter
       stop_boolean <- stop_crit(
-        grad_alpha = if(eval_grad && p_alpha > 0) g_alpha_sc else NULL,
-        grad_beta = if(eval_grad && p_beta > 0) g_beta_sc else NULL,
+        grad_alpha = if (eval_grad && p_alpha > 0) g_alpha_sc else NULL,
+        grad_beta = if (eval_grad && p_beta > 0) g_beta_sc else NULL,
         alpha = alpha, beta = beta,
         last_alpha = alpha_k_start, last_beta = beta_k_start,
         eval_grad = eval_grad
@@ -2327,14 +2399,14 @@ fista_opt2_ls <- function(alpha_start, beta_start,
       }
     }
   }
-  
+
   # Truncate history matrices
   alphas_hist <- alphas_hist[1:final_iter, , drop = FALSE]
   betas_hist <- betas_hist[1:final_iter, , drop = FALSE]
   nllh_results_hist <- nllh_results_hist[1:final_iter]
   grad_alphas_hist_sc <- grad_alphas_hist_sc[1:final_iter, , drop = FALSE]
   grad_betas_hist_sc <- grad_betas_hist_sc[1:final_iter, , drop = FALSE]
-  
+
   return(list(
     alpha = alpha, beta = beta,
     step = final_iter,
@@ -2348,133 +2420,134 @@ fista_opt2_ls <- function(alpha_start, beta_start,
 
 
 ccc_opt <- function(alpha_start, beta_start,
-                    step_size_alpha, step_size_beta, 
+                    step_size_alpha, step_size_beta,
                     lambda,
                     intercept,
-                    max_step = 1000, 
+                    max_step = 1000,
                     va, vb, x, y,
                     prob_fun,
-                    lambda_beta = NULL){
-  
+                    lambda_beta = NULL) {
   if (is.null(lambda_beta)) lambda_beta <- lambda
-  
-  max_outer_iter = max_step/10
-  max_inner_iter = 2
-  tol = 1e-4
-  
+
+  max_outer_iter <- max_step / 10
+  max_inner_iter <- 2
+  tol <- 1e-4
+
   n_obs <- length(y)
   pa <- length(alpha_start)
   pb <- length(beta_start)
-  
+
   alpha <- alpha_start
   beta <- beta_start
-  
+
   # History
   alphas_hist <- matrix(NA_real_, nrow = max_outer_iter, ncol = pa)
   betas_hist <- matrix(NA_real_, nrow = max_outer_iter, ncol = pb)
   obj_hist <- vector("double", max_outer_iter)
   grad_alphas_hist <- matrix(NA_real_, nrow = max_step, ncol = pa) # For stopping criteria
-  grad_betas_hist <- matrix(NA_real_, nrow = max_step, ncol = pb)   # For stopping criteria
-  
+  grad_betas_hist <- matrix(NA_real_, nrow = max_step, ncol = pb) # For stopping criteria
+
   # Active sets: Start with all non-intercept parameters. Intercept is handled separately.
   active_set_alpha_L1 <- (1:pa)
-  active_set_beta_L1  <- (1:pb)
-  
+  active_set_beta_L1 <- (1:pb)
+
   if (intercept) {
     if (pa > 0) active_set_alpha_L1 <- setdiff(active_set_alpha_L1, 1)
-    if (pb > 0) active_set_beta_L1  <- setdiff(active_set_beta_L1, 1)
+    if (pb > 0) active_set_beta_L1 <- setdiff(active_set_beta_L1, 1)
   }
-  
+
   final_outer_iter <- 0
   iter_comb <- 0
-  
+
   for (outer_iter_num in 1:max_outer_iter) {
     final_outer_iter <- outer_iter_num
     alpha_at_outer_start <- alpha
     beta_at_outer_start <- beta
     active_set_changed_this_outer_iter <- FALSE
-    
+
     # Inner loop: Cyclical CD on current active set
     for (inner_iter_num in 1:max_inner_iter) {
       alpha_at_inner_start <- alpha
       beta_at_inner_start <- beta
-      iter_comb <- iter_comb+1
-      
+      iter_comb <- iter_comb + 1
+
       # --- Update Coefs ---
       # 1. Intercept (if present) - no L1 penalty
       # if (intercept) {
       #   grad_alpha1 <- grad_nll_k(
-      #     alpha, beta, y, x, va, vb, prob_fun, 
+      #     alpha, beta, y, x, va, vb, prob_fun,
       #     opt = "alpha", k_index = 1)
       #   alpha[1] <- alpha[1] - step_size_alpha * grad_alpha1
-      #   
-      #   
+      #
+      #
       #   grad_beta1 <- grad_nll_k(
       #     alpha, beta, y, x, va, vb, prob_fun,
       #     opt = "beta", k_index = 1)
       #   beta[1] <- beta[1] - step_size_beta * grad_beta1
-      #   
+      #
       # }
       # 2. L1-penalized coefficients in active set
       for (k in active_set_alpha_L1) {
         grad_alphak <- grad_nll_k(
           alpha, beta, y, x, va, vb, prob_fun,
-          opt = "alpha", k_index = k)
-        
+          opt = "alpha", k_index = k
+        )
+
         unreg_update <- alpha[k] - step_size_alpha * grad_alphak
         alpha[k] <- soft_thres(unreg_update, lambda * step_size_alpha)
-        
+
         grad_betak <- grad_nll_k(
           alpha, beta, y, x, va, vb, prob_fun,
-          opt = "beta", k_index = k)
-        
+          opt = "beta", k_index = k
+        )
+
         unreg_update <- beta[k] - step_size_beta * grad_betak
         beta[k] <- soft_thres(unreg_update, lambda * step_size_beta)
-        
+
         grad_alphas_hist[iter_comb, k] <- grad_alphak
         grad_betas_hist[iter_comb, k] <- grad_betak
       }
-      
+
       # Check for convergence of inner loop
-      alpha_change_inner <- sum((alpha - alpha_at_inner_start)^2) 
-      beta_change_inner  <- sum((beta - beta_at_inner_start)^2)
+      alpha_change_inner <- sum((alpha - alpha_at_inner_start)^2)
+      beta_change_inner <- sum((beta - beta_at_inner_start)^2)
       norm_alpha_inner_start <- sum(alpha_at_inner_start^2)
-      norm_beta_inner_start  <- sum(beta_at_inner_start^2)
-      
+      norm_beta_inner_start <- sum(beta_at_inner_start^2)
+
       cli::cli_alert_success("Inner loop {inner_iter_num} finished.")
-      
+
       alphas_hist[iter_comb, ] <- alpha
       betas_hist[iter_comb, ] <- beta
       obj_hist[iter_comb] <- penalized_nllh(alpha, beta, va, vb, x, y, lambda, intercept, prob_fun)
-      
+
       if ((alpha_change_inner / (norm_alpha_inner_start + 1e-8) < tol) &&
-          (beta_change_inner  / (norm_beta_inner_start  + 1e-8) < tol)) {
+        (beta_change_inner / (norm_beta_inner_start + 1e-8) < tol)) {
         cli::cli_alert_success("work.")
         break # Inner loop converged
       }
     } # End inner loop
-    
+
     # --- KKT Check & Update Active Set ---
     all_kkt_satisfied_now <- TRUE
-    
+
     # KKT for Alpha
-    
-      active_set_alpha_L1 <- NA
-      active_set_beta_L1 <- NA
-    
+
+    active_set_alpha_L1 <- NA
+    active_set_beta_L1 <- NA
+
     full_grad <- grad_nll(alpha, beta, y, x, va, vb, prob_fun, opt = "both")
     full_grad_alpha <- full_grad$grad_alpha
     full_grad_beta <- full_grad$grad_beta
-    
+
     k_check <- 1:pa
     if (intercept) { # Check intercept
       if (abs(full_grad_alpha[1]) > tol) all_kkt_satisfied_now <- FALSE
       if (abs(full_grad_beta[1]) > tol) all_kkt_satisfied_now <- FALSE
       k_check <- 2:pa
     }
-    
-    
-    for (k in k_check ) { # Non-intercept coefs
+
+
+    for (k in k_check) { # Non-intercept coefs
       if (abs(alpha[k]) < 1e-5) { # If coef is zero
         if (abs(full_grad_alpha[k]) > lambda + tol) { # Violation: |grad| > lambda
           all_kkt_satisfied_now <- FALSE
@@ -2494,11 +2567,11 @@ ccc_opt <- function(alpha_start, beta_start,
         }
       }
     }
-    
+
     cli::cli_inform("Active alpha set lenght: {length(active_set_alpha_L1)}")
-    
+
     # KKT for Beta
-    for (k in k_check ) {
+    for (k in k_check) {
       if (abs(beta[k]) < 1e-5) {
         if (abs(full_grad_beta[k]) > lambda + tol) {
           all_kkt_satisfied_now <- FALSE
@@ -2517,38 +2590,40 @@ ccc_opt <- function(alpha_start, beta_start,
         }
       }
     }
-    
+
     cli::cli_inform("Active beta set lenght: {length(active_set_beta_L1)}")
-    
+
     grad_alphas_hist[iter_comb, ] <- full_grad_alpha
     grad_betas_hist[iter_comb, ] <- full_grad_beta
-    
+
     cli::cli_alert_success("Outer loop {outer_iter_num} finished.")
     # Store history for this outer iteration
-    
+
     # Check for overall convergence
     if (all_kkt_satisfied_now && !active_set_changed_this_outer_iter) break
-    
+
     # Fallback: check change from start of this outer loop (after at least one KKT sweep)
     alpha_change_outer <- sum((alpha - alpha_at_outer_start)^2)
-    beta_change_outer  <- sum((alpha - beta_at_outer_start)^2)
-      
+    beta_change_outer <- sum((alpha - beta_at_outer_start)^2)
+
     norm_alpha_outer_start <- sum(alpha_at_outer_start^2)
-    norm_beta_outer_start  <- sum(beta_at_outer_start^2)
-    
+    norm_beta_outer_start <- sum(beta_at_outer_start^2)
+
     if (outer_iter_num > 1 && !active_set_changed_this_outer_iter &&
-        (alpha_change_outer / (norm_alpha_outer_start + 1e-8) < tol) &&
-        (beta_change_outer  / (norm_beta_outer_start  + 1e-8) < tol)) break
-    
+      (alpha_change_outer / (norm_alpha_outer_start + 1e-8) < tol) &&
+      (beta_change_outer / (norm_beta_outer_start + 1e-8) < tol)) {
+      break
+    }
+
     if (outer_iter_num == max_outer_iter) break
-    
-  
   } # End outer loop
-  
-  return(list(alpha = alpha, beta = beta,
-              step = final_outer_iter,
-              alphas = alphas_hist, betas = betas_hist,
-              grad_alphas = grad_alphas_hist, 
-              grad_betas = grad_betas_hist,
-              nllh_results = obj_hist)) # Penalized NLL history
+
+  return(list(
+    alpha = alpha, beta = beta,
+    step = final_outer_iter,
+    alphas = alphas_hist, betas = betas_hist,
+    grad_alphas = grad_alphas_hist,
+    grad_betas = grad_betas_hist,
+    nllh_results = obj_hist
+  )) # Penalized NLL history
 }
