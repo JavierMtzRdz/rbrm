@@ -35,13 +35,6 @@ generate_data <- function(pa, pb, n, n_test, alpha = NULL, beta = NULL, gamma = 
 
   # Propensity Score Model
   # Compute intercept for propensity score to match target prevalence
-
-  # Helper to find intercept for Sigmoid link
-  find_int_sigmoid <- function(lp, target) {
-    f <- function(b) mean(sigmoid(b + lp)) - target
-    tryCatch(uniroot(f, c(-100, 100))$root, error = function(e) 0)
-  }
-
   gamma_linear_pred <- v.train %*% gamma
   gamma_intercept <- find_int_sigmoid(gamma_linear_pred, treatment_prob)
   gamma_true <- c(gamma_intercept, gamma)
@@ -106,62 +99,7 @@ generate_data <- function(pa, pb, n, n_test, alpha = NULL, beta = NULL, gamma = 
 }
 
 #' @export
-map_with_interpolation <- function(value) {
-  mapping <- c(
-    `5` = 0.26,
-    `50` = 0.15,
-    `150` = 0.07,
-    `500` = .05
-  )
-  mapping <- mapping[order(as.numeric(names(mapping)))]
-  keys <- as.numeric(names(mapping))
-  values <- as.numeric(mapping)
-
-  if (value %in% keys) {
-    return(mapping[as.character(value)])
-  }
-  if (value < min(keys)) {
-    return(values[1])
-  }
-  if (value > max(keys)) {
-    return(values[length(values)])
-  }
-
-  lower_index <- max(which(keys < value))
-  upper_index <- min(which(keys > value))
-  x0 <- keys[lower_index]
-  x1 <- keys[upper_index]
-  y0 <- values[lower_index]
-  y1 <- values[upper_index]
-
-  return(y0 + (y1 - y0) * (value - x0) / (x1 - x0))
-}
-
-#' @export
 true_vals <- function(pa, pb = pa) {
-  # Helper to find intercept for generic link function via simulation
-  # link_fun(intercept, linear_pred) -> probabilities
-  compute_intercept_sim <- function(coefs, target_prob, link_fun, linear_pred_other = NULL) {
-    # Simulate covariates if not provided
-    n_vars <- length(coefs)
-    n_sim <- 5000
-    v_sim <- matrix(stats::runif(n_sim * n_vars, min = -1, max = 1), nrow = n_sim)
-    lp <- v_sim %*% coefs
-
-    # If there's another linear predictor (alpha) needed for the link
-    if (is.null(linear_pred_other) && !is.null(formals(link_fun)$lp_other)) {
-      stop("Need other linear predictor for this link.")
-    }
-
-    # Objective: find b such that mean(link(b, lp, lp_other)) = target
-    f <- function(b) {
-      probs <- link_fun(b, lp, linear_pred_other)
-      mean(probs) - target_prob
-    }
-
-    tryCatch(uniroot(f, c(-20, 20))$root, error = function(e) 0)
-  }
-
   # Generate Alpha
   p_a <- map_with_interpolation(pa)
   n_eff_a <- round(pa * p_a)
@@ -203,8 +141,7 @@ true_vals <- function(pa, pb = pa) {
     getProbRR.org(as.vector(theta), as.vector(phi))$p0
   }
 
-  f_beta <- function(b) mean(link_rb_p0(b, lp_beta_sim, theta_sim)) - 0.1
-  beta_int <- tryCatch(uniroot(f_beta, c(-20, 20))$root, error = function(e) -2.3)
+  beta_int <- compute_intercept_sim(linear_pred_main = lp_beta_sim, target_prob = 0.1, link_fun = link_rb_p0, linear_pred_other = theta_sim)
 
   true_betas <- c(beta_int, beta_slopes)
 
