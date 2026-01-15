@@ -2,12 +2,12 @@
 # Generator token: 10BE3573-1514-4C36-9D1C-5A225CD40393
 
 #' @export
-getProbRR_org_cpp <- function(logrr, logop, clipping = TRUE) {
+getProbRR_org_cpp <- function(logrr, logop, clipping = 1e-15) {
     .Call(`_rbrm_getProbRR_org_cpp`, logrr, logop, clipping)
 }
 
 #' @export
-getProbRR_alt_cpp <- function(logrr, logop, clipping = TRUE) {
+getProbRR_alt_cpp <- function(logrr, logop, clipping = 1e-15) {
     .Call(`_rbrm_getProbRR_alt_cpp`, logrr, logop, clipping)
 }
 
@@ -17,27 +17,40 @@ soft_thres_cpp <- function(x, lambda) {
 }
 
 #' @export
-nllh_cpp <- function(alpha, beta, va, vb, x_indicator, y_outcome, prob_fun) {
-    .Call(`_rbrm_nllh_cpp`, alpha, beta, va, vb, x_indicator, y_outcome, prob_fun)
+nllh_cpp <- function(alpha, beta, va, vb, x_indicator, y_outcome, prob_fun, clipping = 1e-10) {
+    .Call(`_rbrm_nllh_cpp`, alpha, beta, va, vb, x_indicator, y_outcome, prob_fun, clipping)
 }
 
 #' @export
-penalized_nllh_cpp <- function(alpha, beta, va, vb, x_indicator, y_outcome, lambda, intercept, prob_fun) {
-    .Call(`_rbrm_penalized_nllh_cpp`, alpha, beta, va, vb, x_indicator, y_outcome, lambda, intercept, prob_fun)
+penalized_nllh_cpp <- function(alpha, beta, va, vb, x_indicator, y_outcome, lambda, intercept, prob_fun, clipping = 1e-10) {
+    .Call(`_rbrm_penalized_nllh_cpp`, alpha, beta, va, vb, x_indicator, y_outcome, lambda, intercept, prob_fun, clipping)
 }
 
 #' @export
-grad_nll_alpha_cpp <- function(alpha_eval, beta_current, va, vb, x_indicator, y_outcome, prob_fun_selector, clipping_for_prob_fun_passed_to_nllh = TRUE) {
-    .Call(`_rbrm_grad_nll_alpha_cpp`, alpha_eval, beta_current, va, vb, x_indicator, y_outcome, prob_fun_selector, clipping_for_prob_fun_passed_to_nllh)
+grad_nll_alpha_analytical_cpp <- function(alpha, beta, va, vb, x_indicator, y_outcome, prob_fun_selector, clipping = 1e-10) {
+    .Call(`_rbrm_grad_nll_alpha_analytical_cpp`, alpha, beta, va, vb, x_indicator, y_outcome, prob_fun_selector, clipping)
 }
 
 #' @export
-grad_nll_beta_cpp <- function(alpha_current, beta_eval, va, vb, x_indicator, y_outcome, prob_fun_selector, clipping_for_prob_fun_passed_to_nllh = TRUE) {
-    .Call(`_rbrm_grad_nll_beta_cpp`, alpha_current, beta_eval, va, vb, x_indicator, y_outcome, prob_fun_selector, clipping_for_prob_fun_passed_to_nllh)
+grad_nll_beta_analytical_cpp <- function(alpha, beta, va, vb, x_indicator, y_outcome, prob_fun_selector, clipping = 1e-10) {
+    .Call(`_rbrm_grad_nll_beta_analytical_cpp`, alpha, beta, va, vb, x_indicator, y_outcome, prob_fun_selector, clipping)
 }
 
 #' @export
-fista_opt2_cpp <- function(alpha_start_rcpp, beta_start_rcpp, step_size_alpha, step_size_beta, lambda, intercept, max_iter, va_rcpp, vb_rcpp, x_indicator, y_outcome, prob_fun_selector, clipping_for_prob_fun = TRUE, eval_grad_for_output_and_stop_crit = TRUE, tol_param_change = 1e-6, tol_grad_norm = 1e-6) {
-    .Call(`_rbrm_fista_opt2_cpp`, alpha_start_rcpp, beta_start_rcpp, step_size_alpha, step_size_beta, lambda, intercept, max_iter, va_rcpp, vb_rcpp, x_indicator, y_outcome, prob_fun_selector, clipping_for_prob_fun, eval_grad_for_output_and_stop_crit, tol_param_change, tol_grad_norm)
+newton_cd_cpp <- function(alpha_start_rcpp, beta_start_rcpp, lambda, intercept, max_iter, va_rcpp, vb_rcpp, x_indicator, y_outcome, prob_fun_selector, lambda_beta = -1.0, tol = 1e-5, clipping = 1e-10) {
+    .Call(`_rbrm_newton_cd_cpp`, alpha_start_rcpp, beta_start_rcpp, lambda, intercept, max_iter, va_rcpp, vb_rcpp, x_indicator, y_outcome, prob_fun_selector, lambda_beta, tol, clipping)
+}
+
+#' @export
+active_set_newton_cd_cpp <- function(alpha_start_rcpp, beta_start_rcpp, lambda, intercept, max_iter, va_rcpp, vb_rcpp, x_indicator, y_outcome, prob_fun_selector, lambda_beta = -1.0, tol = 1e-5, clipping = 1e-10, kkt_check_freq = 10L, active_tol = 1e-6) {
+    .Call(`_rbrm_active_set_newton_cd_cpp`, alpha_start_rcpp, beta_start_rcpp, lambda, intercept, max_iter, va_rcpp, vb_rcpp, x_indicator, y_outcome, prob_fun_selector, lambda_beta, tol, clipping, kkt_check_freq, active_tol)
+}
+
+fista_cpp <- function(alpha_start_rcpp, beta_start_rcpp, lambda, intercept, max_iter, va_rcpp, vb_rcpp, x_indicator, y_outcome, prob_fun_selector, lambda_beta = -1.0, tol = 1e-5, step_size_init = 0.5, armijo_c = 1e-4, shrink_factor = 0.5, clipping = 1e-10) {
+    .Call(`_rbrm_fista_cpp`, alpha_start_rcpp, beta_start_rcpp, lambda, intercept, max_iter, va_rcpp, vb_rcpp, x_indicator, y_outcome, prob_fun_selector, lambda_beta, tol, step_size_init, armijo_c, shrink_factor, clipping)
+}
+
+lbfgs_cpp <- function(alpha_start_rcpp, beta_start_rcpp, lambda, intercept, max_iter, va_rcpp, vb_rcpp, x_indicator, y_outcome, prob_fun_selector, lambda_beta = -1.0, tol = 1e-5, clipping = 1e-10) {
+    .Call(`_rbrm_lbfgs_cpp`, alpha_start_rcpp, beta_start_rcpp, lambda, intercept, max_iter, va_rcpp, vb_rcpp, x_indicator, y_outcome, prob_fun_selector, lambda_beta, tol, clipping)
 }
 

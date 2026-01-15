@@ -19,6 +19,7 @@ optim_newton_cd(
   prob_fun = getProbRR.org,
   lambda_beta = NULL,
   tol = 1e-05,
+  save_history = FALSE,
   ...
 )
 }
