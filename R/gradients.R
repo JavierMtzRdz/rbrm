@@ -139,12 +139,14 @@ dp0_phi <- function(theta, phi,
 #' @param y Vector of binary outcomes (Y in paper).
 #' @param prob_fun Function that takes theta (theta), phi (phi) and returns list(p0, p1).
 #' @param opt Character string specifying which gradient to return ("alpha", "beta", or "both").
+#' @param clipping Small epsilon for probability clipping (defaults to 1e-10).
 #'
 #' @return Analytical gradient vector(s) of the negative log-likelihood defined by user's nllh.
 #' @export
 grad_nll <- function(alpha, beta, y, x, va, vb,
                      prob_fun, opt = c("both", "alpha", "beta"),
-                     method = c("numerical", "analytical")) {
+                     method = c("analytical", "numerical"),
+                     clipping = 1e-10) {
   # Argument matching
   method <- rlang::arg_match(method)
   opt <- rlang::arg_match(opt)
@@ -152,18 +154,32 @@ grad_nll <- function(alpha, beta, y, x, va, vb,
   n <- length(y)
   pa <- length(alpha)
   pb <- length(beta)
-  ep <- 1e-10 # Small epsilon for numerical safety
 
-  # Calculate theta, phi, and probabilities
+  # Calculate theta, phi
   theta <- as.vector(va %*% alpha)
   phi <- as.vector(vb %*% beta)
-  ps <- prob_fun(theta, phi)
+
+  # Calculate probabilities with explicit clipping
+  # We check if prob_fun accepts 'clipping' argument to be safe, though internal ones do.
+  if ("clipping" %in% names(formals(prob_fun))) {
+    ps <- prob_fun(theta, phi, clipping = clipping)
+  } else {
+    ps <- prob_fun(theta, phi)
+  }
+
   p0 <- ps$p0
   p1 <- ps$p1
 
   # Derivatives of log-likelihood_i w.r.t p1_i and p0_i
+  # Note: if p1 is clipped, this value might be large, but will be zeroed out later.
+  # We use the clipped probabilities for this calculation to match the NLL evaluation point.
   dllh_dp1 <- (y * x) / p1 - ((1 - y) * x) / (1 - p1)
   dllh_dp0 <- (y * (1 - x)) / p0 - ((1 - y) * (1 - x)) / (1 - p0)
+
+  # Identify observations where the relevant probability was clipped
+  # pi = p1 if x=1, p0 if x=0
+  pi_val <- p1 * x + p0 * (1 - x)
+  is_clipped <- (pi_val <= clipping) | (pi_val >= (1 - clipping))
 
   if (opt != "beta") {
     if (method == "analytical") {
@@ -173,17 +189,23 @@ grad_nll <- function(alpha, beta, y, x, va, vb,
     }
     if (method == "numerical") {
       dp0_dtheta <- numDeriv::grad(
-        func = function(theta_val) prob_fun(theta_val, phi)$p0,
+        func = function(theta_val) prob_fun(theta_val, phi, clipping = clipping)$p0,
         x = theta,
         method = "simple"
       )
     }
 
     dp1_dtheta <- (p0 + dp0_dtheta) * exp(theta)
+    # Check for boundary consistency explicitly for p1 derivative if needed,
+    # but the generic zeroing below covers the NLL gradient.
     dp1_dtheta[which(same(p0 + dp0_dtheta, 0))] <- 0
 
     grad_alpha_sum <- numeric(pa)
     inner_alpha <- (dllh_dp1 * dp1_dtheta + dllh_dp0 * dp0_dtheta)
+
+    # Zero out gradient for clipped observations
+    inner_alpha[is_clipped] <- 0
+
     grad_alpha <- -(t(va) %*% inner_alpha) / n
   }
   if (opt != "alpha") {
@@ -194,7 +216,7 @@ grad_nll <- function(alpha, beta, y, x, va, vb,
     }
     if (method == "numerical") {
       dp0_dphi <- numDeriv::grad(
-        func = (function(phi_val) prob_fun(theta, phi_val)$p0),
+        func = (function(phi_val) prob_fun(theta, phi_val, clipping = clipping)$p0),
         x = phi,
         method = "simple"
       )
@@ -202,9 +224,13 @@ grad_nll <- function(alpha, beta, y, x, va, vb,
 
     dp1_dphi <- dp0_dphi * exp(theta)
     dp1_dphi[which(same(dp0_dphi, 0))] <- 0
+
     grad_beta_sum <- numeric(pb)
     inner_beta <- (dllh_dp1 * dp1_dphi + dllh_dp0 * dp0_dphi)
-    # grad_beta <- -t(inner_beta%*%vb)/n
+
+    # Zero out gradient for clipped observations
+    inner_beta[is_clipped] <- 0
+
     grad_beta <- -(t(vb) %*% inner_beta) / n
   }
   if (opt == "alpha") {
