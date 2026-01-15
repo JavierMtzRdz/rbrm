@@ -37,7 +37,7 @@ optim_newton_cd_cpp <- function(alpha_start, beta_start,
     res <- newton_cd_cpp(
         alpha_start, beta_start, lambda, intercept, max_step,
         as.matrix(va), as.matrix(vb), x, y,
-        selector, lambda_beta, tol, clipping
+        selector, lambda_beta, tol, clipping, save_history
     )
 
     return(res)
@@ -86,7 +86,7 @@ optim_newton_cd_active_cpp <- function(alpha_start, beta_start,
         alpha_start, beta_start, lambda, intercept, max_step,
         as.matrix(va), as.matrix(vb), x, y,
         selector, lambda_beta, tol, clipping,
-        kkt_check_freq, active_tol
+        kkt_check_freq, active_tol, save_history
     )
 
     return(res)
@@ -136,7 +136,7 @@ optim_fista_cpp <- function(alpha_start, beta_start,
         alpha_start, beta_start, lambda, intercept, max_step,
         as.matrix(va), as.matrix(vb), x, y,
         selector, lambda_beta, tol,
-        step_size_init, armijo_c, shrink_factor, clipping
+        step_size_init, armijo_c, shrink_factor, clipping, save_history
     )
 
     return(res)
@@ -184,7 +184,7 @@ optim_lbfgs_cpp <- function(alpha_start, beta_start,
     res <- lbfgs_cpp(
         alpha_start, beta_start, lambda, intercept, max_step,
         as.matrix(va), as.matrix(vb), x, y,
-        selector, lambda_beta, tol, clipping
+        selector, lambda_beta, tol, clipping, save_history
     )
 
     return(res)

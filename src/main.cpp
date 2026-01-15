@@ -747,12 +747,15 @@ arma::vec grad_nll_beta_analytical_cpp(const arma::vec &alpha,
 // --- Newton-CD Optimizer in C++ ---
 //' @export
 // [[Rcpp::export]]
-Rcpp::List newton_cd_cpp(
-    Rcpp::NumericVector alpha_start_rcpp, Rcpp::NumericVector beta_start_rcpp,
-    double lambda, bool intercept, int max_iter, Rcpp::NumericMatrix va_rcpp,
-    Rcpp::NumericMatrix vb_rcpp, Rcpp::NumericVector x_indicator,
-    Rcpp::NumericVector y_outcome, int prob_fun_selector,
-    double lambda_beta = -1.0, double tol = 1e-5, double clipping = 1e-10) {
+Rcpp::List newton_cd_cpp(Rcpp::NumericVector alpha_start_rcpp,
+                         Rcpp::NumericVector beta_start_rcpp, double lambda,
+                         bool intercept, int max_iter,
+                         Rcpp::NumericMatrix va_rcpp,
+                         Rcpp::NumericMatrix vb_rcpp,
+                         Rcpp::NumericVector x_indicator,
+                         Rcpp::NumericVector y_outcome, int prob_fun_selector,
+                         double lambda_beta = -1.0, double tol = 1e-5,
+                         double clipping = 1e-10, bool save_history = false) {
 
   // Convert to Armadillo
   arma::vec alpha = Rcpp::as<arma::vec>(alpha_start_rcpp);
@@ -769,6 +772,16 @@ Rcpp::List newton_cd_cpp(
 
   int actual_iter = 0;
   bool converged = false;
+
+  arma::mat alphas_hist;
+  arma::mat betas_hist;
+  arma::vec nll_hist;
+
+  if (save_history) {
+    alphas_hist.set_size(max_iter, pa);
+    betas_hist.set_size(max_iter, pb);
+    nll_hist.set_size(max_iter);
+  }
 
   // Main Newton Loop
   for (int iter = 0; iter < max_iter; ++iter) {
@@ -858,8 +871,9 @@ Rcpp::List newton_cd_cpp(
     arma::vec d_beta = beta_new - beta;
 
     // Check convergence
-    double change =
-        std::sqrt(arma::dot(d_alpha, d_alpha) + arma::dot(d_beta, d_beta));
+    double max_a = (d_alpha.n_elem > 0) ? arma::abs(d_alpha).max() : 0.0;
+    double max_b = (d_beta.n_elem > 0) ? arma::abs(d_beta).max() : 0.0;
+    double change = std::max(max_a, max_b);
     if (change < tol) {
       alpha = alpha_new;
       beta = beta_new;
@@ -877,17 +891,29 @@ Rcpp::List newton_cd_cpp(
           penalized_nllh_cpp(a_cand, b_cand, va, vb, x_indicator, y_outcome,
                              lambda, intercept, prob_fun_selector, clipping);
 
-      if (obj_cand <= obj_prev + 1e-8 || !std::isfinite(obj_cand)) {
+      if (obj_cand <= obj_prev + 1e-8 && std::isfinite(obj_cand)) {
         alpha = a_cand;
         beta = b_cand;
         accepted = true;
+        if (save_history)
+          nll_hist(iter) = obj_cand;
         break;
       }
       step_ls *= 0.5;
     }
 
     if (!accepted) {
+      if (save_history) {
+        alphas_hist.row(iter) = alpha.t();
+        betas_hist.row(iter) = beta.t();
+        nll_hist(iter) = obj_prev;
+      }
       break;
+    }
+
+    if (save_history) {
+      alphas_hist.row(iter) = alpha.t();
+      betas_hist.row(iter) = beta.t();
     }
   }
 
@@ -896,11 +922,22 @@ Rcpp::List newton_cd_cpp(
                          intercept, prob_fun_selector, clipping);
 
   // Return results (compatible with R interface)
-  return Rcpp::List::create(Rcpp::Named("alpha") = Rcpp::wrap(alpha),
-                            Rcpp::Named("beta") = Rcpp::wrap(beta),
-                            Rcpp::Named("convergence") = converged,
-                            Rcpp::Named("step") = actual_iter,
-                            Rcpp::Named("final_nll") = final_nll);
+  return Rcpp::List::create(
+      Rcpp::Named("alpha") = Rcpp::wrap(alpha),
+      Rcpp::Named("beta") = Rcpp::wrap(beta),
+      Rcpp::Named("convergence") = converged, Rcpp::Named("step") = actual_iter,
+      Rcpp::Named("final_nll") = final_nll,
+      Rcpp::Named("alphas") =
+          (save_history && actual_iter > 0)
+              ? Rcpp::wrap(alphas_hist.rows(0, actual_iter - 1))
+              : R_NilValue,
+      Rcpp::Named("betas") =
+          (save_history && actual_iter > 0)
+              ? Rcpp::wrap(betas_hist.rows(0, actual_iter - 1))
+              : R_NilValue,
+      Rcpp::Named("nllh_results") = (save_history && actual_iter > 0)
+                                        ? Rcpp::wrap(nll_hist.head(actual_iter))
+                                        : R_NilValue);
 }
 
 //' @export
@@ -911,7 +948,8 @@ Rcpp::List active_set_newton_cd_cpp(
     Rcpp::NumericMatrix vb_rcpp, Rcpp::NumericVector x_indicator,
     Rcpp::NumericVector y_outcome, int prob_fun_selector,
     double lambda_beta = -1.0, double tol = 1e-5, double clipping = 1e-10,
-    int kkt_check_freq = 10, double active_tol = 1e-6) {
+    int kkt_check_freq = 10, double active_tol = 1e-6,
+    bool save_history = false) {
 
   // Convert to Armadillo
   arma::vec alpha = Rcpp::as<arma::vec>(alpha_start_rcpp);
@@ -932,6 +970,16 @@ Rcpp::List active_set_newton_cd_cpp(
 
   int actual_iter = 0;
   bool converged = false;
+
+  arma::mat alphas_hist;
+  arma::mat betas_hist;
+  arma::vec nll_hist;
+
+  if (save_history) {
+    alphas_hist.set_size(max_iter, pa);
+    betas_hist.set_size(max_iter, pb);
+    nll_hist.set_size(max_iter);
+  }
 
   for (int iter = 0; iter < max_iter; ++iter) {
     actual_iter = iter + 1;
@@ -1211,12 +1259,18 @@ Rcpp::List active_set_newton_cd_cpp(
     arma::vec d_alpha = alpha_new - alpha;
     arma::vec d_beta = beta_new - beta;
 
-    double change =
-        std::sqrt(arma::dot(d_alpha, d_alpha) + arma::dot(d_beta, d_beta));
+    double max_a = (d_alpha.n_elem > 0) ? arma::abs(d_alpha).max() : 0.0;
+    double max_b = (d_beta.n_elem > 0) ? arma::abs(d_beta).max() : 0.0;
+    double change = std::max(max_a, max_b);
     if (change < tol) {
       alpha = alpha_new;
       beta = beta_new;
       converged = true;
+      if (save_history) {
+        alphas_hist.row(iter) = alpha.t();
+        betas_hist.row(iter) = beta.t();
+        nll_hist(iter) = obj_prev;
+      }
       break;
     }
 
@@ -1229,16 +1283,23 @@ Rcpp::List active_set_newton_cd_cpp(
           penalized_nllh_cpp(a_cand, b_cand, va, vb, x_indicator, y_outcome,
                              lambda, intercept, prob_fun_selector, clipping);
 
-      if (obj_cand <= obj_prev + 1e-8 || !std::isfinite(obj_cand)) {
+      if (obj_cand <= obj_prev + 1e-8 && std::isfinite(obj_cand)) {
         alpha = a_cand;
         beta = b_cand;
         accepted = true;
+        if (save_history)
+          nll_hist(iter) = obj_cand;
         break;
       }
       step_ls *= 0.5;
     }
 
     if (!accepted) {
+      if (save_history) {
+        alphas_hist.row(iter) = alpha.t();
+        betas_hist.row(iter) = beta.t();
+        nll_hist(iter) = obj_prev;
+      }
       break;
     }
 
@@ -1269,11 +1330,22 @@ Rcpp::List active_set_newton_cd_cpp(
       penalized_nllh_cpp(alpha, beta, va, vb, x_indicator, y_outcome, lambda,
                          intercept, prob_fun_selector, clipping);
 
-  return Rcpp::List::create(Rcpp::Named("alpha") = Rcpp::wrap(alpha),
-                            Rcpp::Named("beta") = Rcpp::wrap(beta),
-                            Rcpp::Named("convergence") = converged,
-                            Rcpp::Named("step") = actual_iter,
-                            Rcpp::Named("final_nll") = final_nll);
+  return Rcpp::List::create(
+      Rcpp::Named("alpha") = Rcpp::wrap(alpha),
+      Rcpp::Named("beta") = Rcpp::wrap(beta),
+      Rcpp::Named("convergence") = converged, Rcpp::Named("step") = actual_iter,
+      Rcpp::Named("final_nll") = final_nll,
+      Rcpp::Named("alphas") =
+          (save_history && actual_iter > 0)
+              ? Rcpp::wrap(alphas_hist.rows(0, actual_iter - 1))
+              : R_NilValue,
+      Rcpp::Named("betas") =
+          (save_history && actual_iter > 0)
+              ? Rcpp::wrap(betas_hist.rows(0, actual_iter - 1))
+              : R_NilValue,
+      Rcpp::Named("nllh_results") = (save_history && actual_iter > 0)
+                                        ? Rcpp::wrap(nll_hist.head(actual_iter))
+                                        : R_NilValue);
 }
 
 // --- FISTA Optimizer in C++ ---
@@ -1288,7 +1360,8 @@ Rcpp::List fista_cpp(Rcpp::NumericVector alpha_start_rcpp,
                      Rcpp::NumericVector y_outcome, int prob_fun_selector,
                      double lambda_beta = -1.0, double tol = 1e-5,
                      double step_size_init = 0.5, double armijo_c = 1e-4,
-                     double shrink_factor = 0.5, double clipping = 1e-10) {
+                     double shrink_factor = 0.5, double clipping = 1e-10,
+                     bool save_history = false) {
 
   // Convert Rcpp objects to Armadillo
   arma::vec alpha = Rcpp::as<arma::vec>(alpha_start_rcpp);
@@ -1314,6 +1387,16 @@ Rcpp::List fista_cpp(Rcpp::NumericVector alpha_start_rcpp,
 
   int final_iter = 0;
   bool converged = false;
+
+  arma::mat alphas_hist;
+  arma::mat betas_hist;
+  arma::vec nll_hist;
+
+  if (save_history) {
+    alphas_hist.set_size(max_iter, alpha.n_elem);
+    betas_hist.set_size(max_iter, beta.n_elem);
+    nll_hist.set_size(max_iter);
+  }
 
   for (int k = 0; k < max_iter; ++k) {
     // 1. Compute Gradient at y_k
@@ -1356,6 +1439,8 @@ Rcpp::List fista_cpp(Rcpp::NumericVector alpha_start_rcpp,
     // Some implementations try current_step * 1.2 first. Let's stick to safe
     // start.
 
+    double nll_new = nll_y; // Default if loop doesn't run or first iter check
+                            // fails? No, loop updates it.
     for (int j = 0; j < 50; ++j) { // Limit backtracks
       // Gradient Step
       arma::vec z_alpha = alpha_y - current_step * grad_alpha;
@@ -1389,8 +1474,8 @@ Rcpp::List fista_cpp(Rcpp::NumericVector alpha_start_rcpp,
       }
 
       // Check Armijo Condition on NLL (Smooth part)
-      double nll_new = nllh_cpp(alpha_new, beta_new, va, vb, x_indicator,
-                                y_outcome, prob_fun_selector, clipping);
+      nll_new = nllh_cpp(alpha_new, beta_new, va, vb, x_indicator, y_outcome,
+                         prob_fun_selector, clipping);
 
       if (!R_finite(nll_new)) {
         current_step *= shrink_factor;
@@ -1428,10 +1513,14 @@ Rcpp::List fista_cpp(Rcpp::NumericVector alpha_start_rcpp,
         std::max(arma::abs(change_a).max(), arma::abs(change_b).max());
 
     if (max_change < tol) {
-      alpha = alpha_new;
       beta = beta_new;
       converged = true;
       final_iter = k + 1;
+      if (save_history) {
+        alphas_hist.row(k) = alpha.t();
+        betas_hist.row(k) = beta.t();
+        nll_hist(k) = nll_new; // Using nll_new from line search
+      }
       break;
     }
 
@@ -1451,17 +1540,40 @@ Rcpp::List fista_cpp(Rcpp::NumericVector alpha_start_rcpp,
 
     t_k = t_k_next;
     final_iter = k + 1;
+
+    if (save_history) {
+      alphas_hist.row(k) = alpha.t();
+      betas_hist.row(k) = beta.t();
+      // nll_hist(k) = nll_new; // Need to access nll_new, but it is local to
+      // loop. nll_new is computed in line search. I need to surface it or
+      // recompute. Recomputing is redundant. Assuming line search accepted,
+      // nll_new is valid. But nll_new is strictly local. I should bubble it
+      // out. For now, recomputing or storing last valid nll_y.
+      nll_hist(k) = nllh_cpp(alpha, beta, va, vb, x_indicator, y_outcome,
+                             prob_fun_selector, clipping);
+    }
   }
 
   double final_nll =
       penalized_nllh_cpp(alpha, beta, va, vb, x_indicator, y_outcome, lambda,
                          intercept, prob_fun_selector, clipping);
 
-  return Rcpp::List::create(Rcpp::Named("alpha") = Rcpp::wrap(alpha),
-                            Rcpp::Named("beta") = Rcpp::wrap(beta),
-                            Rcpp::Named("convergence") = converged,
-                            Rcpp::Named("step") = final_iter,
-                            Rcpp::Named("final_nll") = final_nll);
+  return Rcpp::List::create(
+      Rcpp::Named("alpha") = Rcpp::wrap(alpha),
+      Rcpp::Named("beta") = Rcpp::wrap(beta),
+      Rcpp::Named("convergence") = converged, Rcpp::Named("step") = final_iter,
+      Rcpp::Named("final_nll") = final_nll,
+      Rcpp::Named("alphas") =
+          (save_history && final_iter > 0)
+              ? Rcpp::wrap(alphas_hist.rows(0, final_iter - 1))
+              : R_NilValue,
+      Rcpp::Named("betas") =
+          (save_history && final_iter > 0)
+              ? Rcpp::wrap(betas_hist.rows(0, final_iter - 1))
+              : R_NilValue,
+      Rcpp::Named("nllh_results") = (save_history && final_iter > 0)
+                                        ? Rcpp::wrap(nll_hist.head(final_iter))
+                                        : R_NilValue);
 }
 
 // --- L-BFGS Optimizer (Wrapper for R API) ---
@@ -1548,7 +1660,7 @@ Rcpp::List lbfgs_cpp(Rcpp::NumericVector alpha_start_rcpp,
                      Rcpp::NumericVector x_indicator,
                      Rcpp::NumericVector y_outcome, int prob_fun_selector,
                      double lambda_beta = -1.0, double tol = 1e-5,
-                     double clipping = 1e-10) {
+                     double clipping = 1e-10, bool save_history = false) {
 
   arma::mat va = Rcpp::as<arma::mat>(va_rcpp);
   arma::mat vb = Rcpp::as<arma::mat>(vb_rcpp);

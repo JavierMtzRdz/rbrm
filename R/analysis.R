@@ -10,6 +10,7 @@
 #' @return A list containing data frames and ggplot objects for analysis.
 #' @import dplyr tidyr ggplot2 tibble
 #' @export
+utils::globalVariables(c("step", "value", "name", "type", "true_val", "norm_l2", "gap", "ref_1k", "ref_1k2", "error_l2"))
 analyze_optimization <- function(model, true_alpha = NULL, true_beta = NULL) {
     # Handle structure where history is nested in optimizer_details
     opt_source <- model
@@ -22,7 +23,6 @@ analyze_optimization <- function(model, true_alpha = NULL, true_beta = NULL) {
     }
 
     # Extract history
-    n_steps <- model$step
     # Function to tidy history matrices
     tidy_history <- function(mat, type, param_names) {
         # Ensure it's a matrix (not vector from drop=TRUE somewhere)
@@ -46,7 +46,7 @@ analyze_optimization <- function(model, true_alpha = NULL, true_beta = NULL) {
         parse(text = new_strings)
     }
 
-    # 1. Parameter Trace
+    # Parameter Trace
     history_alpha <- tidy_history(opt_source$alphas, "alpha", alpha_names)
     history_beta <- tidy_history(opt_source$betas, "beta", beta_names)
     history_params <- dplyr::bind_rows(history_alpha, history_beta)

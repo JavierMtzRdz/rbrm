@@ -161,7 +161,7 @@ fit.rbrm <- function(va, vb = NULL, x, y,
     alpha[slope_indices_a] <- as.vector(alpha_std[slope_indices_a, drop = FALSE] / va_scal_info$scale)
     beta[slope_indices_b] <- as.vector(beta_std[slope_indices_b, drop = FALSE] / vb_scal_info$scale)
 
-    if (save_opt) {
+    if (save_opt && !is.null(alphas_std)) {
       alphas[, slope_indices_a] <- alphas_std[, slope_indices_a] / va_scal_info$scale
       betas[, slope_indices_b] <- betas_std[, slope_indices_b] / vb_scal_info$scale
       opt_result$alphas <- alphas
@@ -190,7 +190,7 @@ fit.rbrm <- function(va, vb = NULL, x, y,
       alpha[1] <- as.numeric(alpha_std[1] - intercept_adjustment_a)
       beta[1] <- as.numeric(beta_std[1] - intercept_adjustment_b)
 
-      if (save_opt) {
+      if (save_opt && !is.null(alphas_std)) {
         intercept_adjustment_as <- rowSums(alphas_std[, slope_indices_a, drop = FALSE] * (rep(1, nrow(alphas_std)) %*% t(va_scal_info$center / va_scal_info$scale)))
 
         adj_vec_a <- va_scal_info$center / va_scal_info$scale
@@ -219,7 +219,12 @@ fit.rbrm <- function(va, vb = NULL, x, y,
   time_info <- tictoc::toc(quiet = TRUE)
   run_time <- round(time_info$toc - time_info$tic, 4)
 
-  if (!save_opt) opt_result <- NULL
+  if (!save_opt) {
+    opt_result$alphas <- NULL
+    opt_result$betas <- NULL
+    opt_result$grad_alphas <- NULL
+    opt_result$grad_betas <- NULL
+  }
 
   result <- list(
     call = match.call(), point.est = c(alpha, beta), alpha = alpha,

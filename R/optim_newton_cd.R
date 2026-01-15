@@ -40,6 +40,7 @@ optim_newton_cd <- function(alpha_start, beta_start,
         nllh_results <- NULL
     }
     saved_steps <- 0
+    converged <- FALSE
 
     # Extract clipping once
     args <- list(...)
@@ -54,7 +55,7 @@ optim_newton_cd <- function(alpha_start, beta_start,
     for (iter in 1:max_step) {
         obj_prev <- calc_obj(alpha, beta)
 
-        # 1. Compute Gradient and Diagonal Hessian
+        # Compute Gradient and Diagonal Hessian
         # Analytical Gradient
         grads <- grad_nll(alpha, beta, y, x, va, vb, prob_fun, opt = "both", method = "analytical", clipping = clip)
         g_alpha <- grads$grad_alpha
@@ -100,7 +101,7 @@ optim_newton_cd <- function(alpha_start, beta_start,
         h_alpha <- h_alpha + 1e-6
         h_beta <- h_beta + 1e-6
 
-        # 2. Coordinate Descent (Quadratic model)
+        # Coordinate Descent (Quadratic model)
         # Minimize Q(d) = g'd + 0.5 d'H d + lambda |x+d|
         # x_new = soft(x * H - g, lambda) / H
 
@@ -122,14 +123,17 @@ optim_newton_cd <- function(alpha_start, beta_start,
         if (intercept) lam_seq_beta[1] <- 0
         beta_new <- soft_thres(z_beta, lam_seq_beta) / h_beta
 
-        # 3. Line Search (Backtracking)
+        # Line Search (Backtracking)
         # Direction d
         d_alpha <- alpha_new - alpha
         d_beta <- beta_new - beta
 
         # Norm of change
-        if (sum(d_alpha^2) + sum(d_beta^2) < tol^2) {
-            if (iter > 1) break # Converged
+        if (max(abs(d_alpha), abs(d_beta)) < tol) {
+            if (iter > 1) {
+                converged <- TRUE
+                break
+            }
         }
 
         step_ls <- 1
@@ -140,7 +144,7 @@ optim_newton_cd <- function(alpha_start, beta_start,
             obj_cand <- calc_obj(a_cand, b_cand)
 
             # Simple decrease check (Armijo sufficient decrease usually better but this suffices for convex-ish)
-            if (obj_cand <= obj_prev + 1e-8) {
+            if (obj_cand <= obj_prev + 1e-8 && is.finite(obj_cand)) {
                 alpha <- a_cand
                 beta <- b_cand
                 accepted <- TRUE
@@ -176,7 +180,7 @@ optim_newton_cd <- function(alpha_start, beta_start,
     return(list(
         alpha = alpha,
         beta = beta,
-        convergence = (iter < max_step),
+        convergence = converged,
         step = iter,
         final_nll = calc_obj(alpha, beta),
         alphas = alphas_ret,

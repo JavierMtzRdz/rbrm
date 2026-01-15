@@ -124,8 +124,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // newton_cd_cpp
-Rcpp::List newton_cd_cpp(Rcpp::NumericVector alpha_start_rcpp, Rcpp::NumericVector beta_start_rcpp, double lambda, bool intercept, int max_iter, Rcpp::NumericMatrix va_rcpp, Rcpp::NumericMatrix vb_rcpp, Rcpp::NumericVector x_indicator, Rcpp::NumericVector y_outcome, int prob_fun_selector, double lambda_beta, double tol, double clipping);
-RcppExport SEXP _rbrm_newton_cd_cpp(SEXP alpha_start_rcppSEXP, SEXP beta_start_rcppSEXP, SEXP lambdaSEXP, SEXP interceptSEXP, SEXP max_iterSEXP, SEXP va_rcppSEXP, SEXP vb_rcppSEXP, SEXP x_indicatorSEXP, SEXP y_outcomeSEXP, SEXP prob_fun_selectorSEXP, SEXP lambda_betaSEXP, SEXP tolSEXP, SEXP clippingSEXP) {
+Rcpp::List newton_cd_cpp(Rcpp::NumericVector alpha_start_rcpp, Rcpp::NumericVector beta_start_rcpp, double lambda, bool intercept, int max_iter, Rcpp::NumericMatrix va_rcpp, Rcpp::NumericMatrix vb_rcpp, Rcpp::NumericVector x_indicator, Rcpp::NumericVector y_outcome, int prob_fun_selector, double lambda_beta, double tol, double clipping, bool save_history);
+RcppExport SEXP _rbrm_newton_cd_cpp(SEXP alpha_start_rcppSEXP, SEXP beta_start_rcppSEXP, SEXP lambdaSEXP, SEXP interceptSEXP, SEXP max_iterSEXP, SEXP va_rcppSEXP, SEXP vb_rcppSEXP, SEXP x_indicatorSEXP, SEXP y_outcomeSEXP, SEXP prob_fun_selectorSEXP, SEXP lambda_betaSEXP, SEXP tolSEXP, SEXP clippingSEXP, SEXP save_historySEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -142,13 +142,14 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type lambda_beta(lambda_betaSEXP);
     Rcpp::traits::input_parameter< double >::type tol(tolSEXP);
     Rcpp::traits::input_parameter< double >::type clipping(clippingSEXP);
-    rcpp_result_gen = Rcpp::wrap(newton_cd_cpp(alpha_start_rcpp, beta_start_rcpp, lambda, intercept, max_iter, va_rcpp, vb_rcpp, x_indicator, y_outcome, prob_fun_selector, lambda_beta, tol, clipping));
+    Rcpp::traits::input_parameter< bool >::type save_history(save_historySEXP);
+    rcpp_result_gen = Rcpp::wrap(newton_cd_cpp(alpha_start_rcpp, beta_start_rcpp, lambda, intercept, max_iter, va_rcpp, vb_rcpp, x_indicator, y_outcome, prob_fun_selector, lambda_beta, tol, clipping, save_history));
     return rcpp_result_gen;
 END_RCPP
 }
 // active_set_newton_cd_cpp
-Rcpp::List active_set_newton_cd_cpp(Rcpp::NumericVector alpha_start_rcpp, Rcpp::NumericVector beta_start_rcpp, double lambda, bool intercept, int max_iter, Rcpp::NumericMatrix va_rcpp, Rcpp::NumericMatrix vb_rcpp, Rcpp::NumericVector x_indicator, Rcpp::NumericVector y_outcome, int prob_fun_selector, double lambda_beta, double tol, double clipping, int kkt_check_freq, double active_tol);
-RcppExport SEXP _rbrm_active_set_newton_cd_cpp(SEXP alpha_start_rcppSEXP, SEXP beta_start_rcppSEXP, SEXP lambdaSEXP, SEXP interceptSEXP, SEXP max_iterSEXP, SEXP va_rcppSEXP, SEXP vb_rcppSEXP, SEXP x_indicatorSEXP, SEXP y_outcomeSEXP, SEXP prob_fun_selectorSEXP, SEXP lambda_betaSEXP, SEXP tolSEXP, SEXP clippingSEXP, SEXP kkt_check_freqSEXP, SEXP active_tolSEXP) {
+Rcpp::List active_set_newton_cd_cpp(Rcpp::NumericVector alpha_start_rcpp, Rcpp::NumericVector beta_start_rcpp, double lambda, bool intercept, int max_iter, Rcpp::NumericMatrix va_rcpp, Rcpp::NumericMatrix vb_rcpp, Rcpp::NumericVector x_indicator, Rcpp::NumericVector y_outcome, int prob_fun_selector, double lambda_beta, double tol, double clipping, int kkt_check_freq, double active_tol, bool save_history);
+RcppExport SEXP _rbrm_active_set_newton_cd_cpp(SEXP alpha_start_rcppSEXP, SEXP beta_start_rcppSEXP, SEXP lambdaSEXP, SEXP interceptSEXP, SEXP max_iterSEXP, SEXP va_rcppSEXP, SEXP vb_rcppSEXP, SEXP x_indicatorSEXP, SEXP y_outcomeSEXP, SEXP prob_fun_selectorSEXP, SEXP lambda_betaSEXP, SEXP tolSEXP, SEXP clippingSEXP, SEXP kkt_check_freqSEXP, SEXP active_tolSEXP, SEXP save_historySEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -167,13 +168,14 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type clipping(clippingSEXP);
     Rcpp::traits::input_parameter< int >::type kkt_check_freq(kkt_check_freqSEXP);
     Rcpp::traits::input_parameter< double >::type active_tol(active_tolSEXP);
-    rcpp_result_gen = Rcpp::wrap(active_set_newton_cd_cpp(alpha_start_rcpp, beta_start_rcpp, lambda, intercept, max_iter, va_rcpp, vb_rcpp, x_indicator, y_outcome, prob_fun_selector, lambda_beta, tol, clipping, kkt_check_freq, active_tol));
+    Rcpp::traits::input_parameter< bool >::type save_history(save_historySEXP);
+    rcpp_result_gen = Rcpp::wrap(active_set_newton_cd_cpp(alpha_start_rcpp, beta_start_rcpp, lambda, intercept, max_iter, va_rcpp, vb_rcpp, x_indicator, y_outcome, prob_fun_selector, lambda_beta, tol, clipping, kkt_check_freq, active_tol, save_history));
     return rcpp_result_gen;
 END_RCPP
 }
 // fista_cpp
-Rcpp::List fista_cpp(Rcpp::NumericVector alpha_start_rcpp, Rcpp::NumericVector beta_start_rcpp, double lambda, bool intercept, int max_iter, Rcpp::NumericMatrix va_rcpp, Rcpp::NumericMatrix vb_rcpp, Rcpp::NumericVector x_indicator, Rcpp::NumericVector y_outcome, int prob_fun_selector, double lambda_beta, double tol, double step_size_init, double armijo_c, double shrink_factor, double clipping);
-RcppExport SEXP _rbrm_fista_cpp(SEXP alpha_start_rcppSEXP, SEXP beta_start_rcppSEXP, SEXP lambdaSEXP, SEXP interceptSEXP, SEXP max_iterSEXP, SEXP va_rcppSEXP, SEXP vb_rcppSEXP, SEXP x_indicatorSEXP, SEXP y_outcomeSEXP, SEXP prob_fun_selectorSEXP, SEXP lambda_betaSEXP, SEXP tolSEXP, SEXP step_size_initSEXP, SEXP armijo_cSEXP, SEXP shrink_factorSEXP, SEXP clippingSEXP) {
+Rcpp::List fista_cpp(Rcpp::NumericVector alpha_start_rcpp, Rcpp::NumericVector beta_start_rcpp, double lambda, bool intercept, int max_iter, Rcpp::NumericMatrix va_rcpp, Rcpp::NumericMatrix vb_rcpp, Rcpp::NumericVector x_indicator, Rcpp::NumericVector y_outcome, int prob_fun_selector, double lambda_beta, double tol, double step_size_init, double armijo_c, double shrink_factor, double clipping, bool save_history);
+RcppExport SEXP _rbrm_fista_cpp(SEXP alpha_start_rcppSEXP, SEXP beta_start_rcppSEXP, SEXP lambdaSEXP, SEXP interceptSEXP, SEXP max_iterSEXP, SEXP va_rcppSEXP, SEXP vb_rcppSEXP, SEXP x_indicatorSEXP, SEXP y_outcomeSEXP, SEXP prob_fun_selectorSEXP, SEXP lambda_betaSEXP, SEXP tolSEXP, SEXP step_size_initSEXP, SEXP armijo_cSEXP, SEXP shrink_factorSEXP, SEXP clippingSEXP, SEXP save_historySEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -193,13 +195,14 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type armijo_c(armijo_cSEXP);
     Rcpp::traits::input_parameter< double >::type shrink_factor(shrink_factorSEXP);
     Rcpp::traits::input_parameter< double >::type clipping(clippingSEXP);
-    rcpp_result_gen = Rcpp::wrap(fista_cpp(alpha_start_rcpp, beta_start_rcpp, lambda, intercept, max_iter, va_rcpp, vb_rcpp, x_indicator, y_outcome, prob_fun_selector, lambda_beta, tol, step_size_init, armijo_c, shrink_factor, clipping));
+    Rcpp::traits::input_parameter< bool >::type save_history(save_historySEXP);
+    rcpp_result_gen = Rcpp::wrap(fista_cpp(alpha_start_rcpp, beta_start_rcpp, lambda, intercept, max_iter, va_rcpp, vb_rcpp, x_indicator, y_outcome, prob_fun_selector, lambda_beta, tol, step_size_init, armijo_c, shrink_factor, clipping, save_history));
     return rcpp_result_gen;
 END_RCPP
 }
 // lbfgs_cpp
-Rcpp::List lbfgs_cpp(Rcpp::NumericVector alpha_start_rcpp, Rcpp::NumericVector beta_start_rcpp, double lambda, bool intercept, int max_iter, Rcpp::NumericMatrix va_rcpp, Rcpp::NumericMatrix vb_rcpp, Rcpp::NumericVector x_indicator, Rcpp::NumericVector y_outcome, int prob_fun_selector, double lambda_beta, double tol, double clipping);
-RcppExport SEXP _rbrm_lbfgs_cpp(SEXP alpha_start_rcppSEXP, SEXP beta_start_rcppSEXP, SEXP lambdaSEXP, SEXP interceptSEXP, SEXP max_iterSEXP, SEXP va_rcppSEXP, SEXP vb_rcppSEXP, SEXP x_indicatorSEXP, SEXP y_outcomeSEXP, SEXP prob_fun_selectorSEXP, SEXP lambda_betaSEXP, SEXP tolSEXP, SEXP clippingSEXP) {
+Rcpp::List lbfgs_cpp(Rcpp::NumericVector alpha_start_rcpp, Rcpp::NumericVector beta_start_rcpp, double lambda, bool intercept, int max_iter, Rcpp::NumericMatrix va_rcpp, Rcpp::NumericMatrix vb_rcpp, Rcpp::NumericVector x_indicator, Rcpp::NumericVector y_outcome, int prob_fun_selector, double lambda_beta, double tol, double clipping, bool save_history);
+RcppExport SEXP _rbrm_lbfgs_cpp(SEXP alpha_start_rcppSEXP, SEXP beta_start_rcppSEXP, SEXP lambdaSEXP, SEXP interceptSEXP, SEXP max_iterSEXP, SEXP va_rcppSEXP, SEXP vb_rcppSEXP, SEXP x_indicatorSEXP, SEXP y_outcomeSEXP, SEXP prob_fun_selectorSEXP, SEXP lambda_betaSEXP, SEXP tolSEXP, SEXP clippingSEXP, SEXP save_historySEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -216,7 +219,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type lambda_beta(lambda_betaSEXP);
     Rcpp::traits::input_parameter< double >::type tol(tolSEXP);
     Rcpp::traits::input_parameter< double >::type clipping(clippingSEXP);
-    rcpp_result_gen = Rcpp::wrap(lbfgs_cpp(alpha_start_rcpp, beta_start_rcpp, lambda, intercept, max_iter, va_rcpp, vb_rcpp, x_indicator, y_outcome, prob_fun_selector, lambda_beta, tol, clipping));
+    Rcpp::traits::input_parameter< bool >::type save_history(save_historySEXP);
+    rcpp_result_gen = Rcpp::wrap(lbfgs_cpp(alpha_start_rcpp, beta_start_rcpp, lambda, intercept, max_iter, va_rcpp, vb_rcpp, x_indicator, y_outcome, prob_fun_selector, lambda_beta, tol, clipping, save_history));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -229,10 +233,10 @@ static const R_CallMethodDef CallEntries[] = {
     {"_rbrm_penalized_nllh_cpp", (DL_FUNC) &_rbrm_penalized_nllh_cpp, 10},
     {"_rbrm_grad_nll_alpha_analytical_cpp", (DL_FUNC) &_rbrm_grad_nll_alpha_analytical_cpp, 8},
     {"_rbrm_grad_nll_beta_analytical_cpp", (DL_FUNC) &_rbrm_grad_nll_beta_analytical_cpp, 8},
-    {"_rbrm_newton_cd_cpp", (DL_FUNC) &_rbrm_newton_cd_cpp, 13},
-    {"_rbrm_active_set_newton_cd_cpp", (DL_FUNC) &_rbrm_active_set_newton_cd_cpp, 15},
-    {"_rbrm_fista_cpp", (DL_FUNC) &_rbrm_fista_cpp, 16},
-    {"_rbrm_lbfgs_cpp", (DL_FUNC) &_rbrm_lbfgs_cpp, 13},
+    {"_rbrm_newton_cd_cpp", (DL_FUNC) &_rbrm_newton_cd_cpp, 14},
+    {"_rbrm_active_set_newton_cd_cpp", (DL_FUNC) &_rbrm_active_set_newton_cd_cpp, 16},
+    {"_rbrm_fista_cpp", (DL_FUNC) &_rbrm_fista_cpp, 17},
+    {"_rbrm_lbfgs_cpp", (DL_FUNC) &_rbrm_lbfgs_cpp, 14},
     {NULL, NULL, 0}
 };
 
