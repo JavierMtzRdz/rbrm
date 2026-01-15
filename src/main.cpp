@@ -884,14 +884,14 @@ Rcpp::List newton_cd_cpp(Rcpp::NumericVector alpha_start_rcpp,
     // Line search
     double step_ls = 1.0;
     bool accepted = false;
-    for (int ls = 0; ls < 10; ++ls) {
+    for (int ls = 0; ls < 30; ++ls) {
       arma::vec a_cand = alpha + step_ls * d_alpha;
       arma::vec b_cand = beta + step_ls * d_beta;
       double obj_cand =
           penalized_nllh_cpp(a_cand, b_cand, va, vb, x_indicator, y_outcome,
                              lambda, intercept, prob_fun_selector, clipping);
 
-      if (obj_cand <= obj_prev + 1e-8 && std::isfinite(obj_cand)) {
+      if (obj_cand <= obj_prev && std::isfinite(obj_cand)) {
         alpha = a_cand;
         beta = b_cand;
         accepted = true;
@@ -1276,14 +1276,14 @@ Rcpp::List active_set_newton_cd_cpp(
 
     double step_ls = 1.0;
     bool accepted = false;
-    for (int ls = 0; ls < 10; ++ls) {
+    for (int ls = 0; ls < 30; ++ls) {
       arma::vec a_cand = alpha + step_ls * d_alpha;
       arma::vec b_cand = beta + step_ls * d_beta;
       double obj_cand =
           penalized_nllh_cpp(a_cand, b_cand, va, vb, x_indicator, y_outcome,
                              lambda, intercept, prob_fun_selector, clipping);
 
-      if (obj_cand <= obj_prev + 1e-8 && std::isfinite(obj_cand)) {
+      if (obj_cand <= obj_prev && std::isfinite(obj_cand)) {
         alpha = a_cand;
         beta = b_cand;
         accepted = true;

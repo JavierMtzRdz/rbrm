@@ -150,7 +150,13 @@ fit.rbrm <- function(va, vb = NULL, x, y,
     beta <- beta_std
 
     alphas <- alphas_std
+    if (!is.null(alphas) && !is.matrix(alphas)) alphas <- matrix(alphas, nrow = 1)
     betas <- betas_std
+    if (!is.null(betas) && !is.matrix(betas)) betas <- matrix(betas, nrow = 1)
+
+    # Update std references to ensure they are matrices too for later use
+    alphas_std <- alphas
+    betas_std <- betas
     grad_alphas <- grad_alphas_std
     grad_betas <- grad_betas_std
 

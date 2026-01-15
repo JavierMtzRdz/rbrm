@@ -175,12 +175,12 @@ optim_newton_cd_active <- function(alpha_start, beta_start,
 
         step_ls <- 1
         accepted <- FALSE
-        for (ls in 1:10) {
+        for (ls in 1:30) {
             a_cand <- alpha + step_ls * d_alpha
             b_cand <- beta + step_ls * d_beta
             obj_cand <- calc_obj(a_cand, b_cand)
 
-            if (obj_cand <= obj_prev + 1e-8) {
+            if (obj_cand <= obj_prev) {
                 alpha <- a_cand
                 beta <- b_cand
                 accepted <- TRUE
