@@ -87,8 +87,11 @@ penalized_nllh <- function(alpha, beta, va, vb, x, y,
     )
 
     # Calculate L1 penalty
-    l1_norm_alpha <- sum(abs(ifelse(intercept, alpha[-1], alpha)))
-    l1_norm_beta <- sum(abs(ifelse(intercept, beta[-1], beta)))
+    # Calculate L1 penalty
+    val_alpha <- if (intercept) alpha[-1] else alpha
+    val_beta <- if (intercept) beta[-1] else beta
+    l1_norm_alpha <- sum(abs(val_alpha))
+    l1_norm_beta <- sum(abs(val_beta))
 
     penalty <- lambda * l1_norm_alpha + lambda_beta * l1_norm_beta
 
