@@ -2,33 +2,13 @@
 % Please edit documentation in R/plots.R
 \name{plot.cv_rbrm}
 \alias{plot.cv_rbrm}
-\title{Plot Cross-Validation Curve from cv_rbrm Object}
+\title{Plot Cross-Validation Results}
 \usage{
-\method{plot}{cv_rbrm}(x, type.measure = NULL, opt = "lambda", ...)
-}
-\arguments{
-\item{x}{A fitted object of class \code{cv_rbrm}.}
-
-\item{type.measure}{Optional character string: metric to plot if different
-from the one used in fitting (only applies if \code{opt = "lambda"}).}
-
-\item{opt}{Character string: Parameter to plot against. Either "lambda" (default)
-or "gamma"/"relax_factor".}
-
-\item{...}{Additional arguments (currently unused).}
+\method{plot}{cv_rbrm}(x, ...)
 }
 \value{
-A \code{ggplot} object.
+A ggplot object.
 }
 \description{
-Creates a plot of the cross-validation curve(s) showing the mean performance
-metric versus the tuning parameter (lambda or relax factor).
-}
-\examples{
-\dontrun{
-# Assuming 'cv_fit' is a result from cv_rbrm
-plot(cv_fit)
-plot(cv_fit, opt = "gamma") # If relaxation CV was performed
-plot(cv_fit, type.measure = "mae") # Plot MAE instead of original metric (if lambda)
-}
+Plot Cross-Validation Results
 }

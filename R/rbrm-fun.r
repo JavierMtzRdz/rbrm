@@ -242,3 +242,27 @@ fit.rbrm <- function(va, vb = NULL, x, y,
 
   return(structure(result, class = c("rbrm")))
 }
+
+#' Print RBRM Object
+#'
+#' @export
+print.rbrm <- function(x, ...) {
+  cli::cat_rule(cli::style_bold("RBRM Model Fit"), col = "blue")
+  cat("\n")
+
+  if (!is.null(x$lambda)) {
+    cli::cat_bullet("Lambda: ", sprintf("%.4f", x$lambda), bullet = "info")
+  }
+
+  # Coefficients count
+  n_a <- sum(abs(x$alpha) > 1e-10)
+  n_b <- sum(abs(x$beta) > 1e-10)
+
+  cat("\n")
+  cli::cat_line("Non-zero coefficients:")
+  cli::cat_bullet("Alpha: ", n_a, bullet = "arrow_right")
+  cli::cat_bullet("Beta:  ", n_b, bullet = "arrow_right")
+
+  cat("\n")
+  invisible(x)
+}
