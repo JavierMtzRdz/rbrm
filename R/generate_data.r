@@ -1,145 +1,109 @@
 #' Generative model for rbrm
-#' 
-#' This file/function generates simulated data for studying the rbrm model
 #'
-#' @param pa the number of alpha coefficients without the intercept
-#' @param pb the number of beta coefficients without the intercept
-#' @param n number of samples in training set
-#' @param n_test the number of samples in the test set
-#' @param alpha the true alpha coefficients that are used to generate data.
-#' This list should include the intercept coefficient.
-#' @param beta the true beta coefficients that are used to generate data.
-#' This list should include the intercept coefficient.
-#' @param gamma the true gamma coefficients that are used to generate
-#' the propensity for exposure This list should not include the intercept.
-#' The intercept value will be estimated numerically to achieve an
-#' even proportion of exposure in the training data.
+#' This function generates simulated data for testing and studying the RBRM model.
+#' It allows control over sample size, number of covariates, true coefficients,
+#' and treatment prevalence.
 #'
-#' @return data
+#' @param pa Number of alpha coefficients (predictors for Relative Risk) without the intercept.
+#' @param pb Number of beta coefficients (predictors for Baseline Risk) without the intercept.
+#' @param n Sample size for the training set.
+#' @param n_test Sample size for the test set.
+#' @param alpha True alpha coefficients (including intercept).
+#' @param beta True beta coefficients (including intercept).
+#' @param gamma True gamma coefficients for propensity score model (EXCLUDING intercept).
+#'              The intercept is estimated automatically to match `treatment_prob`.
+#' @param treatment_prob Target probability of treatment (default 0.5).
+#'
+#' @return A list containing training and test data: v (covariates), x (treatment), y (outcome),
+#'         and true probabilities.
 #' @export
-#' @examples
-#' #generate_data(
-#' #    pa = 10, pb = 10, n = 40, n_test = 100,
-#' #    alpha = c(0.5, rep(5, 5), rep(0, 5)), beta = c(0.5, rep(5, 5), rep(0, 5)),
-#' #    gamma = c(rep(5, 5), rep(0, 5)))
-generate_data <- function(pa, pb, n, n_test, alpha, beta, gamma, misspec_nuisance = FALSE, misspec_propensity = FALSE) {
-  
-  # Simulate training data
+generate_data <- function(pa, pb, n, n_test, alpha = NULL, beta = NULL, gamma = NULL, treatment_prob = 0.5,
+                          target_beta_prob = 0.1) {
+  if (any(is.null(alpha), is.null(beta), is.null(gamma))) {
+    gen_t_vals <- true_vals(pa, pb)
+  }
+  if (is.null(alpha)) alpha <- gen_t_vals$true_alphas
+  if (is.null(beta)) beta <- gen_t_vals$true_betas
+  if (is.null(gamma)) gamma <- gen_t_vals$true_gammas
+
+  if (length(alpha) != pa + 1) cli::cli_abort("Length of `alpha` ({length(alpha)}) must match `pa + 1` ({pa + 1}).")
+  if (length(beta) != pb + 1) cli::cli_abort("Length of `beta` ({length(beta)}) must match `pb + 1` ({pb + 1}).")
+  if (length(gamma) != pa) cli::cli_warn("Length of `gamma` ({length(gamma)}) typically matches `pa` ({pa}) for simulation, using provided length.")
+
+  # Simulate Covariates (Uniform -1 to 1)
   v.train <- matrix(stats::runif(n * pa, min = -1, max = 1), nrow = n, ncol = pa)
-  
-  # Generate propensity scores for training data
-  if (misspec_propensity) {
-    # Misspecified propensity model: use only the first half of covariates
-    gamma_true <- c(0, gamma[1:(pa/2)], rep(0, pa/2))
-  } else {
-    # Correctly specified propensity model: use all covariates
-    gamma_true <- c(0, gamma)
+
+  # Propensity Score Model
+  # Compute intercept for propensity score to match target prevalence
+
+  # Helper to find intercept for Sigmoid link
+  find_int_sigmoid <- function(lp, target) {
+    f <- function(b) mean(sigmoid(b + lp)) - target
+    tryCatch(uniroot(f, c(-100, 100))$root, error = function(e) 0)
   }
-  pscore.true <- sigmoid(cbind(rep(1, n), v.train) %*% gamma_true)
 
-  x.train <- stats::rbinom(n, 1, pscore.true)
-  
-  # Generate outcome probabilities for training data
-  if (misspec_nuisance) {
-    # Misspecified nuisance model: use only the first half of covariates
-    alpha_true <- c(alpha[1:(pa/2)], rep(0, pa/2))
-    beta_true <- c(beta[1:(pa/2)], rep(0, pa/2))
-  } else {
-    # Correctly specified nuisance model: use all covariates
-    alpha_true <- alpha
-    beta_true <- beta
-  }
-  p0p1.true <- brm::getProbRR(v.train %*% alpha_true, v.train %*% beta_true)
-  pA.true <- p0p1.true[, 1] # P(Y=1|X=0)
-  pA.true[x.train == 1] <- p0p1.true[x.train == 1, 2] # P(Y=1|X=1)
-  y.train <- stats::rbinom(n, 1, pA.true) # P(Y=1|X)
-  
-  # Simulate test data
-  v.test <- matrix(stats::runif(n_test * pa, min = -1, max = 1), nrow = n_test, ncol = pa)
-  
-  # Generate propensity scores for test data
-  pscore.true.test <- sigmoid(cbind(rep(1, n_test), v.test) %*% gamma_true)
-  x.test <- stats::rbinom(n_test, 1, pscore.true.test)
-  
-  # Generate outcome probabilities for test data
-  p0p1.true.test <- brm::getProbRR(v.test %*% alpha_true, v.test %*% beta_true)
-  pA.true.test <- p0p1.true.test[, 1] # P(Y=1|X=0)
-  pA.true.test[x.test == 1] <- p0p1.true.test[x.test == 1, 2] # P(Y=1|X=1)
-  y.test <- stats::rbinom(n_test, 1, pA.true.test) # P(Y=1|X)
-  
-  # Return training and test data
-  return(list(v.train = v.train, x.train = x.train, y.train = y.train, 
-              v.test = v.test, x.test = x.test, y.test = y.test))
-}
-
-
-#' @export
-generate_data2 <- function(pa, pb, n, n_test, alpha, beta, gamma, treatment_prob = 0.5, 
-                          misspec_nuisance = FALSE, misspec_propensity = FALSE) {
-
-  # Function to compute intercept for desired treatment prevalence
-  compute_intercept <- function(gamma, target_prevalence) {
-    # Simulate a large dataset to estimate the intercept
-    n_large <- 10000
-    v_large <- matrix(stats::runif(n_large * length(gamma)), nrow = n_large)
-    linear_predictor <- v_large %*% gamma
-    intercept <- uniroot(function(b) {
-      mean(sigmoid(b + linear_predictor)) - target_prevalence
-    }, interval = c(-20, 20))$root
-    return(intercept)
-  }
-  
-
-  # Simulate training data
-  v.train <- matrix(stats::runif(n * pa, min = -1, max = 1), nrow = n, ncol = pa)
-  
-  # Compute intercept for propensity score model to achieve desired treatment probability
-  gamma_intercept <- compute_intercept(gamma, target_prevalence = treatment_prob)
+  gamma_linear_pred <- v.train %*% gamma
+  gamma_intercept <- find_int_sigmoid(gamma_linear_pred, treatment_prob)
   gamma_true <- c(gamma_intercept, gamma)
-  
-  # Generate propensity scores for training data
-  if (misspec_propensity) {
-    # Misspecified propensity model: use only the first half of covariates
-    gamma_true <- c(gamma_intercept, gamma[1:(pa/2)], rep(0, pa/2))
-  }
-  pscore.true <- sigmoid(cbind(rep(1, n), v.train) %*% gamma_true)
-  x.train <- stats::rbinom(n, 1, pscore.true)
-  
-  # Generate outcome probabilities for training data
-  if (misspec_nuisance) {
-    # Misspecified nuisance model: use only the first half of covariates
-    alpha_true <- c(alpha[1:(pa/2)], rep(0, pa/2))
-    beta_true <- c(beta[1:(pa/2)], rep(0, pa/2))
-  } else {
-    # Correctly specified nuisance model: use all covariates
-    alpha_true <- alpha
-    beta_true <- beta
-  }
-  p0p1.true <- brm::getProbRR(v.train %*% alpha_true, v.train %*% beta_true)
-  pA.true <- p0p1.true[, 1] # P(Y=1|X=0)
-  pA.true[x.train == 1] <- p0p1.true[x.train == 1, 2] # P(Y=1|X=1)
-  y.train <- stats::rbinom(n, 1, pA.true) # P(Y=1|X)
-  
-  # Simulate test data
-  v.test <- matrix(stats::runif(n_test * pa, min = -1, max = 1), nrow = n_test, ncol = pa)
-  
-  # Generate propensity scores for test data
-  pscore.true.test <- sigmoid(cbind(rep(1, n_test), v.test) %*% gamma_true)
-  x.test <- stats::rbinom(n_test, 1, pscore.true.test)
-  
-  # Generate outcome probabilities for test data
-  p0p1.true.test <- brm::getProbRR(v.test %*% alpha_true, v.test %*% beta_true)
-  pA.true.test <- p0p1.true.test[, 1] # P(Y=1|X=0)
-  pA.true.test[x.test == 1] <- p0p1.true.test[x.test == 1, 2] # P(Y=1|X=1)
-  y.test <- stats::rbinom(n_test, 1, pA.true.test) # P(Y=1|X)
-  
-  # Return training and test data, including predicted p0 and p1
-  return(list(v.train = v.train, x.train = x.train, y.train = y.train, 
-              p0.train = p0p1.true[, 1], p1.train = p0p1.true[, 2], 
-              v.test = v.test, x.test = x.test, y.test = y.test, 
-              p0.test = p0p1.true.test[, 1], p1.test = p0p1.true.test[, 2]))
-}
 
+  # Calculate PS and Treatment
+  pscore.true <- sigmoid(cbind(1, v.train) %*% gamma_true)
+  x.train <- stats::rbinom(n, 1, pscore.true)
+
+  # Outcome Model
+  alpha_true <- alpha
+  beta_true <- beta
+
+  # Linear Predictors
+  theta_train <- cbind(1, v.train) %*% alpha_true
+  phi_train <- cbind(1, v.train) %*% beta_true
+
+  # True Probabilities using brm or internal implementation
+  p0p1.true <- getProbRR.org(theta_train, phi_train)
+  pA.true <- p0p1.true$p0 # P(Y=1|X=0)
+  pA.true[x.train == 1] <- p0p1.true$p1[x.train == 1] # P(Y=1|X=1)
+
+  y.train <- stats::rbinom(n, 1, pA.true) # Observed outcome
+
+  # Simulate Test Data
+  v.test <- matrix(stats::runif(n_test * pa, min = -1, max = 1), nrow = n_test, ncol = pa)
+
+  pscore.true.test <- sigmoid(cbind(1, v.test) %*% gamma_true)
+  x.test <- stats::rbinom(n_test, 1, pscore.true.test)
+
+  theta_test <- cbind(1, v.test) %*% alpha_true
+  phi_test <- cbind(1, v.test) %*% beta_true
+
+  p0p1.true.test <- getProbRR.org(theta_test, phi_test)
+  pA.true.test <- p0p1.true.test$p0
+  pA.true.test[x.test == 1] <- p0p1.true.test$p1[x.test == 1]
+
+  y.test <- stats::rbinom(n_test, 1, pA.true.test)
+
+  # Return structured list
+  return(list(
+    # Training
+    v.train = v.train,
+    x.train = x.train,
+    y.train = y.train,
+    p0.train = p0p1.true$p0,
+    p1.train = p0p1.true$p1,
+    pscore.train = pscore.true,
+
+    # Testing
+    v.test = v.test,
+    x.test = x.test,
+    y.test = y.test,
+    p0.test = p0p1.true.test$p0,
+    p1.test = p0p1.true.test$p1,
+    pscore.test = pscore.true.test,
+
+    # Truth
+    true_alpha = alpha_true,
+    true_beta = beta_true,
+    true_gamma = gamma_true
+  ))
+}
 
 #' @export
 map_with_interpolation <- function(value) {
@@ -148,117 +112,105 @@ map_with_interpolation <- function(value) {
     `50` = 0.15,
     `150` = 0.07,
     `500` = .05
-    # `5` = 0.26, `50` = 0.15, `150` = 0.1, `500` = 0.07
   )
-  # Ensure mapping is sorted by keys
   mapping <- mapping[order(as.numeric(names(mapping)))]
-  
-  # Extract keys (x) and values (y)
   keys <- as.numeric(names(mapping))
   values <- as.numeric(mapping)
-  
-  # Handle exact matches
+
   if (value %in% keys) {
     return(mapping[as.character(value)])
   }
-  
-  # Handle values outside the range (extrapolation)
   if (value < min(keys)) {
-    return(values[1])  # Return the smallest value
+    return(values[1])
   }
   if (value > max(keys)) {
-    return(values[length(values)])  # Return the largest value
+    return(values[length(values)])
   }
-  
-  # Interpolation for intermediate values
+
   lower_index <- max(which(keys < value))
   upper_index <- min(which(keys > value))
-  
-  # Linear interpolation formula
   x0 <- keys[lower_index]
   x1 <- keys[upper_index]
   y0 <- values[lower_index]
   y1 <- values[upper_index]
-  
-  interpolated_value <- y0 + (y1 - y0) * (value - x0) / (x1 - x0)
-  return(interpolated_value)
+
+  return(y0 + (y1 - y0) * (value - x0) / (x1 - x0))
 }
 
 #' @export
-true_vals <- function(dimensions) {
-  
-  p <- map_with_interpolation(dimensions)
-  alpha_eff1 <- 1
-  alpha_eff2 <- -1
-  # alpha_eff1 <- 3
-  # alpha_eff2 <- -3
-  true_alphas <- c(rep(alpha_eff1, round(dimensions*p)), 
-                   rep(alpha_eff2, round(dimensions*p)), 
-                   rep(0, dimensions - round(dimensions*p)*2))#*rnorm(dimensions)
-  beta_eff1 <- -0.5
-  beta_eff2 <- 1
-  # beta_eff1 <- -3
-  # beta_eff2 <- 3
-  true_betas <- c(rep(beta_eff1, round(dimensions*p)), 
-                  rep(beta_eff2, round(dimensions*p)), 
-                  rep(0, dimensions - round(dimensions*p)*2))#*rnorm(dimensions)
-  gamma_eff1 <- 0.1
-  gamma_eff2 <- -0.5
-  true_gammas <- c(rep(gamma_eff1, round(dimensions*p)), 
-                   rep(gamma_eff2, round(dimensions*p)), 
-                   rep(0, dimensions - round(dimensions*p)*2))*rnorm(dimensions)
-  
-  return(list(true_alphas = true_alphas,
-              true_betas = true_betas,
-              true_gammas = true_gammas))
-}
+true_vals <- function(pa, pb = pa) {
+  # Helper to find intercept for generic link function via simulation
+  # link_fun(intercept, linear_pred) -> probabilities
+  compute_intercept_sim <- function(coefs, target_prob, link_fun, linear_pred_other = NULL) {
+    # Simulate covariates if not provided
+    n_vars <- length(coefs)
+    n_sim <- 5000
+    v_sim <- matrix(stats::runif(n_sim * n_vars, min = -1, max = 1), nrow = n_sim)
+    lp <- v_sim %*% coefs
 
-#' @export
-get_selec_meas <- function(.x, true_alpha = NULL,  threshold = 1e-6) {
-  if(is.null(true_alpha)){
-    p <- length(.x)
-    true_values <- true_vals(p)
-    true <- true_values$true_alphas
-  } else {true <- true_alpha}
-  
-  # Calculate TP, FP, TN, and FN
-  selected_vars <- which(abs(.x) > threshold)
-  
-  non_selected_vars <- which(abs(.x) <= threshold)
-  
-  true_vars <- which(abs(true) > threshold)
-  
-  false_vars <- which(abs(true) <= threshold)
-  
-  
-  TP <- sum(selected_vars %in% true_vars)
-  FP <- sum(selected_vars %in% false_vars)
-  TN <- sum(non_selected_vars %in% false_vars)
-  FN <- sum(non_selected_vars %in% true_vars)
-  
-  
-  # Calculate TPR, FPR, and accuracy
-  TPR <- TP / (TP + FN)
-  FPR <- FP / (FP + TN)
-  
-  # Improved Matthews Correlation Coefficient (MCC) Calculation
-  mcc_num <- TP * TN - FP * FN
-  
-  # Calculate terms for the denominator
-  sum_tp_fp <- TP + FP # Total predicted positive
-  sum_tp_fn <- TP + FN # Total actual positive
-  sum_tn_fp <- TN + FP # Total actual negative
-  sum_tn_fn <- TN + FN # Total predicted negative
-  
-  mcc_den <- sqrt(sum_tp_fp) * sqrt(sum_tp_fn) * sqrt(sum_tn_fp) * sqrt(sum_tn_fn)
-  
-  MCC <- ifelse(mcc_den == 0, 0, mcc_num / mcc_den)
-  
-  # Ensure result is numerically stable within the [-1, 1] range
-  if (!is.na(MCC)) {
-    MCC <- max(-1, min(1, MCC))
+    # If there's another linear predictor (alpha) needed for the link
+    if (is.null(linear_pred_other) && !is.null(formals(link_fun)$lp_other)) {
+      stop("Need other linear predictor for this link.")
+    }
+
+    # Objective: find b such that mean(link(b, lp, lp_other)) = target
+    f <- function(b) {
+      probs <- link_fun(b, lp, linear_pred_other)
+      mean(probs) - target_prob
+    }
+
+    tryCatch(uniroot(f, c(-20, 20))$root, error = function(e) 0)
   }
-  
-  
-  return(list(mcc = MCC, tpr = TPR, tnr = 1 - FPR))
+
+  # Generate Alpha
+  p_a <- map_with_interpolation(pa)
+  n_eff_a <- round(pa * p_a)
+  n_null_a <- pa - n_eff_a * 2
+
+  alpha_slopes <- c(rep(1, n_eff_a), rep(-1, n_eff_a), rep(0, n_null_a))
+  true_alphas <- c(0, alpha_slopes) # Intercept = 0
+
+  # Generate Gamma
+  gamma_slopes <- c(rep(0.1, n_eff_a), rep(-0.5, n_eff_a), rep(0, n_null_a)) * stats::rnorm(pa)
+  true_gammas <- gamma_slopes
+
+  # Generate Beta
+  p_b <- map_with_interpolation(pb)
+  n_eff_b <- round(pb * p_b)
+  n_null_b <- pb - n_eff_b * 2
+
+  beta_slopes <- c(rep(-0.5, n_eff_b), rep(1, n_eff_b), rep(0, n_null_b))
+
+  # Beta Intercept (Target P0 = 0.1)
+  # P0 = f(theta, phi). phi = b + beta'V. theta = 0 + alpha'V.
+  # We simulate V using PA dimensions for theta.
+  n_sim <- 5000
+  v_sim_a <- matrix(stats::runif(n_sim * pa, min = -1, max = 1), nrow = n_sim)
+  theta_sim <- v_sim_a %*% alpha_slopes # Intercept is 0
+
+  # For beta, if pb != pa, use specific V simulation if needed
+  if (pb == pa) {
+    lp_beta_sim <- v_sim_a %*% beta_slopes
+  } else {
+    v_sim_b <- matrix(stats::runif(n_sim * pb, min = -1, max = 1), nrow = n_sim)
+    lp_beta_sim <- v_sim_b %*% beta_slopes
+  }
+
+  # Define RB-Link for calculating P0
+  # b is intercept for phi
+  link_rb_p0 <- function(b, lp_b, theta) {
+    phi <- b + lp_b
+    getProbRR.org(as.vector(theta), as.vector(phi))$p0
+  }
+
+  f_beta <- function(b) mean(link_rb_p0(b, lp_beta_sim, theta_sim)) - 0.1
+  beta_int <- tryCatch(uniroot(f_beta, c(-20, 20))$root, error = function(e) -2.3)
+
+  true_betas <- c(beta_int, beta_slopes)
+
+  return(list(
+    true_alphas = true_alphas,
+    true_betas = true_betas,
+    true_gammas = true_gammas
+  ))
 }
