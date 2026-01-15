@@ -133,8 +133,9 @@ analyze_optimization <- function(model, true_alpha = NULL, true_beta = NULL) {
 
         # Calculates "Optimality Gap" assuming min(history) is close to f*
         min_nll <- min(nll_vals[nll_vals != 0], na.rm = TRUE)
-        # Shift slightly to avoid log(0) at the very minimum
-        nll_df <- nll_df %>% dplyr::mutate(gap = value - min_nll + 1e-16)
+        # Compute gap and clip at small positive value to handle numerical precision
+        # (sometimes NLL can be slightly below min due to rounding)
+        nll_df <- nll_df %>% dplyr::mutate(gap = pmax(value - min_nll, 1e-16))
 
         plot_nll <- ggplot(nll_df, aes(step, value)) +
             geom_line() +
@@ -158,11 +159,11 @@ analyze_optimization <- function(model, true_alpha = NULL, true_beta = NULL) {
             geom_line(aes(y = ref_1k, color = "O(1/k)"), linetype = "dashed", alpha = 0.5) +
             geom_line(aes(y = ref_1k2, color = "O(1/k^2)"), linetype = "dotted", alpha = 0.5) +
             scale_y_log10() +
-            scale_x_log10() +
+            # scale_x_log10() +
             labs(
                 title = expression("Optimality Gap " ~ f(x[k]) - f^"*"),
                 y = expression(log[10](Gap)),
-                x = expression(log[10]("Iteration")),
+                x = "Iteration",
                 color = "Rate"
             ) +
             theme_minimal()

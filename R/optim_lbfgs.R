@@ -85,10 +85,6 @@ optim_lbfgs <- function(alpha_start, beta_start,
             gb[pen_idx_b] <- gb[pen_idx_b] + lambda_beta * sign(b[pen_idx_b])
         }
 
-        # Note: We do not save gradient history for L-BFGS because optim calls
-        # fn and gr different numbers of times (line searches), making the histories
-        # incompatible. L-BFGS doesn't follow a simple gradient trajectory anyway.
-
         c(ga, gb)
     }
 

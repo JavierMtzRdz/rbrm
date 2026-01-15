@@ -73,7 +73,7 @@ perform_fista_step <- function(param, y_param, grad, step_size, lambda, intercep
 #'
 #' @export
 fista_opt <- function(alpha_start, beta_start,
-                      step_size_alpha = 0.5, step_size_beta = 0.5,
+                      step_size_alpha = NULL, step_size_beta = NULL,
                       lambda,
                       intercept,
                       max_step,
@@ -83,7 +83,7 @@ fista_opt <- function(alpha_start, beta_start,
                       eval_grad = TRUE,
                       save_history = FALSE,
                       thres = 1e-8,
-                      use_line_search = FALSE, # Disabled by default for convergence
+                      use_line_search = TRUE, # Enabled by default for robustness
                       armijo_c = 1e-4,
                       line_search_shrink = 0.5,
                       line_search_max_iter = 20,
@@ -94,6 +94,16 @@ fista_opt <- function(alpha_start, beta_start,
     # --- Initialization ---
     p_a <- length(alpha_start)
     p_b <- length(beta_start)
+
+    # Adaptive step size initialization for high dimensions
+    if (is.null(step_size_alpha)) {
+        # Conservative: 0.1 for high-dim, 0.5 for low-dim
+        step_size_alpha <- ifelse(p_a > 20, 0.1, 0.5)
+    }
+    if (is.null(step_size_beta)) {
+        step_size_beta <- ifelse(p_b > 20, 0.1, 0.5)
+    }
+    # p_a, p_b already defined above
 
     alpha <- alpha_start
     beta <- beta_start
