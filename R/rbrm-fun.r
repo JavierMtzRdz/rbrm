@@ -142,6 +142,8 @@ fit.rbrm <- function(va, vb = NULL, x, y,
   # Only access history if it exists
   alphas_std <- if (save_opt) opt_result$alphas else NULL
   betas_std <- if (save_opt) opt_result$betas else NULL
+  grad_alphas_std <- if (save_opt) opt_result$grad_alphas else NULL
+  grad_betas_std <- if (save_opt) opt_result$grad_betas else NULL
 
   if (standardize) {
     alpha <- alpha_std
@@ -149,6 +151,8 @@ fit.rbrm <- function(va, vb = NULL, x, y,
 
     alphas <- alphas_std
     betas <- betas_std
+    grad_alphas <- grad_alphas_std
+    grad_betas <- grad_betas_std
 
     # Back-transform slope coefficients
     slope_indices_a <- ifelse(intercept, list(2:pa), list(1:pa))[[1]]
@@ -162,6 +166,20 @@ fit.rbrm <- function(va, vb = NULL, x, y,
       betas[, slope_indices_b] <- betas_std[, slope_indices_b] / vb_scal_info$scale
       opt_result$alphas <- alphas
       opt_result$betas <- betas
+
+      # Back-transform gradients if they exist
+      if (!is.null(grad_alphas_std)) {
+        if (!is.matrix(grad_alphas_std)) grad_alphas_std <- matrix(grad_alphas_std, nrow = 1)
+        if (!is.matrix(grad_alphas)) grad_alphas <- matrix(grad_alphas, nrow = 1)
+        grad_alphas[, slope_indices_a] <- grad_alphas_std[, slope_indices_a, drop = FALSE] * va_scal_info$scale
+        opt_result$grad_alphas <- grad_alphas
+      }
+      if (!is.null(grad_betas_std)) {
+        if (!is.matrix(grad_betas_std)) grad_betas_std <- matrix(grad_betas_std, nrow = 1)
+        if (!is.matrix(grad_betas)) grad_betas <- matrix(grad_betas, nrow = 1)
+        grad_betas[, slope_indices_b] <- grad_betas_std[, slope_indices_b, drop = FALSE] * vb_scal_info$scale
+        opt_result$grad_betas <- grad_betas
+      }
     }
 
     # Adjust intercept if it exists
@@ -173,8 +191,14 @@ fit.rbrm <- function(va, vb = NULL, x, y,
       beta[1] <- as.numeric(beta_std[1] - intercept_adjustment_b)
 
       if (save_opt) {
-        intercept_adjustment_as <- rowSums((alphas_std[, slope_indices_a] * va_scal_info$center) / va_scal_info$scale)
-        intercept_adjustment_bs <- rowSums((betas_std[, slope_indices_b] * vb_scal_info$center) / vb_scal_info$scale)
+        intercept_adjustment_as <- rowSums(alphas_std[, slope_indices_a, drop = FALSE] * (rep(1, nrow(alphas_std)) %*% t(va_scal_info$center / va_scal_info$scale)))
+
+        adj_vec_a <- va_scal_info$center / va_scal_info$scale
+        intercept_adjustment_as <- as.vector(alphas_std[, slope_indices_a, drop = FALSE] %*% adj_vec_a)
+
+        adj_vec_b <- vb_scal_info$center / vb_scal_info$scale
+        intercept_adjustment_bs <- as.vector(betas_std[, slope_indices_b, drop = FALSE] %*% adj_vec_b)
+
         alphas[, 1] <- alphas_std[, 1] - intercept_adjustment_as
         betas[, 1] <- betas_std[, 1] - intercept_adjustment_bs
       }
