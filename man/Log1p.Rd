@@ -2,21 +2,11 @@
 % Please edit documentation in R/helper.r
 \name{Log1p}
 \alias{Log1p}
-\title{log1p}
+\title{Log1p (Stable)}
 \usage{
 Log1p(x)
 }
-\arguments{
-\item{x}{numeric}
-}
-\value{
-numeric, same size as x
-}
 \description{
-Compute log(1+x) in a numerically-stable fashion
+Log1p (Stable)
 }
-\examples{
-Log1p(1e-20)
-# compare to naive approach:
-log(1+1e-20)
-}
+\keyword{internal}

@@ -9,12 +9,11 @@ generate_data(
   pb,
   n,
   n_test,
-  alpha,
-  beta,
-  gamma,
+  alpha = NULL,
+  beta = NULL,
+  gamma = NULL,
   treatment_prob = 0.5,
-  misspec_nuisance = FALSE,
-  misspec_propensity = FALSE
+  target_beta_prob = 0.1
 )
 }
 \arguments{
@@ -34,10 +33,6 @@ generate_data(
 The intercept is estimated automatically to match \code{treatment_prob}.}
 
 \item{treatment_prob}{Target probability of treatment (default 0.5).}
-
-\item{misspec_nuisance}{Logical. If TRUE, simulates model misspecification for nuisance parameter (beta).}
-
-\item{misspec_propensity}{Logical. If TRUE, simulates model misspecification for propensity scores.}
 }
 \value{
 A list containing training and test data: v (covariates), x (treatment), y (outcome),

@@ -15,13 +15,13 @@ fit.rbrm(
   lambda = 0,
   lambda_beta = NULL,
   lambda_b_prop = 1,
-  lr.alpha = 1,
-  lr.beta = 1,
   intercept = FALSE,
   prob_fun = getProbRR.org,
   opt_fun = fista_opt,
   save_opt = FALSE,
-  standardize = TRUE
+  standardize = TRUE,
+  clipping = 1e-10,
+  ...
 )
 }
 \arguments{
@@ -41,29 +41,28 @@ fit.rbrm(
 
 \item{lambda}{Lasso penalty strength (non-negative scalar).}
 
-\item{intercept}{Logical. Does the model include an intercept term (as the first
-element of alpha/beta)? Controls penalization. User should ensure \code{va}/\code{vb}
-matrices include/exclude a column of 1s accordingly.}
+\item{lambda_beta}{Optional separate penalty for beta.}
+
+\item{lambda_b_prop}{Proportion of lambda to use for beta if lambda_beta is NULL.}
+
+\item{intercept}{Logical. Does the model include an intercept term?}
 
 \item{prob_fun}{Function to calculate probabilities (e.g., \code{getProbRR.org}).}
 
-\item{opt_fun}{The optimization function to use (e.g., \code{fista_opt2_ls_sc}).
-Must accept specific arguments (see code).}
+\item{opt_fun}{The optimization function to use (defaults to \code{fista_opt}).}
 
-\item{step_size_alpha_init}{Initial step size guess for alpha (used by some optimizers).}
+\item{save_opt}{Logical. If \code{TRUE}, include the full parameter history in results.}
 
-\item{step_size_beta_init}{Initial step size guess for beta (used by some optimizers).}
+\item{standardize}{Logical. scaling.}
 
-\item{save_optimizer_details}{Logical. If \code{TRUE}, include the full raw output
-from \code{opt_fun} in the results.}
-
-\item{...}{Additional arguments passed directly to \code{opt_fun} (e.g., \code{tol},
-\code{ls_max_iter}, \code{eval_grad}).}
+\item{...}{Additional arguments passed to the optimization function (e.g., \code{step_size_alpha}, \code{armijo_c}).}
 }
 \value{
-An object of class "rbrm" (or similar), typically a list containing
-estimated coefficients, convergence status, objective value, etc.
+An object of class "rbrm".
 }
 \description{
 Wraps an optimization function to fit the RBRM model with Lasso penalty.
+}
+\seealso{
+\code{\link{fista_opt}}, \code{\link{optim_lbfgs}}, \code{\link{optim_newton_cd}}
 }

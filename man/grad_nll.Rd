@@ -14,7 +14,8 @@ grad_nll(
   vb,
   prob_fun,
   opt = c("both", "alpha", "beta"),
-  method = c("numerical", "analytical")
+  method = c("analytical", "numerical"),
+  clipping = 1e-10
 )
 }
 \arguments{
@@ -33,6 +34,8 @@ grad_nll(
 \item{prob_fun}{Function that takes theta (theta), phi (phi) and returns list(p0, p1).}
 
 \item{opt}{Character string specifying which gradient to return ("alpha", "beta", or "both").}
+
+\item{clipping}{Small epsilon for probability clipping (defaults to 1e-10).}
 }
 \value{
 Analytical gradient vector(s) of the negative log-likelihood defined by user's nllh.
