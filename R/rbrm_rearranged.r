@@ -119,7 +119,8 @@ proximal.gd.beta.fista <- function(beta, step_size, lambda, t_old, last_beta,
 
 nllh <- function(alpha, beta, va, vb, x, y,
                  prob_fun = getProbRR.org,
-                 weights = rep(1, length(x))) {
+                 weights = rep(1, length(x)),
+                 clipping = 1e-10) {
   n <- length(y)
   pa <- length(alpha) # Use length of coeff vector
   pb <- length(beta)
@@ -127,7 +128,11 @@ nllh <- function(alpha, beta, va, vb, x, y,
   if (pa > 0 && ncol(va) == pa) logrr <- va %*% alpha else logrr <- matrix(0, nrow = n, ncol = 1)
   if (pb > 0 && ncol(vb) == pb) logop <- vb %*% beta else logop <- matrix(0, nrow = n, ncol = 1)
 
-  ps <- prob_fun(as.vector(logrr), as.vector(logop))
+  if ("clipping" %in% names(formals(prob_fun))) {
+    ps <- prob_fun(as.vector(logrr), as.vector(logop), clipping = clipping)
+  } else {
+    ps <- prob_fun(as.vector(logrr), as.vector(logop))
+  }
   p0 <- ps$p0
   p1 <- ps$p1
 
@@ -185,11 +190,13 @@ penalized_nllh <- function(alpha, beta, va, vb, x, y,
                            lambda_b_prop = 1,
                            intercept = F,
                            prob_fun = getProbRR.org,
-                           nllh_fun = nllh) {
+                           nllh_fun = nllh,
+                           clipping = 1e-10) {
   if (is.null(lambda_beta)) lambda_beta <- lambda * lambda_b_prop
 
   unpenalized.nllh <- nllh_fun(alpha, beta, va, vb, x, y,
-    prob_fun = prob_fun
+    prob_fun = prob_fun,
+    clipping = clipping
   )
 
   # Calculate L1 penalty
