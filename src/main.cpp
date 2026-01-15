@@ -778,9 +778,9 @@ Rcpp::List newton_cd_cpp(Rcpp::NumericVector alpha_start_rcpp,
   arma::vec nll_hist;
 
   if (save_history) {
-    alphas_hist.set_size(max_iter, pa);
-    betas_hist.set_size(max_iter, pb);
-    nll_hist.set_size(max_iter);
+    alphas_hist.zeros(max_iter, pa);
+    betas_hist.zeros(max_iter, pb);
+    nll_hist.zeros(max_iter);
   }
 
   // Main Newton Loop
@@ -870,18 +870,8 @@ Rcpp::List newton_cd_cpp(Rcpp::NumericVector alpha_start_rcpp,
     arma::vec d_alpha = alpha_new - alpha;
     arma::vec d_beta = beta_new - beta;
 
-    // Check convergence
-    double max_a = (d_alpha.n_elem > 0) ? arma::abs(d_alpha).max() : 0.0;
-    double max_b = (d_beta.n_elem > 0) ? arma::abs(d_beta).max() : 0.0;
-    double change = std::max(max_a, max_b);
-    if (change < tol) {
-      alpha = alpha_new;
-      beta = beta_new;
-      converged = true;
-      break;
-    }
-
     // Line search
+
     double step_ls = 1.0;
     bool accepted = false;
     for (int ls = 0; ls < 30; ++ls) {
@@ -895,12 +885,30 @@ Rcpp::List newton_cd_cpp(Rcpp::NumericVector alpha_start_rcpp,
         alpha = a_cand;
         beta = b_cand;
         accepted = true;
-        if (save_history)
+        if (save_history) {
           nll_hist(iter) = obj_cand;
+          alphas_hist.row(iter) = alpha.t();
+          betas_hist.row(iter) = beta.t();
+        }
+
+        // Update obj_prev for next iteration's check!
+        obj_prev = obj_cand;
+
+        // Check convergence on the ACTUAL step taken
+        double step_norm_a =
+            (d_alpha.n_elem > 0) ? arma::abs(d_alpha).max() * step_ls : 0.0;
+        double step_norm_b =
+            (d_beta.n_elem > 0) ? arma::abs(d_beta).max() * step_ls : 0.0;
+        if (std::max(step_norm_a, step_norm_b) < tol) {
+          converged = true;
+        }
         break;
       }
       step_ls *= 0.5;
     }
+
+    if (converged)
+      break;
 
     if (!accepted) {
       if (save_history) {
@@ -976,9 +984,9 @@ Rcpp::List active_set_newton_cd_cpp(
   arma::vec nll_hist;
 
   if (save_history) {
-    alphas_hist.set_size(max_iter, pa);
-    betas_hist.set_size(max_iter, pb);
-    nll_hist.set_size(max_iter);
+    alphas_hist.zeros(max_iter, pa);
+    betas_hist.zeros(max_iter, pb);
+    nll_hist.zeros(max_iter);
   }
 
   for (int iter = 0; iter < max_iter; ++iter) {
@@ -1259,21 +1267,6 @@ Rcpp::List active_set_newton_cd_cpp(
     arma::vec d_alpha = alpha_new - alpha;
     arma::vec d_beta = beta_new - beta;
 
-    double max_a = (d_alpha.n_elem > 0) ? arma::abs(d_alpha).max() : 0.0;
-    double max_b = (d_beta.n_elem > 0) ? arma::abs(d_beta).max() : 0.0;
-    double change = std::max(max_a, max_b);
-    if (change < tol) {
-      alpha = alpha_new;
-      beta = beta_new;
-      converged = true;
-      if (save_history) {
-        alphas_hist.row(iter) = alpha.t();
-        betas_hist.row(iter) = beta.t();
-        nll_hist(iter) = obj_prev;
-      }
-      break;
-    }
-
     double step_ls = 1.0;
     bool accepted = false;
     for (int ls = 0; ls < 30; ++ls) {
@@ -1287,12 +1280,30 @@ Rcpp::List active_set_newton_cd_cpp(
         alpha = a_cand;
         beta = b_cand;
         accepted = true;
-        if (save_history)
+        if (save_history) {
           nll_hist(iter) = obj_cand;
+          alphas_hist.row(iter) = alpha.t();
+          betas_hist.row(iter) = beta.t();
+        }
+
+        // Update obj_prev for next iteration
+        obj_prev = obj_cand;
+
+        // Check convergence on the ACTUAL step taken
+        double step_norm_a =
+            (d_alpha.n_elem > 0) ? arma::abs(d_alpha).max() * step_ls : 0.0;
+        double step_norm_b =
+            (d_beta.n_elem > 0) ? arma::abs(d_beta).max() * step_ls : 0.0;
+        if (std::max(step_norm_a, step_norm_b) < tol) {
+          converged = true;
+        }
         break;
       }
       step_ls *= 0.5;
     }
+
+    if (converged)
+      break;
 
     if (!accepted) {
       if (save_history) {
@@ -1373,6 +1384,20 @@ Rcpp::List fista_cpp(Rcpp::NumericVector alpha_start_rcpp,
   if (lambda_beta < 0)
     lambda_beta = lambda;
 
+  // Helper for full objective (handling lambda_beta correctly)
+  auto calc_obj = [&](const arma::vec &a, const arma::vec &b) {
+    double val = nllh_cpp(a, b, va, vb, x_indicator, y_outcome,
+                          prob_fun_selector, clipping);
+    double pen = 0.0;
+    int s_a = (intercept && a.n_elem > 0) ? 1 : 0;
+    for (arma::uword i = s_a; i < a.n_elem; ++i)
+      pen += std::abs(a[i]) * lambda;
+    int s_b = (intercept && b.n_elem > 0) ? 1 : 0;
+    for (arma::uword i = s_b; i < b.n_elem; ++i)
+      pen += std::abs(b[i]) * lambda_beta;
+    return val + pen;
+  };
+
   // Initialize FISTA variables
   arma::vec alpha_y = alpha;
   arma::vec beta_y = beta;
@@ -1397,6 +1422,8 @@ Rcpp::List fista_cpp(Rcpp::NumericVector alpha_start_rcpp,
     betas_hist.set_size(max_iter, beta.n_elem);
     nll_hist.set_size(max_iter);
   }
+
+  double nll_current = calc_obj(alpha, beta);
 
   for (int k = 0; k < max_iter; ++k) {
     // 1. Compute Gradient at y_k
@@ -1429,7 +1456,13 @@ Rcpp::List fista_cpp(Rcpp::NumericVector alpha_start_rcpp,
                                        y_outcome, prob_fun_selector, clipping);
       nll_y = nllh_cpp(alpha_y, beta_y, va, vb, x_indicator, y_outcome,
                        prob_fun_selector, clipping);
+      nll_y = nllh_cpp(alpha_y, beta_y, va, vb, x_indicator, y_outcome,
+                       prob_fun_selector, clipping);
     }
+
+    // Monotone FISTA: Ensure F(x_{k+1}) <= F(x_k)
+    // We generated candidate x_{k+1} (alpha_new) from y_k.
+    // We will check its NLL later.
 
     arma::vec alpha_new, beta_new;
     double current_step = step_size;
@@ -1519,10 +1552,89 @@ Rcpp::List fista_cpp(Rcpp::NumericVector alpha_start_rcpp,
       if (save_history) {
         alphas_hist.row(k) = alpha.t();
         betas_hist.row(k) = beta.t();
-        nll_hist(k) = nll_new; // Using nll_new from line search
+        nll_hist(k) = nll_new;
       }
       break;
     }
+
+    // --- Monotonicity Check (Restart) ---
+    if (nll_new > nll_current) {
+      // Reject momentum step. Restart to x_k.
+      alpha_y = alpha;
+      beta_y = beta;
+      t_k = 1.0;
+
+      // Recompute gradients at x_k
+      arma::vec g_a_k =
+          grad_nll_alpha_analytical_cpp(alpha, beta, va, vb, x_indicator,
+                                        y_outcome, prob_fun_selector, clipping);
+      arma::vec g_b_k =
+          grad_nll_beta_analytical_cpp(alpha, beta, va, vb, x_indicator,
+                                       y_outcome, prob_fun_selector, clipping);
+
+      double nll_x = nll_current;
+      double cur_step = step_size;
+
+      // Simple backtracking GD from x_k
+      bool step_found = false;
+      arma::vec a_gd, b_gd;
+      double nll_gd = nll_new;
+
+      for (int r = 0; r < 20; ++r) {
+        arma::vec z_a = alpha - cur_step * g_a_k;
+        arma::vec z_b = beta - cur_step * g_b_k;
+
+        a_gd = z_a;
+        int s_a = (intercept && alpha.n_elem > 0) ? 1 : 0;
+        for (arma::uword i = s_a; i < alpha.n_elem; ++i) {
+          double v = z_a[i];
+          double th = lambda * cur_step;
+          if (v > th)
+            a_gd[i] = v - th;
+          else if (v < -th)
+            a_gd[i] = v + th;
+          else
+            a_gd[i] = 0.0;
+        }
+
+        b_gd = z_b;
+        int s_b = (intercept && beta.n_elem > 0) ? 1 : 0;
+        for (arma::uword i = s_b; i < beta.n_elem; ++i) {
+          double v = z_b[i];
+          double th = lambda_beta * cur_step;
+          if (v > th)
+            b_gd[i] = v - th;
+          else if (v < -th)
+            b_gd[i] = v + th;
+          else
+            b_gd[i] = 0.0;
+        }
+
+        nll_gd =
+            penalized_nllh_cpp(a_gd, b_gd, va, vb, x_indicator, y_outcome,
+                               lambda, intercept, prob_fun_selector, clipping);
+
+        // Check sufficient decrease or simple monotonicity
+        if (nll_gd <= nll_x) {
+          step_found = true;
+          break;
+        }
+        cur_step *= shrink_factor;
+      }
+
+      if (step_found) {
+        alpha_new = a_gd;
+        beta_new = b_gd;
+        nll_new = nll_gd;
+        step_size = cur_step;
+      } else {
+        alpha_new = alpha;
+        beta_new = beta;
+        nll_new = nll_current;
+      }
+    }
+
+    nll_current = nll_new;
 
     // Update Momentum
     t_k_next = (1.0 + std::sqrt(1.0 + 4.0 * t_k * t_k)) / 2.0;
@@ -1549,8 +1661,7 @@ Rcpp::List fista_cpp(Rcpp::NumericVector alpha_start_rcpp,
       // recompute. Recomputing is redundant. Assuming line search accepted,
       // nll_new is valid. But nll_new is strictly local. I should bubble it
       // out. For now, recomputing or storing last valid nll_y.
-      nll_hist(k) = nllh_cpp(alpha, beta, va, vb, x_indicator, y_outcome,
-                             prob_fun_selector, clipping);
+      nll_hist(k) = nll_current;
     }
   }
 

@@ -72,23 +72,23 @@ perform_fista_step <- function(param, y_param, grad, step_size, lambda, intercep
 #' @param thres Convergence threshold.
 #'
 #' @export
-fista_opt <- function(alpha_start, beta_start,
-                      step_size_alpha = NULL, step_size_beta = NULL,
-                      lambda,
-                      intercept,
-                      max_step,
-                      va, vb, x, y,
-                      prob_fun = getProbRR.org,
-                      lambda_beta = NULL,
-                      eval_grad = TRUE,
-                      save_history = FALSE,
-                      thres = 1e-8,
-                      use_line_search = TRUE, # Enabled by default for robustness
-                      armijo_c = 1e-4,
-                      line_search_shrink = 0.5,
-                      line_search_max_iter = 20,
-                      clipping = 1e-10,
-                      ...) {
+optim_fista <- function(alpha_start, beta_start,
+                        step_size_alpha = NULL, step_size_beta = NULL,
+                        lambda,
+                        intercept,
+                        max_step,
+                        va, vb, x, y,
+                        prob_fun = getProbRR.org,
+                        lambda_beta = NULL,
+                        eval_grad = TRUE,
+                        save_history = FALSE,
+                        thres = 1e-8,
+                        use_line_search = TRUE, # Enabled by default for robustness
+                        armijo_c = 1e-4,
+                        line_search_shrink = 0.5,
+                        line_search_max_iter = 20,
+                        clipping = 1e-10,
+                        ...) {
     if (is.null(lambda_beta)) lambda_beta <- lambda
 
     # --- Initialization ---
@@ -263,6 +263,18 @@ fista_opt <- function(alpha_start, beta_start,
         }
 
         last_g_beta <- g_beta
+
+        # Check Monotonicity
+        f_next <- penalized_nllh(alpha_next, beta_next, va, vb, x, y, lambda, lambda_beta = lambda_beta, lambda_b_prop = 1, intercept = intercept, prob_fun = prob_fun, clipping = clipping)
+
+        if (f_next > f_current) {
+            # Restart momentum and reject step (stay at alpha/beta)
+            alpha_next <- alpha
+            beta_next <- beta
+            t_next <- 1 # Reset momentum for next iter
+            f_next <- f_current
+            restart_count <- restart_count + 1
+        }
 
         # Check Convergence
         # Proximal Gradient Norm: ||(x - x_next) / step||

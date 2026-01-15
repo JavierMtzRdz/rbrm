@@ -17,7 +17,7 @@ fit.rbrm(
   lambda_b_prop = 1,
   intercept = FALSE,
   prob_fun = getProbRR.org,
-  opt_fun = fista_opt,
+  opt_fun = optim_fista,
   save_opt = FALSE,
   standardize = TRUE,
   clipping = 1e-10,
