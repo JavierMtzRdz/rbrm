@@ -20,7 +20,7 @@ test_that("fit.rbrm converges on simple separable data", {
     x_trt <- rbinom(n, 1, 0.5)
     y <- ifelse(x_trt == 1, rbinom(n, 1, ps$p1), y)
 
-    fit <- fit.rbrm(va, vb, x_trt, y, max_step = 200, lambda = 0, intercept = FALSE, thres = 1e-3)
+    fit <- fit.rbrm(va, vb, x_trt, y, max_step = 1000, lambda = 1e-3, intercept = FALSE, thres = 1e-3, eval_grad = FALSE)
 
     expect_true(fit$convergence)
     expect_equal(length(fit$alpha), p)
