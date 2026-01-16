@@ -1,139 +1,99 @@
-#' Sigmoid (expit) function
-#'
-#' Computes the sigmoid (or expit) function, which maps real-valued inputs to the (0, 1) range.
-#'
-#' @param t A numeric value or vector of values.
-#' 
-#' @return The sigmoid of the input value(s).
-#' 
-#' @examples
-#' sigmoid(0) # returns 0.5
-#' sigmoid(c(-1, 0, 1)) # returns c(0.2689414, 0.5, 0.7310586)
-#' 
-#' @export
+#' Sigmoid function
+#' @keywords internal
 sigmoid <- function(t) {
   return(exp(t) / (1 + exp(t)))
 }
 
-#' Compute Offset for a Desired Proportion Using the Sigmoid Function
-#'
-#' This function computes an offset to apply to a linear combination of predictors such that 
-#' the expected proportion of positive outcomes matches the specified proportion.
-#'
-#' @param M Integer. The number of random samples to generate.
-#' @param gamma A numeric vector of coefficients.
-#' @param Sigma A covariance matrix for the random samples.
-#' @param proportion The target proportion of positive outcomes (between 0 and 1).
-#'
-#' @return The computed offset that achieves the desired proportion.
+#' Compute Offset for Desired Proportion
 #'
 #' @importFrom mvnfast rmvn
-#'
-#' @examples
-#' M <- 1000
-#' gamma <- c(0.5, -0.2, 0.1)
-#' Sigma <- diag(3)
-#' proportion <- 0.7
-#' offset <- offset.compute(M, gamma, Sigma, proportion)
-#'
-#' @export
+#' @keywords internal
 offset.compute <- function(M, gamma, Sigma, proportion) {
-  # Number of coefficients
   p <- length(gamma)
-  
-  # Computing proportion for given offset
   x.data <- rmvn(M, mu = rep(0, p), sigma = Sigma)
   coef.fit <- x.data %*% gamma
-  
+
   proportion.difference <- function(offset, coef.fit, proportion) {
     prob.test <- sigmoid(coef.fit + offset)
-    computed.proportion <- mean(round(prob.test, 0))
-    return(abs(computed.proportion - proportion))
+    return(abs(mean(round(prob.test, 0)) - proportion))
   }
-  
-  # Offset computation
-  optimal.offset <- stats::optimize(
+
+  stats::optimize(
     f = proportion.difference, interval = c(-20, 20),
     coef.fit = coef.fit, proportion = proportion
   )$minimum
-  return(optimal.offset)
 }
 
-#' Proximal Operator Function
-#'
-#' Computes the proximal operator for L1-regularization (soft thresholding).
-#'
-#' @param x A numeric value or vector of values.
-#' @param lambda A regularization parameter. Must be a positive value.
-#'
-#' @return The result of applying the proximal operator to the input value(s).
-#'
-#' @examples
-#' proximal_operator(c(1, -2, 3), 1) # returns c(0, -1, 2)
-#' 
-#' @export
-proximal_operator <- function(x, lambda) {
+#' Soft Thresholding Operator
+#' @keywords internal
+soft_thres <- function(x, lambda) {
   sign(x) * pmax(0, abs(x) - lambda)
 }
 
-#' Check if Two Values are Numerically Equal
-#'
-#' Checks if two values (or vectors) are equal within numerical precision.
-#'
-#' @param x A numeric value or vector of values.
-#' @param y A numeric value or vector of values.
-#' @param tolerance A numeric value indicating the allowable tolerance for equality. Default is the square root of machine precision.
-#'
-#' @return TRUE if the values are within the specified tolerance, otherwise FALSE.
-#'
-#' @examples
-#' same(0.1 + 0.2, 0.3) # returns TRUE
-#' same(c(0.1 + 0.2, 0.3), c(0.3, 0.3)) # returns TRUE
-#'
-#' @export
+#' Check numerical equality
+#' @keywords internal
 same <- function(x, y, tolerance = .Machine$double.eps^0.5) {
   abs(x - y) < tolerance
 }
 
-#' LogSumExp
-#'
-#' Compute log(sum(exp(x))) in a numerically-stable fashion
-#'
-#' @param x numeric, usually a vector
-#'
-#' @return numeric, single number
-#' @examples
-#' logsumexp(c(-1e5,-1e12))
-#' # compare to log(sum(exp(c(-1e5,-1e12))))
-#' log(sum(exp(c(-1e5,-1e12))))
-#' @export
-logsumexp <- function(x){
-  if(!is.numeric(x)) stop('x should be numeric, not ', class(x)[1])
+#' LogSumExp (Stable)
+#' @keywords internal
+logsumexp <- function(x) {
+  if (!is.numeric(x)) stop("x should be numeric")
   x_max <- max(x)
-  result <- x_max + log(sum(exp(x-x_max)))
-  return(result)
+  x_max + log(sum(exp(x - x_max)))
 }
 
-
-#' log1p
-#'
-#' Compute log(1+x) in a numerically-stable fashion
-#'
-#' @param x numeric
-#'
-#' @return numeric, same size as x
-#' @examples
-#' Log1p(1e-20)
-#' # compare to naive approach:
-#' log(1+1e-20)
-#' @export
-Log1p <- function(x){
-  if(!is.numeric(x)) stop('x should be numeric, not ', class(x)[1])
-  y <- 1+x
-  z <- y-1
-  idx <- (z==0) # where is z==0 (ie numerical underflow)
-  out <- rep(0,length(x))
-  out[idx] <- x[idx] # if underflow, x itself is a good approximation
-  out[!idx] <- x[!idx]*log(y[!idx])/z[!idx] # o.w., log(y)/z ~ log(1+x)/x
+#' Log1p (Stable)
+#' @keywords internal
+Log1p <- function(x) {
+  if (!is.numeric(x)) stop("x should be numeric")
+  y <- 1 + x
+  z <- y - 1
+  idx <- (z == 0)
+  out <- rep(0, length(x))
+  out[idx] <- x[idx]
+  out[!idx] <- x[!idx] * log(y[!idx]) / z[!idx]
   return(out)
+}
+
+#' Interpolate Value based on Key mapping
+#' @keywords internal
+map_with_interpolation <- function(value) {
+  mapping <- c(`5` = 0.26, `50` = 0.15, `150` = 0.07, `500` = .05)
+  mapping <- mapping[order(as.numeric(names(mapping)))]
+  keys <- as.numeric(names(mapping))
+  values <- as.numeric(mapping)
+
+  if (value %in% keys) {
+    return(mapping[as.character(value)])
+  }
+  if (value < min(keys)) {
+    return(values[1])
+  }
+  if (value > max(keys)) {
+    return(values[length(values)])
+  }
+
+  lower <- max(which(keys < value))
+  upper <- min(which(keys > value))
+
+  values[lower] + (values[upper] - values[lower]) * (value - keys[lower]) / (keys[upper] - keys[lower])
+}
+
+#' Find Intercept for Sigmoid Probability Target
+#' @keywords internal
+find_int_sigmoid <- function(lp, target) {
+  f <- function(b) mean(sigmoid(b + lp)) - target
+  tryCatch(uniroot(f, c(-100, 100))$root, error = function(e) 0)
+}
+
+#' Compute Intercept for General Link
+#' @keywords internal
+compute_intercept_sim <- function(linear_pred_main, target_prob, link_fun, linear_pred_other = NULL) {
+  f <- function(b) {
+    probs <- link_fun(b, linear_pred_main, linear_pred_other)
+    mean(probs) - target_prob
+  }
+  tryCatch(uniroot(f, c(-20, 20))$root, error = function(e) -2.3)
 }

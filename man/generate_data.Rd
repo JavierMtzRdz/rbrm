@@ -4,37 +4,42 @@
 \alias{generate_data}
 \title{Generative model for rbrm}
 \usage{
-generate_data(pa, pb, n, n_test, alpha, beta, gamma)
+generate_data(
+  pa,
+  pb,
+  n,
+  n_test,
+  alpha = NULL,
+  beta = NULL,
+  gamma = NULL,
+  treatment_prob = 0.5,
+  target_beta_prob = 0.1
+)
 }
 \arguments{
-\item{pa}{the number of alpha coefficients without the intercept}
+\item{pa}{Number of alpha coefficients (predictors for Relative Risk) without the intercept.}
 
-\item{pb}{the number of beta coefficients without the intercept}
+\item{pb}{Number of beta coefficients (predictors for Baseline Risk) without the intercept.}
 
-\item{n}{number of samples in training set}
+\item{n}{Sample size for the training set.}
 
-\item{n_test}{the number of samples in the test set}
+\item{n_test}{Sample size for the test set.}
 
-\item{alpha}{the true alpha coefficients that are used to generate data.
-This list should include the intercept coefficient.}
+\item{alpha}{True alpha coefficients (including intercept).}
 
-\item{beta}{the true beta coefficients that are used to generate data.
-This list should include the intercept coefficient.}
+\item{beta}{True beta coefficients (including intercept).}
 
-\item{gamma}{the true gamma coefficients that are used to generate
-the propensity for exposure This list should not include the intercept.
-The intercept value will be estimated numerically to achieve an
-even proportion of exposure in the training data.}
+\item{gamma}{True gamma coefficients for propensity score model (EXCLUDING intercept).
+The intercept is estimated automatically to match \code{treatment_prob}.}
+
+\item{treatment_prob}{Target probability of treatment (default 0.5).}
 }
 \value{
-data
+A list containing training and test data: v (covariates), x (treatment), y (outcome),
+and true probabilities.
 }
 \description{
-This file/function generates simulated data for studying the rbrm model
-}
-\examples{
-#generate_data(
-#    pa = 10, pb = 10, n = 40, n_test = 100,
-#    alpha = c(0.5, rep(5, 5), rep(0, 5)), beta = c(0.5, rep(5, 5), rep(0, 5)),
-#    gamma = c(rep(5, 5), rep(0, 5)))
+This function generates simulated data for testing and studying the RBRM model.
+It allows control over sample size, number of covariates, true coefficients,
+and treatment prevalence.
 }

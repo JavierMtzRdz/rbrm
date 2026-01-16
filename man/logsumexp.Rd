@@ -2,21 +2,11 @@
 % Please edit documentation in R/helper.r
 \name{logsumexp}
 \alias{logsumexp}
-\title{LogSumExp}
+\title{LogSumExp (Stable)}
 \usage{
 logsumexp(x)
 }
-\arguments{
-\item{x}{numeric, usually a vector}
-}
-\value{
-numeric, single number
-}
 \description{
-Compute log(sum(exp(x))) in a numerically-stable fashion
+LogSumExp (Stable)
 }
-\examples{
-logsumexp(c(-1e5,-1e12))
-# compare to log(sum(exp(c(-1e5,-1e12))))
-log(sum(exp(c(-1e5,-1e12))))
-}
+\keyword{internal}
