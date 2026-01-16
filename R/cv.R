@@ -11,6 +11,7 @@ cv_rbrm <- function(object, ...) {
 
 #' @describeIn cv_rbrm Default method for matrices
 #' @param measure Performance measure: "deviance" (default), "brier", "misclass", or "auc"
+#' @param adjusted Logical. If TRUE (default), the final model is refitted without penalization on the active set.
 #' @export
 cv_rbrm.default <- function(object, vb = NULL, x, y,
                             nfold = 5,
@@ -19,6 +20,7 @@ cv_rbrm.default <- function(object, vb = NULL, x, y,
                             lambda_seq = NULL,
                             folds = NULL,
                             measure = "deviance",
+                            adjusted = TRUE,
                             alpha_start = NULL, beta_start = NULL,
                             seed = NULL,
                             verbose = TRUE,
@@ -96,9 +98,12 @@ cv_rbrm.default <- function(object, vb = NULL, x, y,
         x_test <- x[idx_test]
         y_test <- y[idx_test]
 
-        path_fit <- rbrm_path(va_train, vb_train, x_train, y_train,
+        # Use rbrm (renamed from rbrm_path)
+        # CV always runs on UNADJUSTED (penalized) models for selection speed/consistency
+        path_fit <- rbrm(va_train, vb_train, x_train, y_train,
             lambda_seq = lambda_seq,
             standardize = TRUE,
+            adjusted = FALSE,
             verbose = FALSE, ...
         )
 
@@ -121,6 +126,7 @@ cv_rbrm.default <- function(object, vb = NULL, x, y,
     result$lambdas <- lambda_seq
     result$measure <- measure
     result$measure_name <- measure_name
+    result$adjusted <- adjusted
 
     # Store full results for all metrics
     result$cv_results <- list()
@@ -152,13 +158,16 @@ cv_rbrm.default <- function(object, vb = NULL, x, y,
 
     if (verbose) {
         cli::cli_alert_success("CV Complete. Min Lambda: {format(result$lambda_min, digits=4)}")
-        cli::cli_alert_info("Fitting final model on full dataset...")
+        status_msg <- if (adjusted) "Fitting adjusted final model (unpenalized refit)..." else "Fitting final model on full dataset..."
+        cli::cli_alert_info("{status_msg}")
     }
 
     # Fit Final Model on Full Data
-    final_path <- rbrm_path(va, vb, x, y,
+    # Apply adjustment if requested
+    final_path <- rbrm(va, vb, x, y,
         lambda_seq = lambda_seq,
         standardize = TRUE,
+        adjusted = adjusted,
         verbose = FALSE, ...
     )
 
@@ -222,6 +231,7 @@ print.cv_rbrm <- function(x, ...) {
     cli::cat_bullet("Folds: ", cli::col_cyan(n_folds), bullet = "info", bullet_col = "#F9C74F")
     cli::cat_bullet("Lambda Path Length: ", cli::col_cyan(n_lam), bullet = "info", bullet_col = "#F9C74F")
     cli::cat_bullet("Measure: ", cli::col_cyan(measure_name), bullet = "info", bullet_col = "#F9C74F")
+    cli::cat_bullet("Refit Unpenalized: ", cli::col_cyan(if (x$adjusted) "Yes" else "No"), bullet = "info", bullet_col = "#F9C74F")
 
     cat("\n")
     cli::cat_rule("Optimal Lambdas", col = "#43AA8B")

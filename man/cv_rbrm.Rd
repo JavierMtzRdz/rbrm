@@ -19,6 +19,7 @@ cv_rbrm(object, ...)
   lambda_seq = NULL,
   folds = NULL,
   measure = "deviance",
+  adjusted = TRUE,
   alpha_start = NULL,
   beta_start = NULL,
   seed = NULL,
@@ -34,6 +35,8 @@ cv_rbrm(object, ...)
 \item{...}{Additional arguments.}
 
 \item{measure}{Performance measure: "deviance" (default), "brier", "misclass", or "auc"}
+
+\item{adjusted}{Logical. If TRUE (default), the final model is refitted without penalization on the active set.}
 }
 \description{
 Performs k-fold cross-validation for the RBRM model.

@@ -1,6 +1,40 @@
+#' Refit Unpenalized Model on Active Set
+#'
+#' Helper to refit model without penalization on selected variables.
+#'
+#' @keywords internal
+refit_unpenalized <- function(va, vb, x, y, idx_a, idx_b, ...) {
+    # If sets are empty, return zeros (or intercepts if they were handled? rbrm structure assumes columns)
+    p <- ncol(va)
+    q <- ncol(vb)
+
+    # Check if totally empty
+    if (length(idx_a) == 0 && length(idx_b) == 0) {
+        return(list(alpha = rep(0, p), beta = rep(0, q)))
+    }
+
+    # Subset
+    va_sub <- va[, idx_a, drop = FALSE]
+    vb_sub <- vb[, idx_b, drop = FALSE]
+
+    # Fit with lambda = 0
+    # Note: We assume standardize=FALSE because the passed va/vb are already standardized if needed
+    fit <- fit.rbrm(va_sub, vb_sub, x, y, lambda = 0, standardize = FALSE, ...)
+
+    # Expand
+    alpha_full <- rep(0, p)
+    beta_full <- rep(0, q)
+
+    if (length(idx_a) > 0) alpha_full[idx_a] <- fit$alpha
+    if (length(idx_b) > 0) beta_full[idx_b] <- fit$beta
+
+    return(list(alpha = alpha_full, beta = beta_full))
+}
+
 #' Fit RBRM Regularization Path
 #'
 #' Fits the RBRM model for a sequence of lambda values using warm starts.
+#' Can optionally refit unpenalized models on the active set from the penalized path.
 #'
 #' @param va Matrix of predictors for alpha.
 #' @param vb Matrix of predictors for beta.
@@ -14,14 +48,16 @@
 #' @param standardize Logical. Whether data should be standardized (if not already).
 #'  If TRUE, internal standardization is applied and returned coefficients are on original scale.
 #'  If FALSE, assumes data is prepared (intercepts added, scaling done).
+#' @param adjusted Logical. If TRUE, re-estimates coefficients for active variables without penalization (relaxed fit).
 #' @param ... Additional arguments to fit.rbrm.
-#' @return An object of class `rbrm_path`.
+#' @return An object of class `rbrm_path` (keeping class name for compatibility).
 #' @export
-rbrm_path <- function(va, vb, x, y, lambda_seq = NULL,
-                      nlambda = 100, lambda_min_ratio = 1e-4,
-                      alpha_start = NULL, beta_start = NULL,
-                      standardize = TRUE,
-                      verbose = FALSE, ...) {
+rbrm <- function(va, vb, x, y, lambda_seq = NULL,
+                 nlambda = 100, lambda_min_ratio = 1e-4,
+                 alpha_start = NULL, beta_start = NULL,
+                 standardize = TRUE,
+                 adjusted = FALSE,
+                 verbose = FALSE, ...) {
     if (is.null(vb)) vb <- va
     n <- length(y)
 
@@ -73,17 +109,36 @@ rbrm_path <- function(va, vb, x, y, lambda_seq = NULL,
 
         path_fits[[i]] <- fit
 
-        curr_alpha <- fit$alpha
-        curr_beta <- fit$beta
+        # Determine what to store (adjusted or penalized)
+        if (adjusted) {
+            # Find active sets (using small threshold for robustness against numerical noise)
+            idx_a <- which(abs(fit$alpha) > 1e-12)
+            idx_b <- which(abs(fit$beta) > 1e-12)
 
+            # Refit unpenalized (using current standardized data)
+            refit <- refit_unpenalized(va, vb, x, y, idx_a, idx_b, ...)
+
+            store_alpha <- refit$alpha
+            store_beta <- refit$beta
+        } else {
+            store_alpha <- fit$alpha
+            store_beta <- fit$beta
+        }
+
+        # Store unstandardized version for output
         if (standardize && !is.null(scaler_a)) {
-            res_orig <- unstandardize_coeffs(curr_alpha, curr_beta, scaler_a, scaler_b)
+            res_orig <- unstandardize_coeffs(store_alpha, store_beta, scaler_a, scaler_b)
             path_alphas[[i]] <- res_orig$alpha
             path_betas[[i]] <- res_orig$beta
         } else {
-            path_alphas[[i]] <- curr_alpha
-            path_betas[[i]] <- curr_beta
+            path_alphas[[i]] <- store_alpha
+            path_betas[[i]] <- store_beta
         }
+
+        # Warm start ALWAYS updates from the PENALIZED solution
+        # This preserves the regularization path characteristics
+        curr_alpha <- fit$alpha
+        curr_beta <- fit$beta
 
         if (verbose) cli::cli_progress_update()
     }
@@ -97,7 +152,7 @@ rbrm_path <- function(va, vb, x, y, lambda_seq = NULL,
         scaler_b = scaler_b
     )
 
-    class(res) <- "rbrm_path"
+    class(res) <- "rbrm_path" # Keep attribute as is
     return(res)
 }
 
