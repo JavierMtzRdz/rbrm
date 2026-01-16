@@ -4,7 +4,7 @@
 #' @param vb Matrix for beta.
 #' @return List with standardized matrices and scaler info.
 #' @export
-standardize_rbrm_data <- function(va, vb = NULL) {
+standardize_data <- function(va, vb = NULL) {
     p_a <- ncol(va)
     scaler_a <- list(center = rep(0, p_a), scale = rep(1, p_a))
 
@@ -64,7 +64,7 @@ standardize_rbrm_data <- function(va, vb = NULL) {
 #' Unstandardize RBRM Coefficients
 #'
 #' @export
-unstandardize_rbrm_coeffs <- function(alpha, beta, scaler_a, scaler_b) {
+unstandardize_coeffs <- function(alpha, beta, scaler_a, scaler_b) {
     # Unstandardize alpha
     if (!is.null(alpha) && !is.null(scaler_a)) {
         alpha_orig <- alpha / scaler_a$scale
@@ -88,7 +88,7 @@ unstandardize_rbrm_coeffs <- function(alpha, beta, scaler_a, scaler_b) {
 #' Find Lambda Max for RBRM
 #'
 #' @export
-find_lambda_max_rbrm <- function(va, vb, x, y, alpha_start = NULL, beta_start = NULL, prob_fun = getProbRR.org, intercept = TRUE) {
+find_lambda_max <- function(va, vb, x, y, alpha_start = NULL, beta_start = NULL, prob_fun = getProbRR.org, intercept = TRUE) {
     n <- length(y)
 
     if (is.null(alpha_start)) alpha_start <- rep(0, ncol(va))
@@ -113,7 +113,7 @@ find_lambda_max_rbrm <- function(va, vb, x, y, alpha_start = NULL, beta_start = 
 #' Create Lambda Grid
 #'
 #' @export
-create_lambda_grid_rbrm <- function(lambda_max, nlambda = 100, lambda.min.ratio = 1e-4) {
+create_lambda_grid <- function(lambda_max, nlambda = 100, lambda.min.ratio = 1e-4) {
     if (is.null(lambda_max) || lambda_max == 0) lambda_max <- 1.0 # Fallback
 
     lambdas <- exp(seq(log(lambda_max), log(lambda_max * lambda.min.ratio), length.out = nlambda))
@@ -123,7 +123,7 @@ create_lambda_grid_rbrm <- function(lambda_max, nlambda = 100, lambda.min.ratio 
 #' Calculate RBRM Negative Log-Likelihood
 #'
 #' @export
-calc_rbrm_nll <- function(va, vb, x, y, alpha, beta, prob_fun = getProbRR.org) {
+calc_nll <- function(va, vb, x, y, alpha, beta, prob_fun = getProbRR.org) {
     theta <- as.vector(va %*% alpha)
     phi <- as.vector(vb %*% beta)
 

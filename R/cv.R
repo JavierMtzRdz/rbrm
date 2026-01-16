@@ -48,11 +48,11 @@ cv_rbrm.default <- function(object, vb = NULL, x, y,
     # Lambda Sequence Generation
     if (is.null(lambda_seq)) {
         if (verbose) cli::cli_alert_info("Generating lambda sequence...")
-        std_tmp <- standardize_rbrm_data(va, vb)
+        std_tmp <- standardize_data(va, vb)
 
-        l_max <- find_lambda_max_rbrm(std_tmp$va, std_tmp$vb, x, y, prob_fun = getProbRR.org)
+        l_max <- find_lambda_max(std_tmp$va, std_tmp$vb, x, y, prob_fun = getProbRR.org)
 
-        lambda_seq <- create_lambda_grid_rbrm(l_max, nlambda, lambda_min_ratio)
+        lambda_seq <- create_lambda_grid(l_max, nlambda, lambda_min_ratio)
         if (verbose) cli::cli_alert_success("Generated {length(lambda_seq)} lambdas (Max: {round(l_max, 4)})")
     }
 
@@ -94,7 +94,7 @@ cv_rbrm.default <- function(object, vb = NULL, x, y,
             a_est <- path_fit$alphas[, i]
             b_est <- path_fit$betas[, i]
 
-            nll_val <- calc_rbrm_nll(va_test, vb_test, x_test, y_test, a_est, b_est)
+            nll_val <- calc_nll(va_test, vb_test, x_test, y_test, a_est, b_est)
             nll_mat[k, i] <- nll_val
         }
     }

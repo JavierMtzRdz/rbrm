@@ -32,7 +32,7 @@ rbrm_path <- function(va, vb, x, y, lambda_seq,
     scaler_b <- NULL
 
     if (standardize) {
-        std <- standardize_rbrm_data(va, vb)
+        std <- standardize_data(va, vb)
         va <- std$va
         vb <- std$vb
         scaler_a <- std$scaler_a
@@ -65,7 +65,7 @@ rbrm_path <- function(va, vb, x, y, lambda_seq,
         curr_beta <- fit$beta
 
         if (standardize && !is.null(scaler_a)) {
-            res_orig <- unstandardize_rbrm_coeffs(curr_alpha, curr_beta, scaler_a, scaler_b)
+            res_orig <- unstandardize_coeffs(curr_alpha, curr_beta, scaler_a, scaler_b)
             path_alphas[[i]] <- res_orig$alpha
             path_betas[[i]] <- res_orig$beta
         } else {

@@ -33,7 +33,6 @@ newton_cd_cpp <- function(alpha_start_rcpp, beta_start_rcpp, lambda, intercept, 
     .Call(`_rbrm_newton_cd_cpp`, alpha_start_rcpp, beta_start_rcpp, lambda, intercept, max_iter, va_rcpp, vb_rcpp, x_indicator, y_outcome, prob_fun_selector, lambda_beta, tol, clipping, save_history)
 }
 
-#' @export
 active_set_newton_cd_cpp <- function(alpha_start_rcpp, beta_start_rcpp, lambda, intercept, max_iter, va_rcpp, vb_rcpp, x_indicator, y_outcome, prob_fun_selector, lambda_beta = -1.0, tol = 1e-5, clipping = 1e-10, kkt_check_freq = 10L, active_tol = 1e-6, save_history = FALSE) {
     .Call(`_rbrm_active_set_newton_cd_cpp`, alpha_start_rcpp, beta_start_rcpp, lambda, intercept, max_iter, va_rcpp, vb_rcpp, x_indicator, y_outcome, prob_fun_selector, lambda_beta, tol, clipping, kkt_check_freq, active_tol, save_history)
 }
