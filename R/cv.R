@@ -24,31 +24,44 @@ cv_rbrm.default <- function(object, vb = NULL, x, y,
     va <- object
     if (is.null(vb)) vb <- va
 
+    if (!is.numeric(nfold) || length(nfold) != 1 || nfold < 2) {
+        cli::cli_abort("{.arg nfold} must be an integer >= 2.")
+    }
+    if (!is.numeric(nlambda) || length(nlambda) != 1 || nlambda < 2) {
+        cli::cli_abort("{.arg nlambda} must be an integer >= 2.")
+    }
+
     n <- length(y)
+    if (nrow(va) != n) cli::cli_abort("{.arg va} must have the same number of rows as length of {.arg y}.")
+    if (nrow(vb) != n) cli::cli_abort("{.arg vb} must have the same number of rows as length of {.arg y}.")
+    if (length(x) != n) cli::cli_abort("{.arg x} must have the same length as {.arg y}.")
+
+    if (!all(y %in% c(0, 1))) cli::cli_abort("{.arg y} must contain only 0 and 1.")
+    if (!all(x %in% c(0, 1))) cli::cli_warn("{.arg x} ideally contains only 0 and 1 (treatment indicator).")
+
+    if (!is.null(lambda_seq)) {
+        if (!is.numeric(lambda_seq) || any(lambda_seq < 0)) cli::cli_abort("{.arg lambda_seq} must be numeric and non-negative.")
+    }
+
     if (!is.null(seed)) set.seed(seed)
 
-    # 1. Lambda Sequence Generation
+    # Lambda Sequence Generation
     if (is.null(lambda_seq)) {
         if (verbose) cli::cli_alert_info("Generating lambda sequence...")
-        # Standardize full data temporarily to find max lambda
         std_tmp <- standardize_rbrm_data(va, vb)
 
-        # Calculate max lambda
         l_max <- find_lambda_max_rbrm(std_tmp$va, std_tmp$vb, x, y, prob_fun = getProbRR.org)
 
         lambda_seq <- create_lambda_grid_rbrm(l_max, nlambda, lambda_min_ratio)
         if (verbose) cli::cli_alert_success("Generated {length(lambda_seq)} lambdas (Max: {round(l_max, 4)})")
     }
 
-    # 2. Folds
     if (is.null(folds)) {
-        # Stratified folds if possible?
         folds <- split(sample(seq(n)), rep(1:nfold, length = n))
     } else {
         nfold <- length(folds)
     }
 
-    # 3. CV Loop
     nll_mat <- matrix(NA, nrow = nfold, ncol = length(lambda_seq))
 
     if (verbose) cli::cli_progress_bar("Running Cross-Validation", total = nfold)
@@ -69,8 +82,6 @@ cv_rbrm.default <- function(object, vb = NULL, x, y,
         x_test <- x[idx_test]
         y_test <- y[idx_test]
 
-        # Fit path on training data (standardize=TRUE ensures internal scaling)
-        # The returned path coefficients are on ORIGINAL scale.
         path_fit <- rbrm_path(va_train, vb_train, x_train, y_train,
             lambda_seq = lambda_seq,
             standardize = TRUE,
@@ -83,44 +94,30 @@ cv_rbrm.default <- function(object, vb = NULL, x, y,
             a_est <- path_fit$alphas[, i]
             b_est <- path_fit$betas[, i]
 
-            # Calculate NLL on test set (original scale)
             nll_val <- calc_rbrm_nll(va_test, vb_test, x_test, y_test, a_est, b_est)
             nll_mat[k, i] <- nll_val
         }
     }
 
-    # 4. Aggregate Results
     result <- list()
     result$lambdas <- lambda_seq
     result$nll_fold <- nll_mat
     result$nll_mean <- colMeans(nll_mat, na.rm = TRUE)
     result$nll_se <- apply(nll_mat, 2, sd, na.rm = TRUE) / sqrt(nfold)
 
-    # Optimal Lambdas
     idx_min <- which.min(result$nll_mean)
     result$lambda_min <- lambda_seq[idx_min]
 
-    # 1-SE Rule
     min_nll <- result$nll_mean[idx_min]
     se_min <- result$nll_se[idx_min]
-    # Largest lambda such that error is within min + se
+
     idx_1se <- which(result$nll_mean <= min_nll + se_min)
-    # Since lambdas are decreasing, largest lambda is at the smallest index among those valid
-    # Wait, create_lambda_grid_rbrm returns decreasing?
-    # create_lambda_grid_rbrm uses seq(log(max), log(min)), so decreasing.
-    # So smallest index = largest lambda.
     best_idx_1se <- min(idx_1se)
     result$lambda_1se <- lambda_seq[best_idx_1se]
 
     if (verbose) {
         cli::cli_alert_success("CV Complete. Min Lambda: {format(result$lambda_min, digits=4)}")
     }
-
-    # 5. Final Fit on Full Data
-    # We should return a fit object for lambda_min?
-    # Or fits for the whole path?
-    # Usually glmnet returns the cv object, and user calls fit separately or we fit final model.
-    # Let's fit the path on full data.
 
     if (verbose) cli::cli_alert_info("Fitting final path on full data...")
     result$fit <- rbrm_path(va, vb, x, y, lambda_seq = lambda_seq, standardize = TRUE, verbose = FALSE, ...)

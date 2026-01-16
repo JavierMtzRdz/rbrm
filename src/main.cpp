@@ -1,29 +1,26 @@
 // [[Rcpp::depends(RcppArmadillo)]]
 // [[Rcpp::depends(fntl)]]
-#include <R_ext/Applic.h>  // For lbfgsb
-#include <RcppArmadillo.h> // For Armadillo matrix/vector operations
+#include <R_ext/Applic.h>
+#include <RcppArmadillo.h>
 #include <cmath>
 #include <fntl.h>
 #include <limits>
 #include <string>
 #include <vector>
 
-// Internal helper function (not exported to R)
-// Used by getProbRR_org_cpp
 double getPrbAux_cpp(double x) {
-  if (R_IsNaN(x)) { // Explicitly check for NaN input
+  if (R_IsNaN(x)) {
     return NA_REAL;
   }
   if ((x < 17.0) && (x > -500.0)) {
     return 0.5 * std::exp(x) * (-1.0 + std::sqrt(1.0 + 4.0 * std::exp(-x)));
   } else if (x < 0.0) {
     return 0.0;
-  } else { // x >= 17.0 or x <= -500.0 (and x is not NaN)
+  } else {
     return 1.0;
   }
 }
 
-//' @export
 // [[Rcpp::export]]
 Rcpp::List getProbRR_org_cpp(const Rcpp::NumericVector &logrr,
                              const Rcpp::NumericVector &logop,
@@ -45,11 +42,10 @@ Rcpp::List getProbRR_org_cpp(const Rcpp::NumericVector &logrr,
     double lr = logrr[i];
     double lo = logop[i];
 
-    // Explicit NA check for inputs for this iteration
     if (R_IsNaN(lr) || R_IsNaN(lo)) {
       p0_out[i] = NA_REAL;
       p1_out[i] = NA_REAL;
-      continue; // Skip to the next iteration
+      continue;
     }
 
     double current_p0 = NA_REAL;
@@ -79,7 +75,7 @@ Rcpp::List getProbRR_org_cpp(const Rcpp::NumericVector &logrr,
         double exp_lr = std::exp(lr);
         double exp_lo = std::exp(lo);
         double term1_coeff = exp_lr + 1.0;
-        double expm1_lo = std::expm1(lo); // Use expm1 for precision
+        double expm1_lo = std::expm1(lo);
         double discriminant = std::exp(2.0 * lo) * term1_coeff * term1_coeff +
                               4.0 * std::exp(lr + lo) * (-expm1_lo);
         double sqrt_discriminant = std::sqrt(discriminant);
@@ -104,7 +100,6 @@ Rcpp::List getProbRR_org_cpp(const Rcpp::NumericVector &logrr,
     }
 
     if (R_IsNaN(current_p0)) {
-      // p0 remains NA_REAL
     } else if (!R_finite(current_p0)) {
       current_p0 = (current_p0 > 0) ? (1.0 - clipping) : clipping;
     } else {
@@ -112,7 +107,6 @@ Rcpp::List getProbRR_org_cpp(const Rcpp::NumericVector &logrr,
     }
 
     if (R_IsNaN(current_p1)) {
-      // p1 remains NA_REAL
     } else if (!R_finite(current_p1)) {
       current_p1 = (current_p1 > 0) ? (1.0 - clipping) : clipping;
     } else {
@@ -127,7 +121,6 @@ Rcpp::List getProbRR_org_cpp(const Rcpp::NumericVector &logrr,
                             Rcpp::Named("p1") = p1_out);
 }
 
-//' @export
 // [[Rcpp::export]]
 Rcpp::List getProbRR_alt_cpp(const Rcpp::NumericVector &logrr,
                              const Rcpp::NumericVector &logop,
@@ -145,15 +138,13 @@ Rcpp::List getProbRR_alt_cpp(const Rcpp::NumericVector &logrr,
     double lr = logrr[i];
     double lo = logop[i];
 
-    // Explicit NA check for inputs for this iteration
     if (R_IsNaN(lr) || R_IsNaN(lo)) {
       p0_out[i] = NA_REAL;
       p1_out[i] = NA_REAL;
-      continue; // Skip to the next iteration
+      continue;
     }
 
-    double current_p0 =
-        NA_REAL; // Initialize just in case, though it should be set.
+    double current_p0 = NA_REAL;
 
     double exp_lr = std::exp(lr);
     double exp_lo = std::exp(lo);
@@ -170,7 +161,6 @@ Rcpp::List getProbRR_alt_cpp(const Rcpp::NumericVector &logrr,
     double current_p1 = exp_lr * current_p0;
 
     if (R_IsNaN(current_p0)) {
-      // p0 remains NA_REAL
     } else if (!R_finite(current_p0)) {
       current_p0 = (current_p0 > 0) ? (1.0 - clipping) : clipping;
     } else {
@@ -178,7 +168,6 @@ Rcpp::List getProbRR_alt_cpp(const Rcpp::NumericVector &logrr,
     }
 
     if (R_IsNaN(current_p1)) {
-      // p1 remains NA_REAL
     } else if (!R_finite(current_p1)) {
       current_p1 = (current_p1 > 0) ? (1.0 - clipping) : clipping;
     } else {
@@ -193,12 +182,9 @@ Rcpp::List getProbRR_alt_cpp(const Rcpp::NumericVector &logrr,
                             Rcpp::Named("p1") = p1_out);
 }
 
-//' @export
 // [[Rcpp::export]]
 Rcpp::NumericVector soft_thres_cpp(Rcpp::NumericVector x, double lambda) {
   if (lambda < 0) {
-    // In C++ FISTA, you might handle this error differently or ensure lambda is
-    // valid.
     Rcpp::warning(
         "lambda in soft_thres_cpp should be non-negative. Using abs(lambda).");
     lambda = std::fabs(lambda);
@@ -210,31 +196,27 @@ Rcpp::NumericVector soft_thres_cpp(Rcpp::NumericVector x, double lambda) {
     double val_x = x[i];
     if (R_IsNaN(val_x)) {
       result[i] = NA_REAL;
-    } else if (val_x ==
-               0.0) { // Explicitly handle sign(0)*fmax(0-lambda,0) -> 0
+    } else if (val_x == 0.0) {
       result[i] = 0.0;
     } else {
       double abs_val_x = std::fabs(val_x);
-      double sign_val_x =
-          (val_x > 0) - (val_x < 0); // Efficient sign: 1, -1, or 0
+      double sign_val_x = (val_x > 0) - (val_x < 0);
       result[i] = sign_val_x * std::fmax(0.0, abs_val_x - lambda);
     }
   }
   return result;
 }
 
-//' @export
 // [[Rcpp::export]]
 double nllh_cpp(const arma::vec &alpha, const arma::vec &beta,
                 const arma::mat &va, const arma::mat &vb,
-                const Rcpp::NumericVector &x_indicator, // Assumed to be 0/1
-                const Rcpp::NumericVector &y_outcome,   // Assumed to be 0/1
-                int prob_fun, double clipping = 1e-10) {
+                const Rcpp::NumericVector &x_indicator,
+                const Rcpp::NumericVector &y_outcome, int prob_fun,
+                double clipping = 1e-10) {
 
   int n = y_outcome.size();
   if (n == 0) {
-    return 0.0; // Or R_PosInf or an error, consistent with R version if n can
-                // be 0
+    return 0.0;
   }
   if (x_indicator.size() != n) {
     Rcpp::stop("In nllh_cpp: x_indicator length must match y_outcome length.");
@@ -247,15 +229,11 @@ double nllh_cpp(const arma::vec &alpha, const arma::vec &beta,
     if (va.n_rows == n && va.n_cols == alpha.n_elem) {
       logrr_arma = va * alpha;
     } else {
-      // Handle mismatched dimensions robustly if this function could be called
-      // with them
       Rcpp::Rcout << "Warning: Dimension mismatch or empty va for alpha in "
                      "nllh_cpp. va rows: "
                   << va.n_rows << ", va cols: " << va.n_cols
                   << ", alpha elems: " << alpha.n_elem << ", n: " << n
                   << std::endl;
-      // Depending on desired behavior, either stop or ensure logrr_arma remains
-      // zeros. For now, it remains zeros if condition not met.
       if (va.n_rows != n && alpha.n_elem > 0)
         Rcpp::stop("va rows incorrect for n");
       if (va.n_cols != alpha.n_elem && alpha.n_elem > 0)
@@ -283,9 +261,7 @@ double nllh_cpp(const arma::vec &alpha, const arma::vec &beta,
   Rcpp::NumericVector logop_rcpp = Rcpp::wrap(logop_arma);
 
   Rcpp::List ps;
-  // Pass 1e-15 to prob fun as base clipping, but nllh clips to 'clipping'
-  // (1e-10) Actually, R nllh relies on prob_fun clipping to 'clipping' (1e-10).
-  // So we should pass 'clipping' to getProbRR call here.
+
   if (prob_fun == 0) {
     ps = getProbRR_org_cpp(logrr_rcpp, logop_rcpp, clipping);
   } else if (prob_fun == 1) {
@@ -303,20 +279,10 @@ double nllh_cpp(const arma::vec &alpha, const arma::vec &beta,
     double p0 = p0_vec[i];
     double p1 = p1_vec[i];
 
-    // prob_fun already clipped to 'clipping'.
-    // R nllh does NOT clip again.
-    // So we don't clip again here unless we want safety against NA.
-
-    // Safety against NaN/Inf already handled in getProbRR clipping (if we trust
-    // it) But let's be safe against 0 or 1 if clipping didn't catch something.
-    // However, if clipping >= 1e-15, it should be fine.
-
     double yi = y_outcome[i];
 
     if (x_indicator[i] == 0) {
       if (R_IsNaN(p0) || p0 <= 0 || (1.0 - p0) <= 0) {
-        // If p0 is 0 or 1 despite clipping, clamp it.
-        // This handles cases where clipping might be 0.0 if user passed 0.
         if (p0 <= 0)
           p0 = 1e-15;
         if (p0 >= 1)
@@ -327,7 +293,7 @@ double nllh_cpp(const arma::vec &alpha, const arma::vec &beta,
         }
       }
       nll_sum -= (yi * std::log(p0) + (1.0 - yi) * std::log(1.0 - p0));
-    } else { // x_indicator[i] == 1
+    } else {
       if (R_IsNaN(p1) || p1 <= 0 || (1.0 - p1) <= 0) {
         if (p1 <= 0)
           p1 = 1e-15;
@@ -341,22 +307,20 @@ double nllh_cpp(const arma::vec &alpha, const arma::vec &beta,
       nll_sum -= (yi * std::log(p1) + (1.0 - yi) * std::log(1.0 - p1));
     }
     if (R_IsNaN(nll_sum))
-      break; // Propagate NaN early
+      break;
   }
 
   if (!R_finite(nll_sum)) {
     return R_PosInf;
   }
 
-  // Ensure n is not zero to prevent division by zero if that's possible
   if (n > 0) {
     return nll_sum / static_cast<double>(n);
   } else {
-    return 0.0; // Or appropriate value for n=0, R code returns 0/0 = NaN -> Inf
+    return 0.0;
   }
 }
 
-//' @export
 // [[Rcpp::export]]
 double penalized_nllh_cpp(const arma::vec &alpha, const arma::vec &beta,
                           const arma::mat &va, const arma::mat &vb,
@@ -368,14 +332,13 @@ double penalized_nllh_cpp(const arma::vec &alpha, const arma::vec &beta,
   double unpenalized_nllh =
       nllh_cpp(alpha, beta, va, vb, x_indicator, y_outcome, prob_fun, clipping);
 
-  // If nllh is Inf (or NaN which becomes Inf), propagate it.
   if (unpenalized_nllh == R_PosInf || !R_finite(unpenalized_nllh)) {
     return R_PosInf;
   }
 
   double penalty = 0.0;
 
-  if (lambda > 0) { // Only calculate penalty if lambda is non-zero
+  if (lambda > 0) {
     double l1_norm_alpha = 0.0;
     if (alpha.n_elem > 0) {
       int start_idx_alpha = (intercept && alpha.n_elem > 0) ? 1 : 0;
@@ -386,11 +349,6 @@ double penalized_nllh_cpp(const arma::vec &alpha, const arma::vec &beta,
 
     double l1_norm_beta = 0.0;
     if (beta.n_elem > 0) {
-      // Assuming beta might also have an intercept conceptually, or always
-      // penalize all of beta R code was sum(abs(beta[if(intercept) -1 else
-      // TRUE])) This implies if intercept=TRUE, beta[1] is also an intercept.
-      // Adjust if this assumption is wrong. If beta has no intercept,
-      // start_idx_beta should always be 0.
       int start_idx_beta = (intercept && beta.n_elem > 0) ? 1 : 0;
       for (arma::uword i = start_idx_beta; i < beta.n_elem; ++i) {
         l1_norm_beta += std::fabs(beta[i]);
@@ -407,8 +365,7 @@ inline bool same_cpp(double x, double y = 0.0, double eps = 1e-8) {
   return std::fabs(x - y) < eps;
 }
 
-// Derivative of p0 with respect to theta (Richardson parameterization)
-// Port of R function dp0_theta
+// Derivative of p0 with respect to theta
 arma::vec dp0_theta_richardson_cpp(const arma::vec &theta,
                                    const arma::vec &phi) {
   int n = theta.n_elem;
@@ -463,8 +420,7 @@ arma::vec dp0_theta_richardson_cpp(const arma::vec &theta,
   return dp0_dtheta;
 }
 
-// Derivative of p0 with respect to phi (Richardson parameterization)
-// Port of R function dp0_phi
+// Derivative of p0 with respect to phi
 arma::vec dp0_phi_richardson_cpp(const arma::vec &theta, const arma::vec &phi) {
   int n = theta.n_elem;
   arma::vec dp0_dphi(n);
@@ -480,7 +436,7 @@ arma::vec dp0_phi_richardson_cpp(const arma::vec &theta, const arma::vec &phi) {
     bool is_boundary = (p < -12) || (p > 12) || (t < -12) || (t > 12);
     bool is_south_edge = (t < -12) || ((p < -12) && (t < 0));
     bool is_west_edge = (t > 12) || ((p < -12) && (t > 0));
-    (void)is_west_edge; // Silence unused warning
+    (void)is_west_edge;
     bool is_phi_zero = same_cpp(p, 0.0);
 
     if (is_boundary) {
@@ -527,16 +483,11 @@ arma::vec dp0_theta_pozza_cpp(const arma::vec &theta, const arma::vec &phi) {
     double t = theta[i];
     double p = phi[i];
 
-    // R Formula: sqrt(((exp(theta) + 1) * exp(phi) + 1)^2 - 4 * exp(2 * phi +
-    // theta))
     double exp_t = std::exp(t);
     double exp_p = std::exp(p);
     double term_acc = (exp_t + 1.0) * exp_p + 1.0;
     double sqrt_term =
         std::sqrt(term_acc * term_acc - 4.0 * std::exp(2.0 * p + t));
-
-    // Original formula is split:
-    // result = term1 - term2
 
     double part1_num =
         2.0 * term_acc * std::exp(p + t) - 4.0 * std::exp(2.0 * p + t);
@@ -568,7 +519,6 @@ arma::vec dp0_phi_pozza_cpp(const arma::vec &theta, const arma::vec &phi) {
     double sqrt_term =
         std::sqrt(term_acc * term_acc - 4.0 * std::exp(2.0 * p + t));
 
-    // R Formula:
     double partA =
         2.0 * (exp_t + 1.0) * exp_p * term_acc - 8.0 * std::exp(2.0 * p + t);
     double partB = partA / (2.0 * sqrt_term);
@@ -583,7 +533,6 @@ arma::vec dp0_phi_pozza_cpp(const arma::vec &theta, const arma::vec &phi) {
 }
 
 // Analytical gradient for alpha using correct gradient formula
-//' @export
 // [[Rcpp::export]]
 arma::vec
 grad_nll_alpha_analytical_cpp(const arma::vec &alpha, const arma::vec &beta,
@@ -664,7 +613,6 @@ grad_nll_alpha_analytical_cpp(const arma::vec &alpha, const arma::vec &beta,
 }
 
 // Analytical gradient for beta
-//' @export
 // [[Rcpp::export]]
 arma::vec grad_nll_beta_analytical_cpp(const arma::vec &alpha,
                                        const arma::vec &beta,
@@ -744,8 +692,7 @@ arma::vec grad_nll_beta_analytical_cpp(const arma::vec &alpha,
   return grad_beta;
 }
 
-// --- Newton-CD Optimizer in C++ ---
-//' @export
+// Newton-CD Optimizer
 // [[Rcpp::export]]
 Rcpp::List newton_cd_cpp(Rcpp::NumericVector alpha_start_rcpp,
                          Rcpp::NumericVector beta_start_rcpp, double lambda,
@@ -792,7 +739,7 @@ Rcpp::List newton_cd_cpp(Rcpp::NumericVector alpha_start_rcpp,
         penalized_nllh_cpp(alpha, beta, va, vb, x_indicator, y_outcome, lambda,
                            intercept, prob_fun_selector, clipping);
 
-    // 1. Compute Analytical Gradient
+    // Compute Analytical Gradient
     arma::vec g_alpha =
         grad_nll_alpha_analytical_cpp(alpha, beta, va, vb, x_indicator,
                                       y_outcome, prob_fun_selector, clipping);
@@ -804,7 +751,7 @@ Rcpp::List newton_cd_cpp(Rcpp::NumericVector alpha_start_rcpp,
     g_alpha.elem(arma::find_nonfinite(g_alpha)).zeros();
     g_beta.elem(arma::find_nonfinite(g_beta)).zeros();
 
-    // 2. Compute Weights for Diagonal Hessian
+    // Compute Weights for Diagonal Hessian
     arma::vec theta = va * alpha;
     arma::vec phi = vb * beta;
 
@@ -844,7 +791,7 @@ Rcpp::List newton_cd_cpp(Rcpp::NumericVector alpha_start_rcpp,
           1e-6;
     }
 
-    // 3. Coordinate Descent Update
+    // Coordinate Descent Update
     arma::vec z_alpha = alpha % h_alpha - g_alpha;
     arma::vec z_beta = beta % h_beta - g_beta;
 
@@ -866,11 +813,9 @@ Rcpp::List newton_cd_cpp(Rcpp::NumericVector alpha_start_rcpp,
       beta_new[j] = thresh_j[0] / h_beta[j];
     }
 
-    // 4. Line Search (Backtracking)
+    // Line Search (Backtracking)
     arma::vec d_alpha = alpha_new - alpha;
     arma::vec d_beta = beta_new - beta;
-
-    // Line search
 
     double step_ls = 1.0;
     bool accepted = false;
@@ -891,10 +836,8 @@ Rcpp::List newton_cd_cpp(Rcpp::NumericVector alpha_start_rcpp,
           betas_hist.row(iter) = beta.t();
         }
 
-        // Update obj_prev for next iteration's check!
         obj_prev = obj_cand;
 
-        // Check convergence on the ACTUAL step taken
         double step_norm_a =
             (d_alpha.n_elem > 0) ? arma::abs(d_alpha).max() * step_ls : 0.0;
         double step_norm_b =
@@ -929,7 +872,6 @@ Rcpp::List newton_cd_cpp(Rcpp::NumericVector alpha_start_rcpp,
       penalized_nllh_cpp(alpha, beta, va, vb, x_indicator, y_outcome, lambda,
                          intercept, prob_fun_selector, clipping);
 
-  // Return results (compatible with R interface)
   return Rcpp::List::create(
       Rcpp::Named("alpha") = Rcpp::wrap(alpha),
       Rcpp::Named("beta") = Rcpp::wrap(beta),
@@ -948,7 +890,6 @@ Rcpp::List newton_cd_cpp(Rcpp::NumericVector alpha_start_rcpp,
                                         : R_NilValue);
 }
 
-//' @export
 // [[Rcpp::export]]
 Rcpp::List active_set_newton_cd_cpp(
     Rcpp::NumericVector alpha_start_rcpp, Rcpp::NumericVector beta_start_rcpp,
@@ -999,12 +940,7 @@ Rcpp::List active_set_newton_cd_cpp(
 
     // KKT Check logic
     bool check_kkt = (iter == 0) || ((iter + 1) % kkt_check_freq == 0);
-    // Note: R implementation checks at iter=1 (first step) which means
-    // effectively it computes full gradient first. Here iter 0 is first.
 
-    // Calculate Theta and Phi (Efficiently using active set)
-    // Inactive alpha/beta are 0. So full va*alpha is same as
-    // va_act * alpha_act.
     arma::uvec alpha_idx = arma::find(active_alpha);
     arma::uvec beta_idx = arma::find(active_beta);
 
@@ -1018,7 +954,6 @@ Rcpp::List active_set_newton_cd_cpp(
       phi = vb.cols(beta_idx) * beta.elem(beta_idx);
     }
 
-    // Compute Probabilities and Weights (O(n))
     Rcpp::NumericVector theta_rcpp = Rcpp::wrap(theta);
     Rcpp::NumericVector phi_rcpp = Rcpp::wrap(phi);
 
@@ -1036,17 +971,6 @@ Rcpp::List active_set_newton_cd_cpp(
     arma::vec inner_alpha(n);
     arma::vec inner_beta(n);
 
-    // This loop computes weights AND inner vector elements for gradient reuse
-    // Gradient calculation:
-    // grad = -X' * inner
-    // inner_alpha_i = dllh/dp * dp/dtheta
-    // inner_beta_i = dllh/dp * dp/dphi
-    // Reuse logic from analytical gradient functions, but optimized loop?
-    // We can't easily reuse the exported functions because they take full
-    // alpha/beta and recompute everything. We want to reuse `theta`, `phi`,
-    // `ps`.
-
-    // We need dp0_dtheta/dphi.
     arma::vec dp0_dtheta;
     arma::vec dp0_dphi;
     if (prob_fun_selector == 0) {
@@ -1062,8 +986,7 @@ Rcpp::List active_set_newton_cd_cpp(
 
     for (int i = 0; i < n; ++i) {
 
-      // Let's copy exact logic from analytical_gradient
-      double p0_i = p0_vec[i]; // raw
+      double p0_i = p0_vec[i];
       if (same_cpp(p0_i + dp0_dtheta[i], 0.0)) {
         dp1_dtheta[i] = 0.0;
       } else {
@@ -1092,11 +1015,7 @@ Rcpp::List active_set_newton_cd_cpp(
                               ? (p0_c <= clipping || p0_c >= 1.0 - clipping)
                               : (p1_c <= clipping || p1_c >= 1.0 - clipping);
 
-      if (is_clipped_p &&
-          false) { // R doesn't seem to zero gradient on clipped?
-        // R grad_nll: clipping affects P used in dllh/dp terms.
-        // My C++ grad uses explicit `is_clipped` check to zero `inner`.
-        // Let's stick to C++ grad logic.
+      if (is_clipped_p && false) {
         inner_alpha[i] = 0.0;
         inner_beta[i] = 0.0;
       } else {
@@ -1108,17 +1027,12 @@ Rcpp::List active_set_newton_cd_cpp(
       }
     }
 
-    // Now compute Gradient and Hessian (Subset or Full)
+    // compute Gradient and Hessian
     arma::vec g_alpha;
     arma::vec h_alpha;
     arma::vec g_beta;
     arma::vec h_beta;
 
-    // We need full containers if check_kkt is true, but we can just compute
-    // subsets + violations To minimize memory, let's keep g as sparse or full?
-    // Armadillo vec is dense.
-
-    // Alpha
     g_alpha = arma::vec(pa, arma::fill::zeros);
     h_alpha = arma::vec(pa, arma::fill::zeros);
 
@@ -1126,11 +1040,6 @@ Rcpp::List active_set_newton_cd_cpp(
       // Compute full G and H
       if (pa > 0) {
         g_alpha = -(va.t() * inner_alpha) / static_cast<double>(n);
-        // Full H diagonal
-        // h[j] = dot(v_j^2, w)
-        // This is va.each_col() op?
-        // arma::sum(square(va).each_col() % weights) ?
-        // Or loop. O(np).
         for (int j = 0; j < pa; ++j) {
           h_alpha[j] = arma::dot(va.col(j) % va.col(j), weights) / n + 1e-6;
         }
@@ -1181,17 +1090,12 @@ Rcpp::List active_set_newton_cd_cpp(
       if (lambda > 0) {
         arma::uvec inactive_idx = arma::find(active_alpha == 0);
         if (inactive_idx.n_elem > 0) {
-          // z = alpha * h - g. But alpha=0. so z = -g.
-          // violated: abs(-g) > lambda + tol
           for (arma::uword k = 0; k < inactive_idx.n_elem; ++k) {
             int j = inactive_idx[k];
-            // Skip intercept KKT check (intercept always active usually, but if
-            // not?)
             if (intercept && j == 0)
               continue;
             if (std::abs(-g_alpha[j]) > lambda + active_tol) {
               active_alpha[j] = 1;
-              // Update H for this new active var (needed for update step)
               h_alpha[j] = arma::dot(va.col(j) % va.col(j), weights) / n + 1e-6;
             }
           }
@@ -1213,7 +1117,7 @@ Rcpp::List active_set_newton_cd_cpp(
       }
     }
 
-    // Coordinate Descent Update (Only Active)
+    // Coordinate Descent Update
     arma::vec alpha_new = alpha;
     arma::vec beta_new = beta;
 
@@ -1225,7 +1129,6 @@ Rcpp::List active_set_newton_cd_cpp(
     for (arma::uword k = 0; k < alpha_idx.n_elem; ++k) {
       int j = alpha_idx[k];
       double lam_j = (intercept && j == 0) ? 0.0 : lambda;
-      // z = alpha*h - g
       double z_val = alpha[j] * h_alpha[j] - g_alpha[j];
 
       // Soft thres
@@ -1236,7 +1139,7 @@ Rcpp::List active_set_newton_cd_cpp(
           thresh_val = std::fmax(0.0, abs_z - lam_j) * 1.0;
         else if (z_val < 0)
           thresh_val = std::fmax(0.0, abs_z - lam_j) * -1.0;
-      } else { // Should not happen
+      } else {
         thresh_val = z_val;
       }
 
@@ -1260,10 +1163,6 @@ Rcpp::List active_set_newton_cd_cpp(
       beta_new[j] = thresh_val / h_beta[j];
     }
 
-    // Shrink inactive to 0 (already 0, but safe)
-    // Actually active vars might become 0.
-
-    // Line Search
     arma::vec d_alpha = alpha_new - alpha;
     arma::vec d_beta = beta_new - beta;
 
@@ -1289,7 +1188,6 @@ Rcpp::List active_set_newton_cd_cpp(
         // Update obj_prev for next iteration
         obj_prev = obj_cand;
 
-        // Check convergence on the ACTUAL step taken
         double step_norm_a =
             (d_alpha.n_elem > 0) ? arma::abs(d_alpha).max() * step_ls : 0.0;
         double step_norm_b =
@@ -1314,9 +1212,6 @@ Rcpp::List active_set_newton_cd_cpp(
       break;
     }
 
-    // Update Active Sets (Shrink)
-    // Remove if abs <= active_tol
-    // Intercept always active
     if (lambda > 0) {
       for (int j = 0; j < pa; ++j) {
         if (active_alpha[j]) {
@@ -1384,7 +1279,6 @@ Rcpp::List fista_cpp(Rcpp::NumericVector alpha_start_rcpp,
   if (lambda_beta < 0)
     lambda_beta = lambda;
 
-  // Helper for full objective (handling lambda_beta correctly)
   auto calc_obj = [&](const arma::vec &a, const arma::vec &b) {
     double val = nllh_cpp(a, b, va, vb, x_indicator, y_outcome,
                           prob_fun_selector, clipping);
@@ -1401,7 +1295,7 @@ Rcpp::List fista_cpp(Rcpp::NumericVector alpha_start_rcpp,
   // Initialize FISTA variables
   arma::vec alpha_y = alpha;
   arma::vec beta_y = beta;
-  arma::vec alpha_old = alpha; // x_k
+  arma::vec alpha_old = alpha;
   arma::vec beta_old = beta;
 
   double t_k = 1.0;
@@ -1426,7 +1320,7 @@ Rcpp::List fista_cpp(Rcpp::NumericVector alpha_start_rcpp,
   double nll_current = calc_obj(alpha, beta);
 
   for (int k = 0; k < max_iter; ++k) {
-    // 1. Compute Gradient at y_k
+    // Compute Gradient at y_k
     arma::vec grad_alpha =
         grad_nll_alpha_analytical_cpp(alpha_y, beta_y, va, vb, x_indicator,
                                       y_outcome, prob_fun_selector, clipping);
@@ -1434,16 +1328,11 @@ Rcpp::List fista_cpp(Rcpp::NumericVector alpha_start_rcpp,
         grad_nll_beta_analytical_cpp(alpha_y, beta_y, va, vb, x_indicator,
                                      y_outcome, prob_fun_selector, clipping);
 
-    // 2. Backtracking Line Search
+    // Backtracking Line Search
     double nll_y = nllh_cpp(alpha_y, beta_y, va, vb, x_indicator, y_outcome,
                             prob_fun_selector, clipping);
 
-    // Fallback if nll_y is not finite (should rarely happen if previous steps
-    // were safe)
     if (!R_finite(nll_y)) {
-      // Can't trust gradient if point is invalid.
-      // Usually means step size too big previously or momentum pushed out.
-      // Reset to x_k (no momentum) and retry?
       alpha_y = alpha;
       beta_y = beta;
       t_k = 1.0;
@@ -1460,27 +1349,16 @@ Rcpp::List fista_cpp(Rcpp::NumericVector alpha_start_rcpp,
                        prob_fun_selector, clipping);
     }
 
-    // Monotone FISTA: Ensure F(x_{k+1}) <= F(x_k)
-    // We generated candidate x_{k+1} (alpha_new) from y_k.
-    // We will check its NLL later.
-
     arma::vec alpha_new, beta_new;
     double current_step = step_size;
 
-    // Try to increase step size slightly from previous success (adaptive)?
-    // Standard approach: start with previous step size.
-    // Some implementations try current_step * 1.2 first. Let's stick to safe
-    // start.
-
-    double nll_new = nll_y; // Default if loop doesn't run or first iter check
-                            // fails? No, loop updates it.
-    for (int j = 0; j < 50; ++j) { // Limit backtracks
-      // Gradient Step
+    double nll_new = nll_y;
+    for (int j = 0; j < 50; ++j) {
       arma::vec z_alpha = alpha_y - current_step * grad_alpha;
       arma::vec z_beta = beta_y - current_step * grad_beta;
 
-      // Proximal Operator (Soft Thresholding)
-      alpha_new = z_alpha; // Copies structure
+      // Proximal Operator
+      alpha_new = z_alpha;
       int start_idx_a = (intercept && alpha.n_elem > 0) ? 1 : 0;
       for (arma::uword i = start_idx_a; i < alpha.n_elem; ++i) {
         double val = z_alpha[i];
@@ -1522,7 +1400,6 @@ Rcpp::List fista_cpp(Rcpp::NumericVector alpha_start_rcpp,
       double dot_grad =
           arma::dot(grad_alpha, diff_a) + arma::dot(grad_beta, diff_b);
 
-      // Q(x, y) = f(y) + <g, x-y> + 1/2t ||x-y||^2
       double rhs =
           nll_y + dot_grad + (1.0 / (2.0 * current_step)) * sq_norm_diff;
 
@@ -1533,13 +1410,8 @@ Rcpp::List fista_cpp(Rcpp::NumericVector alpha_start_rcpp,
       current_step *= shrink_factor;
     }
 
-    step_size = current_step; // Save for next iter
+    step_size = current_step;
 
-    // Check convergence on x_k (alpha vs alpha_new) or x_{k+1} - x_k?
-    // Usually ||x_{k+1} - x_k|| / max(1, ||x_k||) or similar.
-    // Using absolute change as consistent with Newton-CD check.
-
-    // alpha_new is x_{k+1}. alpha is x_k.
     arma::vec change_a = alpha_new - alpha;
     arma::vec change_b = beta_new - beta;
     double max_change =
@@ -1557,7 +1429,7 @@ Rcpp::List fista_cpp(Rcpp::NumericVector alpha_start_rcpp,
       break;
     }
 
-    // --- Monotonicity Check (Restart) ---
+    // Monotonicity Check
     if (nll_new > nll_current) {
       // Reject momentum step. Restart to x_k.
       alpha_y = alpha;
@@ -1640,9 +1512,6 @@ Rcpp::List fista_cpp(Rcpp::NumericVector alpha_start_rcpp,
     t_k_next = (1.0 + std::sqrt(1.0 + 4.0 * t_k * t_k)) / 2.0;
     double momentum = (t_k - 1.0) / t_k_next;
 
-    // Restart logic? If gradient direction opposes momentum.
-    // Optional. For now standard FISTA.
-
     alpha_y = alpha_new + momentum * (alpha_new - alpha);
     beta_y = beta_new + momentum * (beta_new - beta);
 
@@ -1656,11 +1525,6 @@ Rcpp::List fista_cpp(Rcpp::NumericVector alpha_start_rcpp,
     if (save_history) {
       alphas_hist.row(k) = alpha.t();
       betas_hist.row(k) = beta.t();
-      // nll_hist(k) = nll_new; // Need to access nll_new, but it is local to
-      // loop. nll_new is computed in line search. I need to surface it or
-      // recompute. Recomputing is redundant. Assuming line search accepted,
-      // nll_new is valid. But nll_new is strictly local. I should bubble it
-      // out. For now, recomputing or storing last valid nll_y.
       nll_hist(k) = nll_current;
     }
   }
@@ -1687,7 +1551,7 @@ Rcpp::List fista_cpp(Rcpp::NumericVector alpha_start_rcpp,
                                         : R_NilValue);
 }
 
-// --- L-BFGS Optimizer (Wrapper for R API) ---
+// L-BFGS Optimizer
 
 struct LBFGS_Data {
   const arma::mat &va;
@@ -1731,15 +1595,8 @@ void lbfgs_grad(int n, double *par, double *gr, void *ex) {
       alpha, beta, data->va, data->vb, data->x_indicator, data->y_outcome,
       data->prob_fun_selector, data->clipping);
 
-  // Add L1 penalty subgradient (approximated or omitted? Standard optim adds it
-  // if fn has it) penalized_nllh includes penalty. Gradients should too. L1
-  // derivative is sign(x) * lambda. Note: L-BFGS on non-smooth is risky.
-
-  // Copy to gr output
-  // Alpha part
   for (int i = 0; i < data->pa; ++i) {
     double penalty = 0.0;
-    // Don't penalize intercept if it exists and is first index
     if (!(data->intercept && i == 0)) {
       if (alpha[i] > 0)
         penalty = data->lambda;
@@ -1762,7 +1619,6 @@ void lbfgs_grad(int n, double *par, double *gr, void *ex) {
   }
 }
 
-// ' @export
 // [[Rcpp::export]]
 Rcpp::List lbfgs_cpp(Rcpp::NumericVector alpha_start_rcpp,
                      Rcpp::NumericVector beta_start_rcpp, double lambda,
@@ -1790,19 +1646,15 @@ Rcpp::List lbfgs_cpp(Rcpp::NumericVector alpha_start_rcpp,
   for (int i = 0; i < pb; ++i)
     par[pa + i] = beta_start_rcpp[i];
 
-  // Bounds (Unbounded for now, but lbfgsb requires them)
-  // We can set +/- Inf
+  // Bounds
   std::vector<double> lower(n_params, -std::numeric_limits<double>::infinity());
   std::vector<double> upper(n_params, std::numeric_limits<double>::infinity());
-  std::vector<int> nbd(n_params, 0); // 0 means unbounded
+  std::vector<int> nbd(n_params, 0);
 
-  // L-BFGS-B parameters
-  int m = 5; // Memory
+  int m = 5;
   int fail = 0;
-  double factr = 1e7; // Default factr ~ 1e-5 relative tolerance?
-  // factr is tolerance on reduction factor. 1e7 is low precision (approx 1e-8
-  // machine epsilon?) R optim default is 1e7.
-  double pgtol = tol; // Gradient tolerance
+  double factr = 1e7;
+  double pgtol = tol;
   int fncount = 0;
   int grcount = 0;
   int trace = 0;
@@ -1828,14 +1680,11 @@ Rcpp::List lbfgs_cpp(Rcpp::NumericVector alpha_start_rcpp,
   for (int i = 0; i < pb; ++i)
     beta_out[i] = par[pa + i];
 
-  bool converged =
-      (fail == 0); // fail=0 usually means convergence (or no error)
+  bool converged = (fail == 0);
 
   return Rcpp::List::create(
       Rcpp::Named("alpha") = alpha_out, Rcpp::Named("beta") = beta_out,
-      Rcpp::Named("convergence") = converged, // fail code?
-      Rcpp::Named("step") =
-          fncount, // or generic iterations? fncount roughly resembles
+      Rcpp::Named("convergence") = converged, Rcpp::Named("step") = fncount,
       Rcpp::Named("final_nll") = Fmin,
       Rcpp::Named("message") = std::string(msg));
 }

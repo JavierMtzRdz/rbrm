@@ -20,13 +20,13 @@ dp0_theta <- function(theta, phi,
 
     # Apply the conditions to calculate p0.
 
-    # Case 1: "on the boundary"
+    # Case on the boundary
     idx_south_not_ext <- (is_boundary & is_south_edge) & ((x < 17) & (x > (-500)))
     idx_south_ext <- (is_boundary & is_south_edge) & !((x < 17) & (x > (-500)))
 
     y_val <- 4 * exp(-x[idx_south_not_ext])
     sqrt_term <- sqrt(y_val + 1)
-    term1 <- -y_val / (1 + sqrt_term) # (1 - sqrt(1+y))
+    term1 <- -y_val / (1 + sqrt_term)
     dp0.theta[idx_south_not_ext] <-
       (0.5 * term1 * sqrt_term * exp(x[idx_south_not_ext]) + 1.0) / sqrt_term
 
@@ -37,14 +37,13 @@ dp0_theta <- function(theta, phi,
     )
 
 
-    # Case 2: "not on the boundary"
+    # Case not on the boundary
     not_boundary_indices <- !is_boundary
 
     dp0.theta[not_boundary_indices & is_phi_zero] <- -exp(theta[not_boundary_indices & is_phi_zero]) / (1 + exp(theta[not_boundary_indices & is_phi_zero]))^2
 
     # Calculate for the quadratic equation case
     quadratic_indices <- not_boundary_indices & !is_phi_zero
-
 
     dp0.theta[quadratic_indices] <- (-exp(phi - theta) / (2 * expm1_phi) + exp(phi) /
       (expm1_phi * sqrt(4 * exp(phi + theta) + expm1_theta^2 * exp(2 * phi))) + (exp(-theta) * (-expm1_theta) *
@@ -66,7 +65,7 @@ dp0_theta <- function(theta, phi,
   }
 }
 # derivative of pi0 with respect to phi
-# written in a different way compared to thesis
+
 dp0_phi <- function(theta, phi,
                     ps_spe = c("Richardson", "Pozza"), ep = 1e-8) {
   ps_spe <- rlang::arg_match(ps_spe)
@@ -87,7 +86,7 @@ dp0_phi <- function(theta, phi,
 
     # Apply the conditions to calculate p0.
 
-    # Case 1: "on the boundary"
+    # Case on the boundary
     idx_south_not_ext <- (is_boundary & is_south_edge) & ((x < 17) & (x > (-500)))
     idx_south_ext <- (is_boundary & is_south_edge) & !((x < 17) & (x > (-500)))
 
@@ -100,7 +99,7 @@ dp0_phi <- function(theta, phi,
     dp0.phi[is_boundary & is_west_edge] <- 0
     dp0.phi[is_boundary & !(is_south_edge | is_west_edge)] <- 0
 
-    # Case 2: "not on the boundary"
+    # Case not on the boundary
     not_boundary_indices <- !is_boundary
 
     dp0.phi[not_boundary_indices & is_phi_zero] <- (exp(theta[not_boundary_indices & is_phi_zero]) /

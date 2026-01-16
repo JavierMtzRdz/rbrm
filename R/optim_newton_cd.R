@@ -5,7 +5,7 @@
 #'
 #' @export
 optim_newton_cd <- function(alpha_start, beta_start,
-                            step_size_alpha, step_size_beta, # Ignored
+                            step_size_alpha, step_size_beta,
                             lambda,
                             intercept,
                             max_step,
@@ -28,7 +28,6 @@ optim_newton_cd <- function(alpha_start, beta_start,
     if (save_history) {
         alphas <- matrix(0, max_step, pa)
         betas <- matrix(0, max_step, pb)
-        # Gradient history?
         grad_alphas <- matrix(0, max_step, pa)
         grad_betas <- matrix(0, max_step, pb)
         nllh_results <- vector("numeric", max_step)
@@ -55,63 +54,31 @@ optim_newton_cd <- function(alpha_start, beta_start,
     for (iter in 1:max_step) {
         obj_prev <- calc_obj(alpha, beta)
 
-        # Compute Gradient and Diagonal Hessian
-        # Analytical Gradient
         grads <- grad_nll(alpha, beta, y, x, va, vb, prob_fun, opt = "both", method = "analytical", clipping = clip)
         g_alpha <- grads$grad_alpha
         g_beta <- grads$grad_beta
 
-        # Diagonal Hessian Approximation
-        # We can use a simple numerical approximation: (g(x+h) - g(x)) / h
-        # Or strict diagonal of Hessian if available.
-        # For robustness, let's use a "Trust Region" style positive diagonal approx
-        # or just fixed step size if Hessian is ill-conditioned.
-        # To be high-dim efficient, we need a vector.
-        # Let's approximate diagonal H approx by finite difference of gradients on each dimension?
-        # No, that's O(p) function evaluations (expensive for huge p).
-        # Better: Use variance of X * weights?
-        # W_ii ~ p(1-p).
-        # h_j ~ sum_i X_ij^2 * W_ii.
-        # Let's compute weights W_ii.
-
-        # Compute Weights O(n)
         theta <- as.vector(va %*% alpha)
         phi <- as.vector(vb %*% beta)
         ps <- prob_fun(theta, phi)
         p0 <- ps$p0
         p1 <- ps$p1
 
-        # Weights for NLL (approximate upper bound weights)
-        # Binary NLL Hessian weights are roughly p(1-p).
-        # For RBRM, it's more complex, but p(1-p) is a decent proxy for convexity.
-        # Let's use pA (predicted probs)
         pA <- rep(0, length(y))
         pA[x == 0] <- p0[x == 0]
         pA[x == 1] <- p1[x == 1]
 
-        weights <- pmax(pA * (1 - pA), 1e-4) # Safety floor
+        weights <- pmax(pA * (1 - pA), 1e-4)
 
-        # Diagonal Hessian O(np)
-        # h_a_j = sum (va[,j]^2 * weights)
-        # h_b_j = sum (vb[,j]^2 * weights)
         h_alpha <- colSums(va^2 * weights) / length(y)
         h_beta <- colSums(vb^2 * weights) / length(y)
 
-        # Add Ridge diagonal for stability?
         h_alpha <- h_alpha + 1e-6
         h_beta <- h_beta + 1e-6
-
-        # Coordinate Descent (Quadratic model)
-        # Minimize Q(d) = g'd + 0.5 d'H d + lambda |x+d|
-        # x_new = soft(x * H - g, lambda) / H
 
         alpha_new <- alpha
         beta_new <- beta
 
-        # Update active set first?
-        # For now, full update cycle (or active set if p is huge).
-
-        # Alpha Update
         z_alpha <- alpha * h_alpha - g_alpha
         lam_seq_alpha <- rep(lambda, pa)
         if (intercept) lam_seq_alpha[1] <- 0
@@ -143,7 +110,6 @@ optim_newton_cd <- function(alpha_start, beta_start,
             b_cand <- beta + step_ls * d_beta
             obj_cand <- calc_obj(a_cand, b_cand)
 
-            # Simple decrease check (Armijo sufficient decrease usually better but this suffices for convex-ish)
             if (obj_cand <= obj_prev && is.finite(obj_cand)) {
                 alpha <- a_cand
                 beta <- b_cand
@@ -154,10 +120,6 @@ optim_newton_cd <- function(alpha_start, beta_start,
         }
 
         if (!accepted) {
-            # If step 1e-3 fails, maybe converged or stuck.
-            # For CD, we should perhaps take the step anyway if it's CD?
-            # But this is Proximal Newton.
-            # If line search fails, stop.
             break
         }
 

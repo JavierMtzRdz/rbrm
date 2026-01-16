@@ -91,7 +91,6 @@ optim_fista <- function(alpha_start, beta_start,
                         ...) {
     if (is.null(lambda_beta)) lambda_beta <- lambda
 
-    # --- Initialization ---
     p_a <- length(alpha_start)
     p_b <- length(beta_start)
 
@@ -114,7 +113,6 @@ optim_fista <- function(alpha_start, beta_start,
 
     t_cur <- 1
 
-    # Monotone variant: track best solution seen
     alpha_best <- alpha
     beta_best <- beta
     f_best <- Inf
@@ -127,11 +125,9 @@ optim_fista <- function(alpha_start, beta_start,
     last_g_alpha <- NULL
     last_g_beta <- NULL
 
-    # Tracks current step size (BB updates this, Line Search generally resets or tracks)
     current_step_alpha <- step_size_alpha
     current_step_beta <- step_size_beta
 
-    # Pre-allocate history only if requested
     if (save_history) {
         alphas <- matrix(0, max_step, p_a)
         betas <- matrix(0, max_step, p_b)
@@ -156,7 +152,7 @@ optim_fista <- function(alpha_start, beta_start,
     for (iter in 1:max_step) {
         step <- iter
 
-        # --- Adaptive Restart & Monotonicity Check ---
+        # Adaptive Restart & Monotonicity Check
         f_current <- penalized_nllh(alpha, beta, va, vb, x, y, lambda, lambda_beta = lambda_beta, lambda_b_prop = 1, intercept = intercept, prob_fun = prob_fun, clipping = clipping)
 
         # Monotonicity / Restart Check
@@ -167,7 +163,7 @@ optim_fista <- function(alpha_start, beta_start,
 
         if (do_restart) {
             restart_count <- restart_count + 1
-            # Monotone FISTA: Revert to previous
+            # Revert to previous
             alpha <- last_alpha
             beta <- last_beta
             f_current <- f_prev
@@ -188,7 +184,6 @@ optim_fista <- function(alpha_start, beta_start,
         t_next <- (1 + sqrt(1 + 4 * t_cur^2)) / 2
         momentum <- (t_cur - 1) / t_next
 
-        # y_alpha = alpha + momentum * (alpha - last_alpha)
         y_alpha <- alpha + momentum * (alpha - last_alpha)
 
         # Gradient calculation at y_alpha
@@ -204,7 +199,7 @@ optim_fista <- function(alpha_start, beta_start,
         }
 
         # Alpha Update
-        # Closure for cost function (fixing beta)
+        # Closure for cost function
         cost_alpha <- function(a) {
             penalized_nllh(a, beta, va, vb, x, y, lambda, lambda_beta = lambda_beta, lambda_b_prop = 1, intercept = intercept, prob_fun = prob_fun, clipping = clipping)
         }
@@ -219,8 +214,6 @@ optim_fista <- function(alpha_start, beta_start,
         )
         alpha_next <- res_alpha$param_next
         if (use_line_search) {
-            # Use updated step for next iter? Often in LS we restart from base or keep adapted.
-            # We keep it to be efficient.
             current_step_alpha <- res_alpha$step_size_next
         } else {
             current_step_alpha <- res_alpha$step_size_next # BB step
@@ -229,10 +222,10 @@ optim_fista <- function(alpha_start, beta_start,
         last_g_alpha <- g_alpha
 
         # Beta Update
-        # Apply momentum (synchronized with alpha logic if restart occurred)
+        # Apply momentum
         y_beta <- beta + momentum * (beta - last_beta)
 
-        # Calculate gradient at y_beta (using alpha_next!)
+        # Calculate gradient at y_beta
         g_beta <- grad_nll(alpha_next, y_beta, y, x, va, vb, prob_fun, opt = "beta", method = "analytical", clipping = clipping)
 
         if (sum((y_beta - beta) * g_beta) > 0) {
@@ -268,7 +261,7 @@ optim_fista <- function(alpha_start, beta_start,
         f_next <- penalized_nllh(alpha_next, beta_next, va, vb, x, y, lambda, lambda_beta = lambda_beta, lambda_b_prop = 1, intercept = intercept, prob_fun = prob_fun, clipping = clipping)
 
         if (f_next > f_current) {
-            # Restart momentum and reject step (stay at alpha/beta)
+            # Restart momentum and reject step
             alpha_next <- alpha
             beta_next <- beta
             t_next <- 1 # Reset momentum for next iter
@@ -278,10 +271,6 @@ optim_fista <- function(alpha_start, beta_start,
 
         # Check Convergence
         # Proximal Gradient Norm: ||(x - x_next) / step||
-        # This measures stationarity for proximal methods.
-
-        # We use alpha/beta (current x_k) vs alpha_next (x_{k+1}).
-        # Note: alpha and alpha_next are vectors.
 
         pg_a <- sqrt(sum(((alpha - alpha_next) / current_step_alpha)^2))
         pg_b <- sqrt(sum(((beta - beta_next) / current_step_beta)^2))

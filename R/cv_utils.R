@@ -10,7 +10,7 @@ standardize_rbrm_data <- function(va, vb = NULL) {
 
     # Standardize va
     if (p_a > 0) {
-        # Check for intercept (constant column)
+        # Check for intercept
         is_intercept_a <- apply(va, 2, function(x) var(x) == 0)
 
         # Scale non-intercept columns
@@ -91,7 +91,6 @@ unstandardize_rbrm_coeffs <- function(alpha, beta, scaler_a, scaler_b) {
 find_lambda_max_rbrm <- function(va, vb, x, y, alpha_start = NULL, beta_start = NULL, prob_fun = getProbRR.org, intercept = TRUE) {
     n <- length(y)
 
-    # 1. Fit Null/Intercept-only Model (unpenalized)
     if (is.null(alpha_start)) alpha_start <- rep(0, ncol(va))
     if (is.null(beta_start)) beta_start <- rep(0, ncol(vb))
 
@@ -101,7 +100,7 @@ find_lambda_max_rbrm <- function(va, vb, x, y, alpha_start = NULL, beta_start = 
     g_beta <- abs(grads$grad_beta)
 
     if (intercept) {
-        # Remove gradient for intercept (assuming col 1)
+        # Remove gradient for intercept
         g_alpha <- g_alpha[-1]
         g_beta <- g_beta[-1]
     }

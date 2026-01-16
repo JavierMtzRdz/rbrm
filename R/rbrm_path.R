@@ -19,13 +19,19 @@ rbrm_path <- function(va, vb, x, y, lambda_seq,
                       alpha_start = NULL, beta_start = NULL,
                       standardize = TRUE,
                       verbose = FALSE, ...) {
-    # Pre-processing
+    if (is.null(vb)) vb <- va
+    n <- length(y)
+
+    if (nrow(va) != n) cli::cli_abort("{.arg va} rows ({nrow(va)}) must match length of {.arg y} ({n}).")
+    if (nrow(vb) != n) cli::cli_abort("{.arg vb} rows ({nrow(vb)}) must match length of {.arg y} ({n}).")
+    if (length(x) != n) cli::cli_abort("{.arg x} length ({length(x)}) must match length of {.arg y} ({n}).")
+    if (!all(y %in% c(0, 1))) cli::cli_warn("{.arg y} should ideally be 0/1.")
+
     n_lambda <- length(lambda_seq)
     scaler_a <- NULL
     scaler_b <- NULL
 
     if (standardize) {
-        # If user asks to standardize here, we do it and keep the scalers
         std <- standardize_rbrm_data(va, vb)
         va <- std$va
         vb <- std$vb
@@ -45,30 +51,18 @@ rbrm_path <- function(va, vb, x, y, lambda_seq,
     for (i in seq_along(lambda_seq)) {
         lam <- lambda_seq[i]
 
-        # Fit model with warm start
         fit <- fit.rbrm(va, vb, x, y,
             alpha_start = curr_alpha,
             beta_start = curr_beta,
             lambda = lam,
-            standardize = FALSE, # We handled it or user handled it
+            standardize = FALSE,
             ...
         )
 
         path_fits[[i]] <- fit
 
-        # Update warm start
         curr_alpha <- fit$alpha
         curr_beta <- fit$beta
-
-        # Store coefficients
-        # If we standardized locally, we should unstandardize for the *final output*,
-        # BUT for warm start we need the standardized ones!
-        # fit.rbrm returns 'alpha', 'beta'. If standardize=FALSE passed to fit.rbrm,
-        # these are exactly the coefficients on the data passed (i.e., standardized data).
-        # So curr_alpha/curr_beta are standardized. Good.
-
-        # But for storing in the path object, we typically want the Original Scale coefficients.
-        # So we unstandardize 'for record keeping'.
 
         if (standardize && !is.null(scaler_a)) {
             res_orig <- unstandardize_rbrm_coeffs(curr_alpha, curr_beta, scaler_a, scaler_b)
@@ -82,7 +76,6 @@ rbrm_path <- function(va, vb, x, y, lambda_seq,
         if (verbose) cli::cli_progress_update()
     }
 
-    # Combine results
     res <- list(
         lambdas = lambda_seq,
         alphas = do.call(cbind, path_alphas), # p x n_lambda
@@ -94,4 +87,24 @@ rbrm_path <- function(va, vb, x, y, lambda_seq,
 
     class(res) <- "rbrm_path"
     return(res)
+}
+
+#' Print RBRM Path
+#' @export
+print.rbrm_path <- function(x, ...) {
+    cli::cat_rule(cli::style_bold("RBRM Regularization Path"), col = "blue")
+    cat("\n")
+
+    if (!is.list(x) || is.null(x$lambdas)) {
+        cli::cli_alert_danger("Invalid 'rbrm_path' object.")
+        return(invisible(x))
+    }
+
+    n_lam <- length(x$lambdas)
+
+    cli::cat_bullet("Lambdas: ", n_lam, bullet = "info")
+    cli::cat_bullet("Range: ", sprintf("%.4f - %.4f", min(x$lambdas), max(x$lambdas)), bullet = "info")
+
+    cat("\n")
+    invisible(x)
 }

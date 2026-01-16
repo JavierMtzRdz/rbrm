@@ -8,7 +8,7 @@
 #' @inheritParams optim_newton_cd
 #' @export
 optim_newton_cd_active <- function(alpha_start, beta_start,
-                                   step_size_alpha, step_size_beta, # Ignored
+                                   step_size_alpha, step_size_beta,
                                    lambda,
                                    intercept,
                                    max_step,
@@ -69,12 +69,12 @@ optim_newton_cd_active <- function(alpha_start, beta_start,
     for (iter in 1:max_step) {
         obj_prev <- calc_obj(alpha, beta)
 
-        # 1. Compute Gradient and Diagonal Hessian
+        # Compute Gradient and Diagonal Hessian
         grads <- grad_nll(alpha, beta, y, x, va, vb, prob_fun, opt = "both", method = "analytical", clipping = clip)
         g_alpha <- grads$grad_alpha
         g_beta <- grads$grad_beta
 
-        # Compute Weights O(n)
+        # Compute Weights
         theta <- as.vector(va %*% alpha)
         phi <- as.vector(vb %*% beta)
         ps <- prob_fun(theta, phi)
@@ -94,21 +94,16 @@ optim_newton_cd_active <- function(alpha_start, beta_start,
         h_alpha <- h_alpha + 1e-6
         h_beta <- h_beta + 1e-6
 
-        # 2. KKT Check for Inactive Variables (periodically)
+        # KKT Check for Inactive Variables
         if (iter %% kkt_check_freq == 0 || iter == 1) {
-            # Check KKT conditions for inactive variables
-            # For L1: if |gradient| > lambda at zero, the variable should be active
-
-            # Alpha
             if (lambda > 0 && sum(!active_alpha) > 0) {
                 inactive_idx <- which(!active_alpha)
                 if (intercept && 1 %in% inactive_idx) {
-                    inactive_idx <- setdiff(inactive_idx, 1) # Exclude intercept
+                    inactive_idx <- setdiff(inactive_idx, 1)
                 }
 
                 if (length(inactive_idx) > 0) {
-                    # Compute gradient at zero for inactive variables (using current beta)
-                    z_alpha <- alpha * h_alpha - g_alpha
+                    # Compute gradient at zero for inactive variables
                     violated <- abs(z_alpha[inactive_idx]) > lambda + active_tol
 
                     if (any(violated)) {
@@ -135,11 +130,11 @@ optim_newton_cd_active <- function(alpha_start, beta_start,
             }
         }
 
-        # 3. Coordinate Descent on Active Set Only
+        # Coordinate Descent on Active Set Only
         alpha_new <- alpha
         beta_new <- beta
 
-        # Alpha Update (only active variables)
+        # Alpha Update
         active_idx_a <- which(active_alpha)
         if (length(active_idx_a) > 0) {
             z_alpha <- alpha * h_alpha - g_alpha
@@ -150,7 +145,7 @@ optim_newton_cd_active <- function(alpha_start, beta_start,
             alpha_new[active_idx_a] <- soft_thres(z_alpha[active_idx_a], lam_seq_alpha[active_idx_a]) / h_alpha[active_idx_a]
         }
 
-        # Beta Update (only active variables)
+        # Beta Update
         active_idx_b <- which(active_beta)
         if (length(active_idx_b) > 0) {
             z_beta <- beta * h_beta - g_beta
@@ -164,13 +159,13 @@ optim_newton_cd_active <- function(alpha_start, beta_start,
         alpha_new[!active_alpha] <- 0
         beta_new[!active_beta] <- 0
 
-        # 4. Line Search (Backtracking)
+        # Line Search (Backtracking)
         d_alpha <- alpha_new - alpha
         d_beta <- beta_new - beta
 
         # Norm of change
         if (sum(d_alpha^2) + sum(d_beta^2) < tol^2) {
-            if (iter > 1) break # Converged
+            if (iter > 1) break
         }
 
         step_ls <- 1
@@ -194,10 +189,9 @@ optim_newton_cd_active <- function(alpha_start, beta_start,
         }
 
         # Update active sets based on current solution
-        # Remove variables that have shrunk to exactly zero
         if (lambda > 0) {
             active_alpha <- abs(alpha) > active_tol
-            if (intercept) active_alpha[1] <- TRUE # Keep intercept active
+            if (intercept) active_alpha[1] <- TRUE
         }
         if (lambda_beta > 0) {
             active_beta <- abs(beta) > active_tol

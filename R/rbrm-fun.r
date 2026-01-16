@@ -114,7 +114,6 @@ fit.rbrm <- function(va, vb = NULL, x, y,
   if (is.null(beta_start)) beta_start <- rep(0, pb)
 
   # Optimizer
-  # Pass explict args + ... args
   opt_args <- list(
     alpha_start = alpha_start,
     beta_start = beta_start,

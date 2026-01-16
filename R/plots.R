@@ -3,9 +3,13 @@
 #' @return A ggplot object.
 #' @export
 plot.cv_rbrm <- function(x, ...) {
-  # Calculate non-zero counts from the final fit on full data
-  # x$fit is the rbrm_path object
-  # alphas: p x n_lambda
+  if (!inherits(x, "cv_rbrm")) {
+    cli::cli_abort("Object must be of class 'cv_rbrm'")
+  }
+  if (is.null(x$nll_mean) || is.null(x$lambdas)) {
+    cli::cli_abort("Invalid 'cv_rbrm' object: missing components.")
+  }
+
   n_vars_a <- colSums(abs(x$fit$alphas) > 1e-10)
   n_vars_b <- colSums(abs(x$fit$betas) > 1e-10)
   n_vars <- n_vars_a + n_vars_b
@@ -18,7 +22,6 @@ plot.cv_rbrm <- function(x, ...) {
     n_vars = round(n_vars)
   )
 
-  # Secondary axis labels (select ~10)
   n_total <- nrow(plot_data)
   n_labels <- min(n_total, 10)
   label_indices <- round(seq(1, n_total, length.out = n_labels))
@@ -77,27 +80,27 @@ plot.cv_rbrm <- function(x, ...) {
 #' @param plot_intercept Logical. Include intercept?
 #' @export
 plot.rbrm_path <- function(x, plot_intercept = FALSE, ...) {
-  # Alpha Coefficients
+  if (!inherits(x, "rbrm_path")) {
+    cli::cli_abort("Object must be of class 'rbrm_path'")
+  }
+  if (is.null(x$alphas) || is.null(x$betas) || is.null(x$lambdas)) {
+    cli::cli_abort("Invalid 'rbrm_path' object: missing components.")
+  }
+
   df_a <- as.data.frame(x$alphas)
   df_a$variable <- rownames(x$alphas)
   if (is.null(df_a$variable)) df_a$variable <- paste0("A", 1:nrow(df_a))
   df_a$type <- "Alpha"
 
-  # Beta Coefficients
   df_b <- as.data.frame(x$betas)
   df_b$variable <- rownames(x$betas)
   if (is.null(df_b$variable)) df_b$variable <- paste0("B", 1:nrow(df_b))
   df_b$type <- "Beta"
 
-  # Combine
-  # Pivot longer: columns are indexes 1..n_lambda corresponding to x$lambdas
   colnames(df_a)[1:length(x$lambdas)] <- as.character(x$lambdas)
   colnames(df_b)[1:length(x$lambdas)] <- as.character(x$lambdas)
 
   df_all <- rbind(df_a, df_b)
-
-  # Identify numeric columns (lambda columns)
-  # They are named by lambda value (character)
 
   plot_data <- df_all %>%
     tidyr::pivot_longer(
@@ -108,10 +111,6 @@ plot.rbrm_path <- function(x, plot_intercept = FALSE, ...) {
     dplyr::mutate(lambda = as.numeric(lambda))
 
   if (!plot_intercept) {
-    # Assuming intercept named "(Intercept)" or similar.
-    # Or usually index 1.
-    # standardize_rbrm_data doesn't rename. fit.rbrm naming is used.
-    # fit.rbrm names: "Intercept", "V1", etc.
     plot_data <- dplyr::filter(plot_data, !variable %in% c("(Intercept)", "Intercept"))
   }
 
