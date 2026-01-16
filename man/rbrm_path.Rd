@@ -9,7 +9,9 @@ rbrm_path(
   vb,
   x,
   y,
-  lambda_seq,
+  lambda_seq = NULL,
+  nlambda = 100,
+  lambda_min_ratio = 1e-04,
   alpha_start = NULL,
   beta_start = NULL,
   standardize = TRUE,
@@ -26,7 +28,11 @@ rbrm_path(
 
 \item{y}{Outcome vector.}
 
-\item{lambda_seq}{Vector of lambda values (decreasing).}
+\item{lambda_seq}{Vector of lambda values (decreasing). If NULL, automatically generated.}
+
+\item{nlambda}{Number of lambda values if lambda_seq is NULL.}
+
+\item{lambda_min_ratio}{Ratio of smallest to largest lambda if lambda_seq is NULL.}
 
 \item{alpha_start}{Initial alpha.}
 

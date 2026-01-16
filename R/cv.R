@@ -10,6 +10,7 @@ cv_rbrm <- function(object, ...) {
 }
 
 #' @describeIn cv_rbrm Default method for matrices
+#' @param measure Performance measure: "deviance" (default), "brier", "misclass", or "auc"
 #' @export
 cv_rbrm.default <- function(object, vb = NULL, x, y,
                             nfold = 5,
@@ -17,6 +18,7 @@ cv_rbrm.default <- function(object, vb = NULL, x, y,
                             lambda_min_ratio = ifelse(nrow(object) < ncol(object), 0.01, 0.0001),
                             lambda_seq = NULL,
                             folds = NULL,
+                            measure = "deviance",
                             alpha_start = NULL, beta_start = NULL,
                             seed = NULL,
                             verbose = TRUE,
@@ -62,7 +64,19 @@ cv_rbrm.default <- function(object, vb = NULL, x, y,
         nfold <- length(folds)
     }
 
-    nll_mat <- matrix(NA, nrow = nfold, ncol = length(lambda_seq))
+    # Get performance measure name
+    measure_name <- get_measure_name(measure)
+
+    if (verbose) cli::cli_alert_info("Using {measure_name} as primary selection metric")
+
+    n_lambda <- length(lambda_seq)
+
+    # Storage for all metrics
+    metrics <- c("deviance", "brier", "misclass", "auc", "f1")
+    perf_arrays <- list()
+    for (m in metrics) {
+        perf_arrays[[m]] <- matrix(NA, nrow = nfold, ncol = n_lambda)
+    }
 
     if (verbose) cli::cli_progress_bar("Running Cross-Validation", total = nfold)
 
@@ -94,36 +108,71 @@ cv_rbrm.default <- function(object, vb = NULL, x, y,
             a_est <- path_fit$alphas[, i]
             b_est <- path_fit$betas[, i]
 
-            nll_val <- calc_nll(va_test, vb_test, x_test, y_test, a_est, b_est)
-            nll_mat[k, i] <- nll_val
+            # Calculate ALL metrics efficiently
+            all_vals <- calc_all_measures(va_test, vb_test, x_test, y_test, a_est, b_est)
+
+            for (m in metrics) {
+                perf_arrays[[m]][k, i] <- all_vals[[m]]
+            }
         }
     }
 
     result <- list()
     result$lambdas <- lambda_seq
-    result$nll_fold <- nll_mat
-    result$nll_mean <- colMeans(nll_mat, na.rm = TRUE)
-    result$nll_se <- apply(nll_mat, 2, sd, na.rm = TRUE) / sqrt(nfold)
+    result$measure <- measure
+    result$measure_name <- measure_name
 
-    idx_min <- which.min(result$nll_mean)
+    # Store full results for all metrics
+    result$cv_results <- list()
+    for (m in metrics) {
+        mat <- perf_arrays[[m]]
+        res <- list(
+            mean = colMeans(mat, na.rm = TRUE),
+            se = apply(mat, 2, sd, na.rm = TRUE) / sqrt(nfold)
+        )
+        result$cv_results[[m]] <- res
+    }
+
+    # Primary metric results (for compatibility and default print/plot)
+    selected_res <- result$cv_results[[measure]]
+    result$performance_mean <- selected_res$mean
+    result$performance_se <- selected_res$se
+    result$performance <- perf_arrays[[measure]] # Keep matrix for the primary one
+
+    # Calculate Min and 1SE based on PRIMARY metric
+    idx_min <- which.min(result$performance_mean)
     result$lambda_min <- lambda_seq[idx_min]
 
-    min_nll <- result$nll_mean[idx_min]
-    se_min <- result$nll_se[idx_min]
+    min_perf <- result$performance_mean[idx_min]
+    se_min <- result$performance_se[idx_min]
 
-    idx_1se <- which(result$nll_mean <= min_nll + se_min)
+    idx_1se <- which(result$performance_mean <= min_perf + se_min)
     best_idx_1se <- min(idx_1se)
     result$lambda_1se <- lambda_seq[best_idx_1se]
 
     if (verbose) {
         cli::cli_alert_success("CV Complete. Min Lambda: {format(result$lambda_min, digits=4)}")
+        cli::cli_alert_info("Fitting final model on full dataset...")
     }
 
-    if (verbose) cli::cli_alert_info("Fitting final path on full data...")
-    result$fit <- rbrm_path(va, vb, x, y, lambda_seq = lambda_seq, standardize = TRUE, verbose = FALSE, ...)
+    # Fit Final Model on Full Data
+    final_path <- rbrm_path(va, vb, x, y,
+        lambda_seq = lambda_seq,
+        standardize = TRUE,
+        verbose = FALSE, ...
+    )
+
+    # Extract coefficients for lambda.min
+    result$final_fit <- list(
+        path = final_path,
+        alpha_min = final_path$alphas[, idx_min],
+        beta_min = final_path$betas[, idx_min],
+        alpha_1se = final_path$alphas[, best_idx_1se],
+        beta_1se = final_path$betas[, best_idx_1se]
+    )
 
     class(result) <- "cv_rbrm"
-    return(result)
+    return(invisible(result))
 }
 
 #' @describeIn cv_rbrm Formula interface
@@ -166,16 +215,33 @@ print.cv_rbrm <- function(x, ...) {
     cli::cat_rule(cli::style_bold("RBRM Cross-Validation"), col = "#277DA1")
     cat("\n")
 
-    n_folds <- nrow(x$nll_fold)
+    n_folds <- nrow(x$performance)
     n_lam <- length(x$lambdas)
+    measure_name <- if (!is.null(x$measure_name)) x$measure_name else "Performance"
 
     cli::cat_bullet("Folds: ", cli::col_cyan(n_folds), bullet = "info", bullet_col = "#F9C74F")
     cli::cat_bullet("Lambda Path Length: ", cli::col_cyan(n_lam), bullet = "info", bullet_col = "#F9C74F")
+    cli::cat_bullet("Measure: ", cli::col_cyan(measure_name), bullet = "info", bullet_col = "#F9C74F")
 
     cat("\n")
     cli::cat_rule("Optimal Lambdas", col = "#43AA8B")
-    cli::cat_bullet("Min Lambda: ", cli::col_cyan(sprintf("%.4f", x$lambda_min)), " (NLL: ", sprintf("%.4f", min(x$nll_mean)), ")", bullet = "star", bullet_col = "#F9C74F")
+    cli::cat_bullet("Min Lambda: ", cli::col_cyan(sprintf("%.4f", x$lambda_min)),
+        " (", measure_name, ": ", sprintf("%.2f", min(x$performance_mean)), ")",
+        bullet = "star", bullet_col = "#F9C74F"
+    )
     cli::cat_bullet("1-SE Lambda: ", cli::col_cyan(sprintf("%.4f", x$lambda_1se)), bullet = "star", bullet_col = "#F9C74F")
+
+    if (!is.null(x$final_fit)) {
+        cat("\n")
+        cli::cat_rule("Final Model (at Lambda Min)", col = "#43AA8B")
+
+        # Count non-zeros
+        nz_a <- sum(abs(x$final_fit$alpha_min) > 1e-10)
+        nz_b <- sum(abs(x$final_fit$beta_min) > 1e-10)
+
+        cli::cat_bullet("Active Va Coeffs: ", cli::col_cyan(nz_a), bullet = "arrow_right", bullet_col = "#F9C74F")
+        cli::cat_bullet("Active Vb Coeffs: ", cli::col_cyan(nz_b), bullet = "arrow_right", bullet_col = "#F9C74F")
+    }
 
     cat("\n")
     invisible(x)

@@ -120,10 +120,12 @@ create_lambda_grid <- function(lambda_max, nlambda = 100, lambda.min.ratio = 1e-
     return(lambdas)
 }
 
-#' Calculate RBRM Negative Log-Likelihood
+#' Calculate All Performance Measures
+#'
+#' efficient calculation of all binary regression metrics in one pass.
 #'
 #' @export
-calc_nll <- function(va, vb, x, y, alpha, beta, prob_fun = getProbRR.org) {
+calc_all_measures <- function(va, vb, x, y, alpha, beta, prob_fun = getProbRR.org) {
     theta <- as.vector(va %*% alpha)
     phi <- as.vector(vb %*% beta)
 
@@ -133,13 +135,63 @@ calc_nll <- function(va, vb, x, y, alpha, beta, prob_fun = getProbRR.org) {
 
     # Clip for stability
     ep <- 1e-10
-    p0 <- pmax(p0, ep)
-    p1 <- pmax(p1, ep)
-    p1 <- pmin(p1, 1 - ep)
+    p0 <- pmax(pmin(p0, 1 - ep), ep)
+    p1 <- pmax(pmin(p1, 1 - ep), ep)
 
     probs <- ifelse(x == 1, p1, p0)
 
+    # 1. Deviance (-2 * log-likelihood)
     ll <- y * log(probs) + (1 - y) * log(1 - probs)
+    deviance <- -2 * sum(ll, na.rm = TRUE)
 
-    return(-mean(ll, na.rm = TRUE))
+    # 2. Brier Score (MSE)
+    brier <- mean((y - probs)^2, na.rm = TRUE)
+
+    # 3. Misclassification & F1 (Threshold 0.5)
+    pred_class <- ifelse(probs > 0.5, 1, 0)
+
+    tp <- sum(pred_class == 1 & y == 1, na.rm = TRUE)
+    fp <- sum(pred_class == 1 & y == 0, na.rm = TRUE)
+    fn <- sum(pred_class == 0 & y == 1, na.rm = TRUE)
+    tn <- sum(pred_class == 0 & y == 0, na.rm = TRUE)
+
+    misclass <- mean(pred_class != y, na.rm = TRUE)
+
+    precision <- if ((tp + fp) > 0) tp / (tp + fp) else 0
+    recall <- if ((tp + fn) > 0) tp / (tp + fn) else 0
+    f1 <- if ((precision + recall) > 0) 2 * (precision * recall) / (precision + recall) else 0
+
+    # 4. AUC (1 - AUC returned for consistency so "lower is better")
+    n_pos <- sum(y == 1)
+    n_neg <- sum(y == 0)
+
+    if (n_pos == 0 || n_neg == 0) {
+        auc_val <- 0.5
+    } else {
+        ranks <- rank(probs)
+        auc_val <- (sum(ranks[y == 1]) - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg)
+    }
+
+    return(c(
+        deviance = deviance,
+        brier = brier,
+        misclass = misclass,
+        auc = 1 - auc_val, # Return 1-AUC
+        f1 = 1 - f1 # Return 1-F1 so lower is better
+    ))
+}
+
+#' Get Performance Measure Name
+#'
+#' @export
+get_measure_name <- function(measure) {
+    measure <- tolower(measure)
+    switch(measure,
+        "deviance" = "Deviance",
+        "brier" = "Brier Score",
+        "misclass" = "Misclassification Error",
+        "auc" = "1 - AUC",
+        "f1" = "1 - F1 Score",
+        "Deviance"
+    )
 }

@@ -4,9 +4,19 @@
 \alias{plot.cv_rbrm}
 \title{Plot Cross-Validation Results}
 \usage{
-\method{plot}{cv_rbrm}(x, ...)
+\method{plot}{cv_rbrm}(x, measure = NULL, ...)
+}
+\arguments{
+\item{x}{A 'cv_rbrm' object.}
+
+\item{measure}{Optional character string to plot a specific metric (e.g., "auc", "brier").
+If NULL, plots the primary metric used in CV.}
+
+\item{...}{Additional arguments (unused).}
 }
 \value{
+A ggplot object.
+
 A ggplot object.
 }
 \description{

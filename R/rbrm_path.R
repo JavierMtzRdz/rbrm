@@ -6,7 +6,9 @@
 #' @param vb Matrix of predictors for beta.
 #' @param x Treatment vector.
 #' @param y Outcome vector.
-#' @param lambda_seq Vector of lambda values (decreasing).
+#' @param lambda_seq Vector of lambda values (decreasing). If NULL, automatically generated.
+#' @param nlambda Number of lambda values if lambda_seq is NULL.
+#' @param lambda_min_ratio Ratio of smallest to largest lambda if lambda_seq is NULL.
 #' @param alpha_start Initial alpha.
 #' @param beta_start Initial beta.
 #' @param standardize Logical. Whether data should be standardized (if not already).
@@ -15,7 +17,8 @@
 #' @param ... Additional arguments to fit.rbrm.
 #' @return An object of class `rbrm_path`.
 #' @export
-rbrm_path <- function(va, vb, x, y, lambda_seq,
+rbrm_path <- function(va, vb, x, y, lambda_seq = NULL,
+                      nlambda = 100, lambda_min_ratio = 1e-4,
                       alpha_start = NULL, beta_start = NULL,
                       standardize = TRUE,
                       verbose = FALSE, ...) {
@@ -27,7 +30,6 @@ rbrm_path <- function(va, vb, x, y, lambda_seq,
     if (length(x) != n) cli::cli_abort("{.arg x} length ({length(x)}) must match length of {.arg y} ({n}).")
     if (!all(y %in% c(0, 1))) cli::cli_warn("{.arg y} should ideally be 0/1.")
 
-    n_lambda <- length(lambda_seq)
     scaler_a <- NULL
     scaler_b <- NULL
 
@@ -38,6 +40,16 @@ rbrm_path <- function(va, vb, x, y, lambda_seq,
         scaler_a <- std$scaler_a
         scaler_b <- std$scaler_b
     }
+
+    # Auto-generate lambda sequence if not provided
+    if (is.null(lambda_seq)) {
+        if (verbose) cli::cli_alert_info("Generating lambda sequence...")
+        l_max <- find_lambda_max(va, vb, x, y, prob_fun = getProbRR.org)
+        lambda_seq <- create_lambda_grid(l_max, nlambda, lambda_min_ratio)
+        if (verbose) cli::cli_alert_success("Generated {length(lambda_seq)} lambdas (Max: {round(l_max, 4)})")
+    }
+
+    n_lambda <- length(lambda_seq)
 
     path_fits <- vector("list", n_lambda)
     path_alphas <- vector("list", n_lambda)

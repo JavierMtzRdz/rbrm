@@ -18,6 +18,7 @@ cv_rbrm(object, ...)
   lambda_min_ratio = ifelse(nrow(object) < ncol(object), 0.01, 1e-04),
   lambda_seq = NULL,
   folds = NULL,
+  measure = "deviance",
   alpha_start = NULL,
   beta_start = NULL,
   seed = NULL,
@@ -31,6 +32,8 @@ cv_rbrm(object, ...)
 \item{object}{Formula or matrix.}
 
 \item{...}{Additional arguments.}
+
+\item{measure}{Performance measure: "deviance" (default), "brier", "misclass", or "auc"}
 }
 \description{
 Performs k-fold cross-validation for the RBRM model.
