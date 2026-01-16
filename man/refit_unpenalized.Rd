@@ -4,7 +4,7 @@
 \alias{refit_unpenalized}
 \title{Refit Unpenalized Model on Active Set}
 \usage{
-refit_unpenalized(va, vb, x, y, idx_a, idx_b, ...)
+refit_unpenalized(va, vb, x, y, idx_a, idx_b, intercept = FALSE, ...)
 }
 \description{
 Helper to refit model without penalization on selected variables.

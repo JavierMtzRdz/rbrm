@@ -6,6 +6,11 @@
 \usage{
 \method{print}{rbrm_path}(x, ...)
 }
+\arguments{
+\item{x}{An rbrm_path object.}
+
+\item{...}{Additional arguments (unused).}
+}
 \description{
 Print RBRM Path
 }

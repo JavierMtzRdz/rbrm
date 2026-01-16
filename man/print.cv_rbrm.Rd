@@ -6,6 +6,11 @@
 \usage{
 \method{print}{cv_rbrm}(x, ...)
 }
+\arguments{
+\item{x}{A cv_rbrm object.}
+
+\item{...}{Additional arguments (unused).}
+}
 \description{
 Print CV RBRM Object
 }

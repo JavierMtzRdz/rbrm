@@ -61,6 +61,18 @@ optim_fista(
 \item{save_history}{Boolean, whether to store full parameter history (memory intensive).}
 
 \item{thres}{Convergence threshold.}
+
+\item{use_line_search}{Boolean, use backtracking line search?}
+
+\item{armijo_c}{Armijo condition constant.}
+
+\item{line_search_shrink}{Shrinkage factor for line search.}
+
+\item{line_search_max_iter}{Maximum line search iterations.}
+
+\item{clipping}{Probability clipping threshold.}
+
+\item{...}{Additional arguments.}
 }
 \description{
 Performs FISTA optimization for RBRM with inlined updates and efficiency improvements.

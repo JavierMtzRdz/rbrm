@@ -13,6 +13,7 @@
 #' @param gamma True gamma coefficients for propensity score model (EXCLUDING intercept).
 #'              The intercept is estimated automatically to match `treatment_prob`.
 #' @param treatment_prob Target probability of treatment (default 0.5).
+#' @param target_beta_prob Target baseline probability for beta intercept calculation (default 0.1).
 #'
 #' @return A list containing training and test data: v (covariates), x (treatment), y (outcome),
 #'         and true probabilities.
@@ -133,6 +134,8 @@ generate_data <- function(pa, pb, n, n_test = 100, alpha = NULL, beta = NULL, ga
   ))
 }
 
+#' Generate default true parameter values
+#' @keywords internal
 #' @export
 true_vals <- function(pa, pb = pa) {
   # Generate Alpha

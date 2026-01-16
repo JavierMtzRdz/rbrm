@@ -21,6 +21,35 @@ optim_lbfgs(
   ...
 )
 }
+\arguments{
+\item{alpha_start}{Initial alpha coefficients.}
+
+\item{beta_start}{Initial beta coefficients.}
+
+\item{step_size_alpha}{Step size for alpha (ignored by L-BFGS).}
+
+\item{step_size_beta}{Step size for beta (ignored by L-BFGS).}
+
+\item{lambda}{Lasso penalty for alpha.}
+
+\item{intercept}{Whether model includes intercept.}
+
+\item{max_step}{Maximum iterations.}
+
+\item{va}{Design matrix for alpha.}
+
+\item{vb}{Design matrix for beta.}
+
+\item{x}{Treatment vector.}
+
+\item{y}{Outcome vector.}
+
+\item{prob_fun}{Probability function (default getProbRR.org).}
+
+\item{lambda_beta}{Penalty for beta (default NULL, uses lambda).}
+
+\item{...}{Additional arguments (e.g., clipping, save_history).}
+}
 \description{
 Drops parameters into optim usually for MLE (lambda=0).
 }

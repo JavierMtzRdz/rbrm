@@ -76,6 +76,12 @@ refit_unpenalized <- function(va, vb, x, y, idx_a, idx_b, intercept = FALSE, ...
 #' @param adjusted Logical. If TRUE, re-estimates coefficients for active variables without penalization (relaxed fit).
 #' @param optimizer Optimization method: "fista" (default, C++), "lbfgs" (C++), "newton" (C++), "newton_active" (C++), or their R versions ("fista_R", "lbfgs_R", "newton_R", "newton_active_R").
 #' @param ... Additional arguments to fit.rbrm.
+#' @param intercept Whether to include intercept (default TRUE).
+#' @param verbose Print progress messages (default FALSE).
+
+#' @param intercept Whether to include intercept (default TRUE).
+#' @param verbose Print progress messages (default FALSE).
+
 #' @return An object of class `rbrm_path` (if multiple lambdas) or `rbrm` (if single lambda).
 #' @export
 rbrm <- function(va, vb, x, y, lambda = NULL,
@@ -250,6 +256,9 @@ rbrm <- function(va, vb, x, y, lambda = NULL,
 }
 
 #' Print RBRM Path
+#'
+#' @param x An rbrm_path object.
+#' @param ... Additional arguments (unused).
 #' @export
 print.rbrm_path <- function(x, ...) {
     cli::cat_rule(cli::style_bold("RBRM Regularization Path"), col = "#277DA1")

@@ -8,7 +8,7 @@ generate_data(
   pa,
   pb,
   n,
-  n_test,
+  n_test = 100,
   alpha = NULL,
   beta = NULL,
   gamma = NULL,
@@ -33,6 +33,8 @@ generate_data(
 The intercept is estimated automatically to match \code{treatment_prob}.}
 
 \item{treatment_prob}{Target probability of treatment (default 0.5).}
+
+\item{target_beta_prob}{Target baseline probability for beta intercept calculation (default 0.1).}
 }
 \value{
 A list containing training and test data: v (covariates), x (treatment), y (outcome),

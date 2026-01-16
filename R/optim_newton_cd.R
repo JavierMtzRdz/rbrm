@@ -3,6 +3,22 @@
 #' Implements a Proximal Newton algorithm with Cyclic Coordinate Descent updates.
 #' Suitable for high-dimensional, L1-penalized problems.
 #'
+#' @param alpha_start Initial alpha.
+#' @param beta_start Initial beta.
+#' @param step_size_alpha Ignored.
+#' @param step_size_beta Ignored.
+#' @param lambda Lasso penalty.
+#' @param intercept Boolean, include intercept?
+#' @param max_step Max iterations.
+#' @param va Covariate matrix A.
+#' @param vb Covariate matrix B.
+#' @param x Treatment vector.
+#' @param y Outcome vector.
+#' @param prob_fun Probability function.
+#' @param lambda_beta Penalty for beta.
+#' @param tol Convergence tolerance.
+#' @param save_history Save history?
+#' @param ... Additional arguments.
 #' @export
 optim_newton_cd <- function(alpha_start, beta_start,
                             step_size_alpha, step_size_beta,

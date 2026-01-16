@@ -7,10 +7,9 @@
 \method{plot}{cv_rbrm}(x, measure = NULL, ...)
 }
 \arguments{
-\item{x}{A 'cv_rbrm' object.}
+\item{x}{An rbrm object.}
 
-\item{measure}{Optional character string to plot a specific metric (e.g., "auc", "brier").
-If NULL, plots the primary metric used in CV.}
+\item{measure}{Whether to plot intercept (default FALSE).}
 
 \item{...}{Additional arguments (unused).}
 }

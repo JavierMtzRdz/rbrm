@@ -37,6 +37,7 @@
 #' logrr_matrix <- matrix(c(0.5, 0.3, 0.7, 0.4), ncol = 2)
 #' getProbRR.alt(logrr = logrr_matrix)
 #'
+#' @param clipping Threshold for clipping probabilities to avoid numerical issues (default 1e-15).
 #' @export
 getProbRR.org <- function(logrr, logop = NA,
                           clipping = 1e-15) {
@@ -52,7 +53,7 @@ getProbRR.org <- function(logrr, logop = NA,
     ## on the boundary South edge: large -ve logrr or (large -ve logop and -ve
     ## logrr)
     ifelse((logrr < (-12)) | ((logop < (-12)) & (logrr < 0)),
-      brm:::getPrbAux(logop - logrr),
+      getPrbAux(logop - logrr),
       ifelse((logrr > 12) | ((logop < (-12)) & (logrr > 0)),
         ## West edge: large +ve logrr or (large -ve logop and +ve logrr)
         0,
@@ -76,7 +77,7 @@ getProbRR.org <- function(logrr, logop = NA,
   p0 * exp(logrr),
   ifelse((logrr > 12) | ((logop < (-12)) & (logrr > 0)),
     ## West edge: large +ve logrr or (large -ve logop and +ve logrr)
-    brm:::getPrbAux(logop + logrr),
+    getPrbAux(logop + logrr),
     pmin(exp(logrr), 1)
   )
   ),
@@ -136,6 +137,7 @@ getProbRR.org <- function(logrr, logop = NA,
 #' logrr_matrix <- matrix(c(0.5, 0.3, 0.7, 0.4), ncol = 2)
 #' getProbRR.alt(logrr = logrr_matrix)
 #'
+#' @param clipping Threshold for clipping probabilities to avoid numerical issues (default 1e-15).
 #' @export
 getProbRR.alt <- function(logrr, logop,
                           clipping = 1e-15) {
@@ -163,4 +165,9 @@ getProbRR.alt <- function(logrr, logop,
     list(p0 = p0, p1 = p1),
     class = "Pozza"
   ))
+}
+
+# Internal helper from brm package
+getPrbAux <- function(x) {
+  ifelse((x < 17) & (x > (-500)), 0.5 * exp(x) * (-1 + (1 + 4 * exp(-x))^0.5), ifelse(x < 0, 0, 1))
 }

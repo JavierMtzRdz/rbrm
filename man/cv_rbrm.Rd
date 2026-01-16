@@ -23,6 +23,7 @@ cv_rbrm(object, ...)
   optimizer = "fista",
   alpha_start = NULL,
   beta_start = NULL,
+  intercept = TRUE,
   seed = NULL,
   verbose = TRUE,
   ...
@@ -35,11 +36,39 @@ cv_rbrm(object, ...)
 
 \item{...}{Additional arguments.}
 
+\item{vb}{Matrix for beta (default NULL, uses object).}
+
+\item{x}{Treatment vector.}
+
+\item{y}{Outcome vector.}
+
+\item{nfold}{Number of folds (default 5).}
+
+\item{nlambda}{Number of lambda values (default 50).}
+
+\item{lambda_min_ratio}{Minimum lambda ratio (default based on n/p).}
+
+\item{lambda_seq}{Custom lambda sequence (default NULL, auto-generated).}
+
+\item{folds}{Custom fold assignments (default NULL, auto-generated).}
+
 \item{measure}{Performance measure: "deviance" (default), "brier", "misclass", or "auc"}
 
 \item{adjusted}{Logical. If TRUE (default), the final model is refitted without penalization on the active set.}
 
-\item{optimizer}{Optimization method: "fista" (default), "lbfgs", "newton", or "newton_active".}
+\item{optimizer}{Optimization method: "fista" (default, C++), "lbfgs" (C++), "newton" (C++), "newton_active" (C++), or their R versions ("fista_R", "lbfgs_R", "newton_R", "newton_active_R").}
+
+\item{alpha_start}{Initial alpha coefficients (default NULL).}
+
+\item{beta_start}{Initial beta coefficients (default NULL).}
+
+\item{intercept}{Whether to include intercept (default TRUE).}
+
+\item{seed}{Random seed for fold generation (default NULL).}
+
+\item{verbose}{Print progress messages (default TRUE).}
+
+\item{data}{Data frame for formula interface.}
 }
 \description{
 Performs k-fold cross-validation for the RBRM model.

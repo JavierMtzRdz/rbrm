@@ -16,6 +16,7 @@ rbrm(
   beta_start = NULL,
   standardize = TRUE,
   adjusted = FALSE,
+  intercept = TRUE,
   optimizer = "fista",
   verbose = FALSE,
   ...
@@ -46,7 +47,11 @@ If FALSE, assumes data is prepared (intercepts added, scaling done).}
 
 \item{adjusted}{Logical. If TRUE, re-estimates coefficients for active variables without penalization (relaxed fit).}
 
-\item{optimizer}{Optimization method: "fista" (default), "lbfgs", "newton", or "newton_active".}
+\item{intercept}{Whether to include intercept (default TRUE).}
+
+\item{optimizer}{Optimization method: "fista" (default, C++), "lbfgs" (C++), "newton" (C++), "newton_active" (C++), or their R versions ("fista_R", "lbfgs_R", "newton_R", "newton_active_R").}
+
+\item{verbose}{Print progress messages (default FALSE).}
 
 \item{...}{Additional arguments to fit.rbrm.}
 }

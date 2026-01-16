@@ -9,8 +9,8 @@
 #' @param true_beta Optional vector of true beta coefficients for comparison.
 #' @return A list containing data frames and ggplot objects for analysis.
 #' @import dplyr tidyr ggplot2 tibble
+#' @importFrom stats sd uniroot var
 #' @export
-utils::globalVariables(c("step", "value", "name", "type", "true_val", "norm_l2", "gap", "ref_1k", "ref_1k2", "error_l2"))
 analyze_optimization <- function(model, true_alpha = NULL, true_beta = NULL) {
     # Handle structure where history is nested in optimizer_details
     opt_source <- model
@@ -199,3 +199,5 @@ analyze_optimization <- function(model, true_alpha = NULL, true_beta = NULL) {
         plot_error_norm = plot_error_norm
     )
 }
+
+utils::globalVariables(c("step", "value", "name", "type", "true_val", "norm_l2", "gap", "ref_1k", "ref_1k2", "error_l2", "coefficient", "lambda", "lower", "mean_perf", "upper", "variable"))

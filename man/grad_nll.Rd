@@ -35,6 +35,8 @@ grad_nll(
 
 \item{opt}{Character string specifying which gradient to return ("alpha", "beta", or "both").}
 
+\item{method}{Method for computing gradient: "analytical" (default) or "numerical".}
+
 \item{clipping}{Small epsilon for probability clipping (defaults to 1e-10).}
 }
 \value{

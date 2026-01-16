@@ -6,6 +6,11 @@
 \usage{
 \method{print}{rbrm}(x, ...)
 }
+\arguments{
+\item{x}{An rbrm object.}
+
+\item{...}{Additional arguments (unused).}
+}
 \description{
 Print RBRM Object
 }

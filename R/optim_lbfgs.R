@@ -2,6 +2,20 @@
 #'
 #' Drops parameters into optim usually for MLE (lambda=0).
 #'
+#' @param alpha_start Initial alpha coefficients.
+#' @param beta_start Initial beta coefficients.
+#' @param step_size_alpha Step size for alpha (ignored by L-BFGS).
+#' @param step_size_beta Step size for beta (ignored by L-BFGS).
+#' @param lambda Lasso penalty for alpha.
+#' @param intercept Whether model includes intercept.
+#' @param max_step Maximum iterations.
+#' @param va Design matrix for alpha.
+#' @param vb Design matrix for beta.
+#' @param x Treatment vector.
+#' @param y Outcome vector.
+#' @param prob_fun Probability function (default getProbRR.org).
+#' @param lambda_beta Penalty for beta (default NULL, uses lambda).
+#' @param ... Additional arguments (e.g., clipping, save_history).
 #' @export
 optim_lbfgs <- function(alpha_start, beta_start,
                         step_size_alpha, step_size_beta, # Ignored

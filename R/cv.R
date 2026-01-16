@@ -14,6 +14,36 @@ cv_rbrm <- function(object, ...) {
 #' @param adjusted Logical. If TRUE (default), the final model is refitted without penalization on the active set.
 #' @param optimizer Optimization method: "fista" (default, C++), "lbfgs" (C++), "newton" (C++), "newton_active" (C++), or their R versions ("fista_R", "lbfgs_R", "newton_R", "newton_active_R").
 #' @export
+#' @param vb Matrix for beta (default NULL, uses object).
+#' @param x Treatment vector.
+#' @param y Outcome vector.
+#' @param nfold Number of folds (default 5).
+#' @param nlambda Number of lambda values (default 50).
+#' @param lambda_min_ratio Minimum lambda ratio (default based on n/p).
+#' @param lambda_seq Custom lambda sequence (default NULL, auto-generated).
+#' @param folds Custom fold assignments (default NULL, auto-generated).
+#' @param alpha_start Initial alpha coefficients (default NULL).
+#' @param beta_start Initial beta coefficients (default NULL).
+#' @param intercept Whether to include intercept (default TRUE).
+#' @param seed Random seed for fold generation (default NULL).
+#' @param verbose Print progress messages (default TRUE).
+#' @param data Data frame for formula interface.
+
+#' @param vb Matrix for beta (default NULL, uses object).
+#' @param x Treatment vector.
+#' @param y Outcome vector.
+#' @param nfold Number of folds (default 5).
+#' @param nlambda Number of lambda values (default 50).
+#' @param lambda_min_ratio Minimum lambda ratio (default based on n/p).
+#' @param lambda_seq Custom lambda sequence (default NULL, auto-generated).
+#' @param folds Custom fold assignments (default NULL, auto-generated).
+#' @param alpha_start Initial alpha coefficients (default NULL).
+#' @param beta_start Initial beta coefficients (default NULL).
+#' @param intercept Whether to include intercept (default TRUE).
+#' @param seed Random seed for fold generation (default NULL).
+#' @param verbose Print progress messages (default TRUE).
+#' @param data Data frame for formula interface.
+
 cv_rbrm.default <- function(object, vb = NULL, x, y,
                             nfold = 5,
                             nlambda = 50,
@@ -224,7 +254,6 @@ cv_rbrm.default <- function(object, vb = NULL, x, y,
     class(result) <- "cv_rbrm"
     return(invisible(result))
 }
-
 #' @describeIn cv_rbrm Formula interface
 #' @export
 cv_rbrm.formula <- function(object, data, ...) {
@@ -234,6 +263,9 @@ cv_rbrm.formula <- function(object, data, ...) {
 
 #' Print CV RBRM Object
 #' @export
+#' @param x A cv_rbrm object.
+#' @param ... Additional arguments (unused).
+
 print.cv_rbrm <- function(x, ...) {
     cli::cat_rule(cli::style_bold("RBRM Cross-Validation"), col = "#277DA1")
     cat("\n")
@@ -286,3 +318,4 @@ print.cv_rbrm <- function(x, ...) {
     cat("\n")
     invisible(x)
 }
+

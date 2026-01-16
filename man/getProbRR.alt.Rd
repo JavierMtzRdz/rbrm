@@ -14,6 +14,8 @@ the first column is treated as the log-relative risk and the second as the log-o
 
 \item{logop}{A numeric value or vector representing the log-odds product. If \code{logop}
 is \code{NA} and \code{logrr} is a vector of length 2, \code{logop} is extracted from the second element of \code{logrr}.}
+
+\item{clipping}{Threshold for clipping probabilities to avoid numerical issues (default 1e-15).}
 }
 \value{
 A matrix with two columns:

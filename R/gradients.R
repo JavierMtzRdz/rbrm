@@ -139,6 +139,8 @@ dp0_phi <- function(theta, phi,
 #' @param prob_fun Function that takes theta (theta), phi (phi) and returns list(p0, p1).
 #' @param opt Character string specifying which gradient to return ("alpha", "beta", or "both").
 #' @param clipping Small epsilon for probability clipping (defaults to 1e-10).
+#' @param method Method for computing gradient: "analytical" (default) or "numerical".
+
 #'
 #' @return Analytical gradient vector(s) of the negative log-likelihood defined by user's nllh.
 #' @export
@@ -246,6 +248,8 @@ grad_nll <- function(alpha, beta, y, x, va, vb,
   }
 }
 
+#' Gradient component for k-th parameter
+#' @keywords internal
 #' @export
 grad_nll_k <- function(alpha, beta, y, x, va, vb,
                        prob_fun,
@@ -314,6 +318,8 @@ grad_nll_k <- function(alpha, beta, y, x, va, vb,
 }
 
 
+#' Hessian for model under misspecification
+#' @keywords internal
 #' @export
 hessian_or <- function(y, x, va, vb, alpha.ml, beta.ml, weights) {
   # calculating the Hessian using the second derivative have to do so
@@ -390,3 +396,4 @@ hessian_or <- function(y, x, va, vb, alpha.ml, beta.ml, weights) {
     hess_alpha = -d2l.by.dalpha.2, hess_beta = -d2l.by.dbeta.2
   ))
 }
+#' @param method Method for gradient computation ("analytical" or "numerical")

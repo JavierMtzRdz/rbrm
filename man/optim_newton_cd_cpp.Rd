@@ -23,6 +23,39 @@ optim_newton_cd_cpp(
   ...
 )
 }
+\arguments{
+\item{alpha_start}{Initial alpha.}
+
+\item{beta_start}{Initial beta.}
+
+\item{step_size_alpha}{Ignored.}
+
+\item{step_size_beta}{Ignored.}
+
+\item{lambda}{Lasso penalty.}
+
+\item{intercept}{Boolean, include intercept?}
+
+\item{max_step}{Max iterations.}
+
+\item{va}{Covariate matrix A.}
+
+\item{vb}{Covariate matrix B.}
+
+\item{x}{Treatment vector.}
+
+\item{y}{Outcome vector.}
+
+\item{prob_fun}{Probability function.}
+
+\item{lambda_beta}{Penalty for beta.}
+
+\item{tol}{Convergence tolerance.}
+
+\item{save_history}{Save history?}
+
+\item{...}{Additional arguments.}
+}
 \description{
 Standard Newton-CD using C++ backend.
 }

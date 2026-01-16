@@ -70,6 +70,12 @@ perform_fista_step <- function(param, y_param, grad, step_size, lambda, intercep
 #' @param eval_grad Boolean, whether to evaluate gradients for stopping.
 #' @param save_history Boolean, whether to store full parameter history (memory intensive).
 #' @param thres Convergence threshold.
+#' @param use_line_search Boolean, use backtracking line search?
+#' @param armijo_c Armijo condition constant.
+#' @param line_search_shrink Shrinkage factor for line search.
+#' @param line_search_max_iter Maximum line search iterations.
+#' @param clipping Probability clipping threshold.
+#' @param ... Additional arguments.
 #'
 #' @export
 optim_fista <- function(alpha_start, beta_start,

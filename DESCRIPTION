@@ -1,13 +1,13 @@
 Package: rbrm
-Title: What the Package Does (One Line, Title Case)
-Version: 0.0.0.9000
-Authors@R: c(person(given = "First", family = "Last", role = c("aut", "cre"), email = "name@gmail.com", comment = c(ORCID = "ORCID-ID")),
-    person(given = "David B.", family = "Dahl", email = "dahl@stat.byu.edu", role = "cph", comment = "Rust crates: roxido, roxido_macro."),
-    person(given = "Alex", family = "Crichton", email = "alex@alexcrichton.com", role = "cph", comment = "Rust crate: proc-macro2."),
-    person(given = "David", family = "Tolnay", email = "dtolnay@gmail.com", role = "cph", comment = "Rust crates: syn, proc-macro2, quote, unicode-ident."),
-    person(given = "Unicode, Inc.", role = "cph", comment = "Rust crate: unicode-ident.")
+Title: Regularized Binary Regression Models
+Version: 0.0.0.1
+Authors@R: c(person(given = "Javier", family = "Martinez-Rodriguez", role = c("aut", "cre"), email = "javier@example.com")
     )
-Description: One paragraph description of what the package does.
+Description: Fits relative risk regression models for binary outcomes using 
+    Richardson-Robins-Wang and Pozza-Kenne-Pagui-Salvan parameterizations. 
+    Supports L1-penalized (lasso) estimation with multiple optimization algorithms 
+    including FISTA, L-BFGS, and coordinate descent. Provides cross-validation for 
+    penalty parameter selection and regularization path computation.
 License: MIT + file LICENSE
 Depends: R (>= 4.2.0)
 Encoding: UTF-8
@@ -24,12 +24,9 @@ Imports:
     dplyr (>= 1.0.0),
     tidyr (>= 1.0.0),
     ggplot2,
-    magrittr,
     tibble,
-    tictoc,
     rlang,
-    Rcpp,
-    pROC
+    Rcpp
 Config/testthat/edition: 3
 LinkingTo: 
     Rcpp,

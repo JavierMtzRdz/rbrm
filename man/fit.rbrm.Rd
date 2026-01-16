@@ -15,7 +15,7 @@ fit.rbrm(
   lambda = 0,
   lambda_beta = NULL,
   lambda_b_prop = 1,
-  intercept = FALSE,
+  intercept = TRUE,
   prob_fun = getProbRR.org,
   optimizer = "fista",
   save_opt = FALSE,
@@ -49,11 +49,13 @@ fit.rbrm(
 
 \item{prob_fun}{Function to calculate probabilities (e.g., \code{getProbRR.org}).}
 
-\item{optimizer}{Optimization method: "fista" (default), "lbfgs", "newton", or "newton_active".}
+\item{optimizer}{Optimization method: "fista" (default, C++), "lbfgs" (C++), "newton" (C++), "newton_active" (C++), or their R versions ("fista_R", "lbfgs_R", "newton_R", "newton_active_R").}
 
 \item{save_opt}{Logical. If \code{TRUE}, include the full parameter history in results.}
 
 \item{standardize}{Logical. scaling.}
+
+\item{clipping}{Threshold for clipping probabilities (default 1e-10).}
 
 \item{...}{Additional arguments passed to the optimization function (e.g., \code{step_size_alpha}, \code{armijo_c}).}
 }
@@ -64,5 +66,5 @@ An object of class "rbrm".
 Wraps an optimization function to fit the RBRM model with Lasso penalty.
 }
 \seealso{
-\code{\link{fista_opt}}, \code{\link{optim_lbfgs}}, \code{\link{optim_newton_cd}}
+\code{\link{optim_fista}}, \code{\link{optim_lbfgs}}, \code{\link{optim_newton_cd}}
 }

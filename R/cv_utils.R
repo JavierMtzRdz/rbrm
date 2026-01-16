@@ -1,9 +1,4 @@
-#' Standardize Design Matrices for RBRM
-#'
-#' @param va Matrix for alpha.
-#' @param vb Matrix for beta.
-#' @return List with standardized matrices and scaler info.
-#' @export
+#' @keywords internal
 standardize_data <- function(va, vb = NULL) {
     p_a <- ncol(va)
     scaler_a <- list(center = rep(0, p_a), scale = rep(1, p_a))
@@ -61,9 +56,7 @@ standardize_data <- function(va, vb = NULL) {
     list(va = va, vb = vb, scaler_a = scaler_a, scaler_b = scaler_b)
 }
 
-#' Unstandardize RBRM Coefficients
-#'
-#' @export
+#' @keywords internal
 unstandardize_coeffs <- function(alpha, beta, scaler_a, scaler_b) {
     # Unstandardize alpha
     if (!is.null(alpha) && !is.null(scaler_a)) {
@@ -115,9 +108,7 @@ unstandardize_coeffs <- function(alpha, beta, scaler_a, scaler_b) {
 }
 
 
-#' Find Lambda Max for RBRM
-#'
-#' @export
+#' @keywords internal
 find_lambda_max <- function(va, vb, x, y, alpha_start = NULL, beta_start = NULL, prob_fun = getProbRR.org, intercept = TRUE) {
     n <- length(y)
 
@@ -140,9 +131,7 @@ find_lambda_max <- function(va, vb, x, y, alpha_start = NULL, beta_start = NULL,
     return(max_grad)
 }
 
-#' Create Lambda Grid
-#'
-#' @export
+#' @keywords internal
 create_lambda_grid <- function(lambda_max, nlambda = 100, lambda.min.ratio = 1e-4) {
     if (is.null(lambda_max) || lambda_max == 0) lambda_max <- 1.0 # Fallback
 
@@ -150,11 +139,7 @@ create_lambda_grid <- function(lambda_max, nlambda = 100, lambda.min.ratio = 1e-
     return(lambdas)
 }
 
-#' Calculate All Performance Measures
-#'
-#' efficient calculation of all binary regression metrics in one pass.
-#'
-#' @export
+#' @keywords internal
 calc_all_measures <- function(va, vb, x, y, alpha, beta, prob_fun = getProbRR.org) {
     theta <- as.vector(va %*% alpha)
     phi <- as.vector(vb %*% beta)
@@ -211,9 +196,7 @@ calc_all_measures <- function(va, vb, x, y, alpha, beta, prob_fun = getProbRR.or
     ))
 }
 
-#' Get Performance Measure Name
-#'
-#' @export
+#' @keywords internal
 get_measure_name <- function(measure) {
     measure <- tolower(measure)
     switch(measure,

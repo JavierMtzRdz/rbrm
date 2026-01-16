@@ -17,19 +17,16 @@ test_that("All optimizers converge on simple data", {
     y[x_trt == 0] <- rbinom(sum(x_trt == 0), 1, ps$p0[x_trt == 0])
     y[x_trt == 1] <- rbinom(sum(x_trt == 1), 1, ps$p1[x_trt == 1])
 
-    # List of optimizers
-    optimizers <- list(fista_opt, optim_newton_cd, optim_lbfgs)
-    names(optimizers) <- c("fista", "newton", "lbfgs")
+    # List of optimizers (testing R versions)
+    optimizer_names <- c("fista_R", "newton_R", "lbfgs_R")
 
-    for (opt_name in names(optimizers)) {
-        opt_fun <- optimizers[[opt_name]]
-
+    for (opt_name in optimizer_names) {
         # 1. Basic Fit
         fit <- fit.rbrm(va, vb, x_trt, y,
             max_step = 100,
             lambda = 0.01,
             intercept = FALSE,
-            opt_fun = opt_fun,
+            optimizer = opt_name,
             save_opt = FALSE
         )
 
@@ -53,18 +50,15 @@ test_that("analyze_optimization works with all optimizers", {
     x_trt <- rbinom(n, 1, 0.5)
     y <- rbinom(n, 1, 0.3)
 
-    optimizers <- list(fista_opt, optim_newton_cd, optim_lbfgs)
-    names(optimizers) <- c("fista", "newton", "lbfgs")
+    optimizer_names <- c("fista_R", "newton_R", "lbfgs_R")
 
-    for (opt_name in names(optimizers)) {
-        opt_fun <- optimizers[[opt_name]]
-
+    for (opt_name in optimizer_names) {
         # Fit with save_opt = TRUE
         fit <- fit.rbrm(va, vb, x_trt, y,
             max_step = 10,
             lambda = 0,
             intercept = FALSE,
-            opt_fun = opt_fun,
+            optimizer = opt_name,
             save_opt = TRUE
         )
 
@@ -84,7 +78,7 @@ test_that("analyze_optimization works with all optimizers", {
         expect_true(!is.null(analysis$plot_opt_gap))
 
         # Gradient plots: FISTA and Newton save gradients, L-BFGS does not
-        if (opt_name %in% c("fista", "newton")) {
+        if (opt_name %in% c("fista_R", "newton_R")) {
             expect_true(!is.null(analysis$plot_grads), info = paste("Optimizer:", opt_name))
             expect_true(!is.null(analysis$plot_grad_norm), info = paste("Optimizer:", opt_name))
         }

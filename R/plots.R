@@ -6,6 +6,14 @@
 #' @param ... Additional arguments (unused).
 #' @return A ggplot object.
 #' @export
+#' @param x A cv_rbrm object.
+#' @param measure Performance measure to plot (default NULL).
+#' @param ... Additional arguments (unused).
+
+#' @param x A cv_rbrm object.
+#' @param measure Performance measure to plot (default NULL).
+#' @param ... Additional arguments (unused).
+
 plot.cv_rbrm <- function(x, measure = NULL, ...) {
   if (!inherits(x, "cv_rbrm")) {
     cli::cli_abort("Object must be of class 'cv_rbrm'")
@@ -134,14 +142,22 @@ plot.cv_rbrm <- function(x, measure = NULL, ...) {
   } else {
     p <- p + ggplot2::scale_x_log10()
   }
+#' @param x An rbrm object.
+#' @param measure Whether to plot intercept (default FALSE).
+#' @param ... Additional arguments (unused).
+
 
   return(p)
 }
 
+#' @param x An rbrm object.
+#' @param measure Whether to plot intercept (default FALSE).
+#' @param ... Additional arguments (unused).
+
 #' Plot RBRM Coefficients (Single Fit)
 #'
 #' @param x An object of class `rbrm`.
-#' @param intercept Logical. Include intercept in plot?
+#' @param measure Logical. Include intercept in plot?
 #' @export
 plot.rbrm <- function(x, intercept = FALSE, ...) {
   if (!inherits(x, "rbrm")) cli::cli_abort("Object must be of class 'rbrm'")
@@ -179,6 +195,10 @@ plot.rbrm <- function(x, intercept = FALSE, ...) {
     ggplot2::facet_wrap(~type, scales = "free", ncol = 1) +
     ggplot2::coord_flip() +
     ggplot2::labs(
+#' @param x An rbrm_path object.
+#' @param plot_intercept Whether to plot intercept (default FALSE).
+#' @param ... Additional arguments (unused).
+
       title = "RBRM Coefficients",
       x = "Variable",
       y = "Value"
@@ -186,6 +206,10 @@ plot.rbrm <- function(x, intercept = FALSE, ...) {
     ggplot2::theme_minimal()
 }
 
+
+#' @param x An rbrm_path object.
+#' @param plot_intercept Whether to plot intercept (default FALSE).
+#' @param ... Additional arguments (unused).
 
 #' Plot Coefficient Paths from rbrm_path Object
 #'

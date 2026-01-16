@@ -27,11 +27,43 @@ optim_fista_cpp(
 )
 }
 \arguments{
+\item{alpha_start}{Initial alpha.}
+
+\item{beta_start}{Initial beta.}
+
+\item{step_size_alpha}{Ignored.}
+
+\item{step_size_beta}{Ignored.}
+
+\item{lambda}{Lasso penalty.}
+
+\item{intercept}{Boolean, include intercept?}
+
+\item{max_step}{Max iterations.}
+
+\item{va}{Covariate matrix A.}
+
+\item{vb}{Covariate matrix B.}
+
+\item{x}{Treatment vector.}
+
+\item{y}{Outcome vector.}
+
+\item{prob_fun}{Probability function.}
+
+\item{lambda_beta}{Penalty for beta.}
+
+\item{tol}{Convergence tolerance.}
+
+\item{save_history}{Save history?}
+
 \item{step_size_init}{Initial step size for backtracking line search.}
 
 \item{armijo_c}{Armijo condition parameter (default 1e-4). Not used in current C++ implementation (quadratic approx used instead).}
 
 \item{shrink_factor}{Factor to reduce step size during backtracking (default 0.5).}
+
+\item{...}{Additional arguments.}
 }
 \description{
 Fast Iterative Shrinkage-Thresholding Algorithm (FISTA) using C++ backend.

@@ -19,7 +19,8 @@
 #' @param standardize Logical. scaling.
 #' @param ... Additional arguments passed to the optimization function (e.g., `step_size_alpha`, `armijo_c`).
 #'
-#' @seealso \code{\link{fista_opt}}, \code{\link{optim_lbfgs}}, \code{\link{optim_newton_cd}}
+#' @param clipping Threshold for clipping probabilities (default 1e-10).
+#' @seealso \code{\link{optim_fista}}, \code{\link{optim_lbfgs}}, \code{\link{optim_newton_cd}}
 #' @return An object of class "rbrm".
 #' @export
 fit.rbrm <- function(va, vb = NULL, x, y,
@@ -34,13 +35,13 @@ fit.rbrm <- function(va, vb = NULL, x, y,
                      standardize = TRUE,
                      clipping = 1e-10,
                      ...) {
-  tictoc::tic("rbrm_fit time")
-
   # Optimizer Selection
   optimizer <- rlang::arg_match(optimizer, c(
     "fista", "lbfgs", "newton", "newton_active",
     "fista_R", "lbfgs_R", "newton_R", "newton_active_R"
   ))
+
+  start_time <- Sys.time()
 
   opt_fun <- switch(optimizer,
     "fista" = optim_fista_cpp,
@@ -238,8 +239,7 @@ fit.rbrm <- function(va, vb = NULL, x, y,
   step <- opt_result$step
   convergence <- opt_result$convergence
 
-  time_info <- tictoc::toc(quiet = TRUE)
-  run_time <- round(time_info$toc - time_info$tic, 4)
+  run_time <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
 
   if (!save_opt) {
     opt_result$alphas <- NULL
@@ -286,6 +286,12 @@ fit.rbrm <- function(va, vb = NULL, x, y,
 }
 
 #' Print RBRM Object
+#' @param x An rbrm object.
+#' @param ... Additional arguments (unused).
+
+#' @param x An rbrm object.
+#' @param ... Additional arguments (unused).
+
 #'
 #' @export
 print.rbrm <- function(x, ...) {
