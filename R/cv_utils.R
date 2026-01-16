@@ -67,18 +67,48 @@ standardize_data <- function(va, vb = NULL) {
 unstandardize_coeffs <- function(alpha, beta, scaler_a, scaler_b) {
     # Unstandardize alpha
     if (!is.null(alpha) && !is.null(scaler_a)) {
-        alpha_orig <- alpha / scaler_a$scale
-        adj <- sum(alpha * scaler_a$center / scaler_a$scale)
-        alpha_orig[1] <- alpha_orig[1] - adj
-        alpha <- alpha_orig
+        p <- length(scaler_a$scale)
+        if (length(alpha) == p) {
+            # Dimensions match (e.g. Intercept was in data)
+            alpha_orig <- alpha / scaler_a$scale
+            adj <- sum(alpha * scaler_a$center / scaler_a$scale)
+            alpha_orig[1] <- alpha_orig[1] - adj
+            alpha <- alpha_orig
+        } else if (length(alpha) == p + 1) {
+            # Alpha has added intercept (first element)
+            alpha_std <- alpha[-1]
+            intercept_val <- alpha[1]
+
+            alpha_orig_coeffs <- alpha_std / scaler_a$scale
+            adj <- sum(alpha_std * scaler_a$center / scaler_a$scale)
+            intercept_orig <- intercept_val - adj
+
+            alpha <- c(intercept_orig, alpha_orig_coeffs)
+
+            # Preserve names if present
+            if (!is.null(names(alpha_std))) names(alpha) <- c("Intercept", names(alpha_std))
+        }
     }
 
     # Unstandardize beta
     if (!is.null(beta) && !is.null(scaler_b)) {
-        beta_orig <- beta / scaler_b$scale
-        adj_b <- sum(beta * scaler_b$center / scaler_b$scale)
-        beta_orig[1] <- beta_orig[1] - adj_b
-        beta <- beta_orig
+        p_b <- length(scaler_b$scale)
+        if (length(beta) == p_b) {
+            beta_orig <- beta / scaler_b$scale
+            adj_b <- sum(beta * scaler_b$center / scaler_b$scale)
+            beta_orig[1] <- beta_orig[1] - adj_b
+            beta <- beta_orig
+        } else if (length(beta) == p_b + 1) {
+            beta_std <- beta[-1]
+            intercept_val <- beta[1]
+
+            beta_orig_coeffs <- beta_std / scaler_b$scale
+            adj_b <- sum(beta_std * scaler_b$center / scaler_b$scale)
+            intercept_orig <- intercept_val - adj_b
+
+            beta <- c(intercept_orig, beta_orig_coeffs)
+            if (!is.null(names(beta_std))) names(beta) <- c("Intercept", names(beta_std))
+        }
     }
 
     list(alpha = alpha, beta = beta)

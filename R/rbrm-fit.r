@@ -14,7 +14,7 @@
 #' @param lambda_b_prop Proportion of lambda to use for beta if lambda_beta is NULL.
 #' @param intercept Logical. Does the model include an intercept term?
 #' @param prob_fun Function to calculate probabilities (e.g., `getProbRR.org`).
-#' @param optimizer Optimization method: "fista" (default), "lbfgs", "newton", or "newton_active".
+#' @param optimizer Optimization method: "fista" (default, C++), "lbfgs" (C++), "newton" (C++), "newton_active" (C++), or their R versions ("fista_R", "lbfgs_R", "newton_R", "newton_active_R").
 #' @param save_opt Logical. If `TRUE`, include the full parameter history in results.
 #' @param standardize Logical. scaling.
 #' @param ... Additional arguments passed to the optimization function (e.g., `step_size_alpha`, `armijo_c`).
@@ -27,7 +27,7 @@ fit.rbrm <- function(va, vb = NULL, x, y,
                      max_step = 1000, lambda = 0,
                      lambda_beta = NULL,
                      lambda_b_prop = 1,
-                     intercept = FALSE,
+                     intercept = TRUE,
                      prob_fun = getProbRR.org,
                      optimizer = "fista",
                      save_opt = FALSE,
@@ -73,8 +73,8 @@ fit.rbrm <- function(va, vb = NULL, x, y,
   # Add Intercept Automatically
   if (intercept) {
     # Check if intercept already exists (first column is all ones)
-    has_intercept_va <- isTRUE(all(va[, 1] == 1))
-    has_intercept_vb <- isTRUE(all(vb[, 1] == 1))
+    has_intercept_va <- if (ncol(va) > 0) isTRUE(all(va[, 1] == 1)) else FALSE
+    has_intercept_vb <- if (ncol(vb) > 0) isTRUE(all(vb[, 1] == 1)) else FALSE
 
     if (!has_intercept_va) {
       va <- cbind(Intercept = 1, va)
@@ -248,6 +248,32 @@ fit.rbrm <- function(va, vb = NULL, x, y,
     opt_result$grad_betas <- NULL
   }
 
+  # Assign Names (Robust)
+  nms_a <- colnames(va)
+  if (is.null(nms_a)) {
+    seq_a <- seq_len(length(alpha))
+    nms_a <- paste0("V", seq_a)
+    if (intercept) nms_a[1] <- "Intercept"
+  } else {
+    missing_idx <- which(nms_a == "")
+    if (length(missing_idx) > 0) nms_a[missing_idx] <- paste0("V", missing_idx)
+    # Ensure intercept name is standard if it is first
+    if (intercept && nms_a[1] != "Intercept" && nms_a[1] != "(Intercept)") nms_a[1] <- "Intercept"
+  }
+  names(alpha) <- nms_a
+
+  nms_b <- colnames(vb)
+  if (is.null(nms_b)) {
+    seq_b <- seq_len(length(beta))
+    nms_b <- paste0("V", seq_b)
+    if (intercept) nms_b[1] <- "Intercept"
+  } else {
+    missing_idx <- which(nms_b == "")
+    if (length(missing_idx) > 0) nms_b[missing_idx] <- paste0("V", missing_idx)
+    if (intercept && nms_b[1] != "Intercept" && nms_b[1] != "(Intercept)") nms_b[1] <- "Intercept"
+  }
+  names(beta) <- nms_b
+
   result <- list(
     call = match.call(), point.est = c(alpha, beta), alpha = alpha,
     beta = beta, convergence = convergence, step = step,
@@ -270,14 +296,56 @@ print.rbrm <- function(x, ...) {
     cli::cat_bullet("Lambda: ", cli::col_cyan(sprintf("%.4f", x$lambda)), bullet = "info", bullet_col = "#F9C74F")
   }
 
-  # Coefficients count
-  n_a <- sum(abs(x$alpha) > 1e-10)
-  n_b <- sum(abs(x$beta) > 1e-10)
+
+  if (!is.null(x$dimensions)) {
+    cli::cat_bullet("Features (Alpha): ", cli::col_cyan(x$dimensions$p_a), bullet = "info", bullet_col = "#F9C74F")
+    cli::cat_bullet("Features (Beta): ", cli::col_cyan(x$dimensions$p_b), bullet = "info", bullet_col = "#F9C74F")
+  }
+
+  # Helper to print coeffs
+  print_coefs <- function(coefs, label, intercept_used, limit = 8) {
+    idx <- which(abs(coefs) > 1e-10)
+
+    # Handle Intercept
+    has_intercept <- FALSE
+    match_int <- grep("^(Intercept|\\(Intercept\\))$", names(coefs))
+
+    # If standard 'intercept' flag is true, and we find it at index 1 usually
+    if (intercept_used && length(match_int) > 0) {
+      # Check if intercept is non-zero
+      int_idx <- match_int[1] # Take first match
+      if (int_idx %in% idx) {
+        has_intercept <- TRUE
+        val <- coefs[int_idx]
+        cli::cat_bullet(paste0(label, " Intercept: "), cli::col_cyan(sprintf("%.3f", val)), bullet = "arrow_right", bullet_col = "#F94144")
+        # Rmove from index list for counting/listing
+        idx <- setdiff(idx, int_idx)
+      }
+    }
+
+    n_nz <- length(idx)
+    cli::cat_bullet(paste0(label, " Non-zero (Penalized): "), cli::col_cyan(n_nz), bullet = "arrow_right", bullet_col = "#43AA8B")
+
+    if (n_nz > 0) {
+      show_n <- min(n_nz, limit)
+      show_idx <- idx[1:show_n]
+      vals <- coefs[show_idx]
+
+      nms <- names(coefs)[show_idx]
+      if (is.null(nms)) nms <- paste0("[", show_idx, "]")
+
+      items <- paste0(nms, "=", sprintf("%.3f", vals))
+      out <- paste(items, collapse = ", ")
+      if (n_nz > limit) out <- paste0(out, ", ...")
+
+      cli::cat_line(paste0("   ", cli::col_grey(out)))
+    }
+  }
 
   cat("\n")
-  cli::cat_line("Non-zero coefficients:")
-  cli::cat_bullet("Alpha: ", cli::col_cyan(n_a), bullet = "arrow_right", bullet_col = "#43AA8B")
-  cli::cat_bullet("Beta:  ", cli::col_cyan(n_b), bullet = "arrow_right", bullet_col = "#43AA8B")
+  cli::cat_line("Coefficients:")
+  print_coefs(x$alpha, "Alpha", x$intercept)
+  print_coefs(x$beta, "Beta", x$intercept)
 
   cat("\n")
   invisible(x)

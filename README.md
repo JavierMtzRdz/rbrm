@@ -39,47 +39,135 @@ p <- 5
 
 data <- generate_data(
   n = n,
-  p_a = p,
-  p_b = p,
-  alpha_true = c(0.5, -0.3, 0.2, 0, 0),
-  beta_true = c(-0.2, 0.4, 0, 0, 0)
+  pa = p,
+  pb = p,
+  n_test = 100
 )
 
-# Fit regularized model
-fit <- fit.rbrm(
-  va = data$va,
-  vb = data$vb,
-  x = data$x,
-  y = data$y,
-  lambda = 0.01,
-  intercept = TRUE
+# Fit regularized model (Penalized)
+fit <- rbrm(
+  va = data$v.train,
+  vb = data$v.train,
+  x = data$x.train,
+  y = data$y.train,
+  lambda = 0.02,
+  adjusted = FALSE
 )
 
-print(fit)
+fit
+#> ── RBRM Model Fit ──────────────────────────────────────────────────────────────
+#> 
+#> ℹ Lambda: 0.0200
+#> ℹ Features (Alpha): 6
+#> ℹ Features (Beta): 6
+#> 
+#> Coefficients:
+#> → Alpha Intercept: -0.350
+#> → Alpha Non-zero (Penalized): 1
+#>    V2=1.242
+#> → Beta Intercept: -4.422
+#> → Beta Non-zero (Penalized): 0
 
-# Cross-validation for lambda selection
+# Cross-validation with custom metric and adjusted final model
 cv_fit <- cv_rbrm(
-  va = data$va,
-  vb = data$vb,
-  x = data$x,
-  y = data$y,
-  nfold = 5,
-  nlambda = 50
+  data$v.train,
+  vb = data$v.train,
+  x = data$x.train,
+  y = data$y.train,
+  measure = "deviance" # Options: deviance, auc, brier, misclass
 )
+#> ℹ Generating lambda sequence...
+#> ✔ Generated 50 lambdas (Max: 0.047)
+#> ℹ Using Deviance as primary selection metric
+#> Running Cross-Validation ■■■■■■■■■■■■■                     40% | ETA:  9sRunning Cross-Validation ■■■■■■■■■■■■■■■■■■■               60% | ETA:  8sRunning Cross-Validation ■■■■■■■■■■■■■■■■■■■■■■■■■         80% | ETA:  4s                                                                          ✔ CV Complete. Min Lambda: 0.02018
+#> ℹ Fitting adjusted final model (unpenalized refit)...
 
+cv_fit
+#> ── RBRM Cross-Validation ───────────────────────────────────────────────────────
+#> 
+#> ℹ Folds: 5
+#> ℹ Lambda Path Length: 50
+#> ℹ Measure: Deviance
+#> ℹ Refit Unpenalized: Yes
+#> ℹ Optimizer: fista
+#> 
+#> ── Optimal Lambdas ─────────────────────────────────────────────────────────────
+#> ★ Min Lambda: 0.0202 (Deviance: 28.54)
+#> ★ 1-SE Lambda: 0.0470
+#> 
+#> ── Final Model (at Lambda Min) ─────────────────────────────────────────────────
+#> → Active Va Coeffs (Penalized): 1
+#> → Active Vb Coeffs (Penalized): 0
 plot(cv_fit)
+```
 
-# Fit regularization path
-path <- rbrm_path(
-  va = data$va,
-  vb = data$vb,
-  x = data$x,
-  y = data$y,
-  nlambda = 50
+<img src="man/figures/README-example-1.png" width="100%" />
+
+``` r
+cv_fit$final_fit
+#> ── RBRM Model Fit ──────────────────────────────────────────────────────────────
+#> 
+#> ℹ Lambda: 0.0202
+#> ℹ Features (Alpha): 5
+#> ℹ Features (Beta): 5
+#> 
+#> Coefficients:
+#> → Alpha Intercept: -0.201
+#> → Alpha Non-zero (Penalized): 1
+#>    V2=2.323
+#> → Beta Intercept: -4.622
+#> → Beta Non-zero (Penalized): 0
+
+# Fit relaxed regularization path (no refitting)
+fit_path <- rbrm(
+  va = data$v.train,
+  vb = data$v.train,
+  x = data$x.train,
+  y = data$y.train,
+  adjusted = FALSE
 )
 
-plot(path)
+fit_path
+#> ── RBRM Regularization Path ────────────────────────────────────────────────────
+#> 
+#> ℹ Lambdas: 50
+#> ℹ Range: 0.0000 - 0.0470
+#> ℹ Optimizer: fista
+#> ℹ Intercept: Included
+#> ℹ Features (Alpha): 5
+#> ℹ Features (Beta): 5
+plot(fit_path) +
+  geom_vline(xintercept = cv_fit$lambda_min,
+             alpha = 0.3, linetype = "dashed")
 ```
+
+<img src="man/figures/README-example-2.png" width="100%" />
+
+``` r
+
+# Fit relaxed regularization path (Unpenalized Refitting)
+fit_path <- rbrm(
+  va = data$v.train,
+  vb = data$v.train,
+  x = data$x.train,
+  y = data$y.train,
+  adjusted = TRUE
+)
+
+fit_path
+#> ── RBRM Regularization Path ────────────────────────────────────────────────────
+#> 
+#> ℹ Lambdas: 50
+#> ℹ Range: 0.0000 - 0.0470
+#> ℹ Type: Relaxed (Unpenalized Refit)
+#> ℹ Optimizer: fista
+#> ℹ Intercept: Included
+#> ℹ Features (Alpha): 5
+#> ℹ Features (Beta): 5
+plot(fit_path) 
+```
+
+<img src="man/figures/README-example-3.png" width="100%" />
 
 ## The Model
 

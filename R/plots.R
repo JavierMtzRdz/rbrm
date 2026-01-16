@@ -50,11 +50,22 @@ plot.cv_rbrm <- function(x, measure = NULL, ...) {
   }
 
   # Extract variable counts
-  fit_obj <- if (!is.null(x$final_fit)) x$final_fit$path else x$fit
+  fit_obj <- if (!is.null(x$path)) x$path else if (!is.null(x$final_fit) && !is.null(x$final_fit$path)) x$final_fit$path else x$fit
 
   if (!is.null(fit_obj)) {
-    n_vars_a <- colSums(abs(fit_obj$alphas) > 1e-10)
-    n_vars_b <- colSums(abs(fit_obj$betas) > 1e-10)
+    # Helper to count variables excluding intercept
+    count_vars <- function(coefs, has_int) {
+      if (has_int && nrow(coefs) > 0) {
+        # Exclude first row (Intercept)
+        colSums(abs(coefs[-1, , drop = FALSE]) > 1e-10)
+      } else {
+        colSums(abs(coefs) > 1e-10)
+      }
+    }
+
+    has_int <- isTRUE(fit_obj$intercept)
+    n_vars_a <- count_vars(fit_obj$alphas, has_int)
+    n_vars_b <- count_vars(fit_obj$betas, has_int)
     n_vars <- n_vars_a + n_vars_b
   } else {
     n_vars <- rep(NA, length(x$lambdas))
@@ -127,6 +138,54 @@ plot.cv_rbrm <- function(x, measure = NULL, ...) {
   return(p)
 }
 
+#' Plot RBRM Coefficients (Single Fit)
+#'
+#' @param x An object of class `rbrm`.
+#' @param intercept Logical. Include intercept in plot?
+#' @export
+plot.rbrm <- function(x, intercept = FALSE, ...) {
+  if (!inherits(x, "rbrm")) cli::cli_abort("Object must be of class 'rbrm'")
+
+  # helper
+  prep_df <- function(coefs, type) {
+    df <- data.frame(
+      variable = names(coefs),
+      value = as.numeric(coefs),
+      type = type,
+      stringsAsFactors = FALSE
+    )
+    if (is.null(df$variable)) df$variable <- paste0(substr(type, 1, 1), 1:nrow(df))
+    df
+  }
+
+  df_a <- prep_df(x$alpha, "Alpha")
+  df_b <- prep_df(x$beta, "Beta")
+  df <- rbind(df_a, df_b)
+
+  if (!intercept) {
+    df <- df[!grepl("^(Intercept|\\(Intercept\\))$", df$variable), ]
+  }
+
+  # Filter non-zero
+  df <- df[abs(df$value) > 1e-10, , drop = FALSE]
+
+  if (nrow(df) == 0) {
+    cli::cli_warn("No non-zero coefficients to plot.")
+    return(invisible(NULL))
+  }
+
+  ggplot2::ggplot(df, ggplot2::aes(x = stats::reorder(variable, value), y = value, fill = type)) +
+    ggplot2::geom_col(show.legend = FALSE) +
+    ggplot2::facet_wrap(~type, scales = "free", ncol = 1) +
+    ggplot2::coord_flip() +
+    ggplot2::labs(
+      title = "RBRM Coefficients",
+      x = "Variable",
+      y = "Value"
+    ) +
+    ggplot2::theme_minimal()
+}
+
 
 #' Plot Coefficient Paths from rbrm_path Object
 #'
@@ -165,7 +224,7 @@ plot.rbrm_path <- function(x, plot_intercept = FALSE, ...) {
     dplyr::mutate(lambda = as.numeric(lambda))
 
   if (!plot_intercept) {
-    plot_data <- dplyr::filter(plot_data, !variable %in% c("(Intercept)", "Intercept"))
+    plot_data <- dplyr::filter(plot_data, !grepl("^(Intercept|\\(Intercept\\))$", variable, ignore.case = TRUE))
   }
 
   ggplot2::ggplot(plot_data, ggplot2::aes(x = lambda, y = coefficient, group = interaction(variable, type), color = type)) +

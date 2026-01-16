@@ -1414,8 +1414,11 @@ Rcpp::List fista_cpp(Rcpp::NumericVector alpha_start_rcpp,
 
     arma::vec change_a = alpha_new - alpha;
     arma::vec change_b = beta_new - beta;
-    double max_change =
-        std::max(arma::abs(change_a).max(), arma::abs(change_b).max());
+    double max_change_a =
+        (change_a.n_elem > 0) ? arma::abs(change_a).max() : 0.0;
+    double max_change_b =
+        (change_b.n_elem > 0) ? arma::abs(change_b).max() : 0.0;
+    double max_change = std::max(max_change_a, max_change_b);
 
     if (max_change < tol) {
       beta = beta_new;

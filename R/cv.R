@@ -12,7 +12,7 @@ cv_rbrm <- function(object, ...) {
 #' @describeIn cv_rbrm Default method for matrices
 #' @param measure Performance measure: "deviance" (default), "brier", "misclass", or "auc"
 #' @param adjusted Logical. If TRUE (default), the final model is refitted without penalization on the active set.
-#' @param optimizer Optimization method: "fista" (default), "lbfgs", "newton", or "newton_active".
+#' @param optimizer Optimization method: "fista" (default, C++), "lbfgs" (C++), "newton" (C++), "newton_active" (C++), or their R versions ("fista_R", "lbfgs_R", "newton_R", "newton_active_R").
 #' @export
 cv_rbrm.default <- function(object, vb = NULL, x, y,
                             nfold = 5,
@@ -24,6 +24,7 @@ cv_rbrm.default <- function(object, vb = NULL, x, y,
                             adjusted = TRUE,
                             optimizer = "fista",
                             alpha_start = NULL, beta_start = NULL,
+                            intercept = TRUE,
                             seed = NULL,
                             verbose = TRUE,
                             ...) {
@@ -37,11 +38,6 @@ cv_rbrm.default <- function(object, vb = NULL, x, y,
         cli::cli_abort("{.arg nlambda} must be an integer >= 2.")
     }
 
-    # Validate optimizer
-    optimizer <- rlang::arg_match(optimizer, c(
-        "fista", "lbfgs", "newton", "newton_active",
-        "fista_R", "lbfgs_R", "newton_R", "newton_active_R"
-    ))
 
     n <- length(y)
     if (nrow(va) != n) cli::cli_abort("{.arg va} must have the same number of rows as length of {.arg y}.")
@@ -62,7 +58,8 @@ cv_rbrm.default <- function(object, vb = NULL, x, y,
         if (verbose) cli::cli_alert_info("Generating lambda sequence...")
         std_tmp <- standardize_data(va, vb)
 
-        l_max <- find_lambda_max(std_tmp$va, std_tmp$vb, x, y, prob_fun = getProbRR.org)
+        # Find lambda_max using standardized data (so effectively NO INTERCEPT in that matrix)
+        l_max <- find_lambda_max(std_tmp$va, std_tmp$vb, x, y, prob_fun = getProbRR.org, intercept = FALSE)
 
         lambda_seq <- create_lambda_grid(l_max, nlambda, lambda_min_ratio)
         if (verbose) cli::cli_alert_success("Generated {length(lambda_seq)} lambdas (Max: {round(l_max, 4)})")
@@ -112,6 +109,7 @@ cv_rbrm.default <- function(object, vb = NULL, x, y,
             lambda = lambda_seq,
             standardize = TRUE,
             adjusted = FALSE,
+            intercept = intercept,
             optimizer = optimizer,
             verbose = FALSE, ...
         )
@@ -122,8 +120,20 @@ cv_rbrm.default <- function(object, vb = NULL, x, y,
             a_est <- path_fit$alphas[, i]
             b_est <- path_fit$betas[, i]
 
+            # Match Dimensions for Test Set (Add Intercept if needed)
+            va_test_calc <- va_test
+            vb_test_calc <- vb_test
+
+            # If intercept=TRUE, refitted model has Intercept column.
+            # calc_all_measures expects matrix matching coefficients.
+            if (intercept) {
+                # Add intercept column manually to test set
+                if (!any(va_test_calc[, 1] == 1)) va_test_calc <- cbind(1, va_test_calc)
+                if (!any(vb_test_calc[, 1] == 1)) vb_test_calc <- cbind(1, vb_test_calc)
+            }
+
             # Calculate ALL metrics efficiently
-            all_vals <- calc_all_measures(va_test, vb_test, x_test, y_test, a_est, b_est)
+            all_vals <- calc_all_measures(va_test_calc, vb_test_calc, x_test, y_test, a_est, b_est)
 
             for (m in metrics) {
                 perf_arrays[[m]][k, i] <- all_vals[[m]]
@@ -178,17 +188,37 @@ cv_rbrm.default <- function(object, vb = NULL, x, y,
         lambda = lambda_seq,
         standardize = TRUE,
         adjusted = adjusted,
+        intercept = intercept,
         optimizer = optimizer,
         verbose = FALSE, ...
     )
 
-    # Extract coefficients for lambda.min
-    result$final_fit <- list(
-        path = final_path,
-        alpha_min = final_path$alphas[, idx_min],
-        beta_min = final_path$betas[, idx_min],
-        alpha_1se = final_path$alphas[, best_idx_1se],
-        beta_1se = final_path$betas[, best_idx_1se]
+    # Construct "rbrm" object for optimal fit to mimic fit.rbrm output
+    final_fit_obj <- list(
+        call = match.call(),
+        point.est = c(final_path$alphas[, idx_min], final_path$betas[, idx_min]),
+        alpha = final_path$alphas[, idx_min],
+        beta = final_path$betas[, idx_min],
+        lambda = result$lambda_min,
+        intercept = intercept,
+        va_scale_info = final_path$scaler_a,
+        vb_scale_info = final_path$scaler_b,
+        dimensions = list(n = nrow(va), p_a = ncol(va), p_b = ncol(vb)),
+        optimizer_details = NULL,
+        time = NULL,
+        convergence = TRUE,
+        step = NA
+    )
+    class(final_fit_obj) <- "rbrm"
+
+    result$path <- final_path
+    result$final_fit <- final_fit_obj
+
+    # Store 1se fit as simpler list (or full object if desired, sticking to list for now)
+    result$fit_1se <- list(
+        alpha = final_path$alphas[, best_idx_1se],
+        beta = final_path$betas[, best_idx_1se],
+        lambda = result$lambda_1se
     )
 
     class(result) <- "cv_rbrm"
@@ -232,12 +262,25 @@ print.cv_rbrm <- function(x, ...) {
         cat("\n")
         cli::cat_rule("Final Model (at Lambda Min)", col = "#43AA8B")
 
-        # Count non-zeros
-        nz_a <- sum(abs(x$final_fit$alpha_min) > 1e-10)
-        nz_b <- sum(abs(x$final_fit$beta_min) > 1e-10)
+        # Get coeffs (handle rbrm object or legacy list)
+        alpha <- if (!is.null(x$final_fit$alpha)) x$final_fit$alpha else x$final_fit$alpha_min
+        beta <- if (!is.null(x$final_fit$beta)) x$final_fit$beta else x$final_fit$beta_min
 
-        cli::cat_bullet("Active Va Coeffs: ", cli::col_cyan(nz_a), bullet = "arrow_right", bullet_col = "#F9C74F")
-        cli::cat_bullet("Active Vb Coeffs: ", cli::col_cyan(nz_b), bullet = "arrow_right", bullet_col = "#F9C74F")
+        # Check intercept
+        intercept <- if (!is.null(x$final_fit$intercept)) x$final_fit$intercept else x$intercept
+
+        # Helper to count
+        count_nz <- function(c, int) {
+            # If intercept is TRUE, assume first element is intercept
+            if (isTRUE(int) && length(c) > 0) c <- c[-1]
+            sum(abs(c) > 1e-10)
+        }
+
+        nz_a <- count_nz(alpha, intercept)
+        nz_b <- count_nz(beta, intercept)
+
+        cli::cat_bullet("Active Va Coeffs (Penalized): ", cli::col_cyan(nz_a), bullet = "arrow_right", bullet_col = "#F9C74F")
+        cli::cat_bullet("Active Vb Coeffs (Penalized): ", cli::col_cyan(nz_b), bullet = "arrow_right", bullet_col = "#F9C74F")
     }
 
     cat("\n")

@@ -3,30 +3,54 @@
 #' Helper to refit model without penalization on selected variables.
 #'
 #' @keywords internal
-refit_unpenalized <- function(va, vb, x, y, idx_a, idx_b, ...) {
-    # If sets are empty, return zeros (or intercepts if they were handled? rbrm structure assumes columns)
+refit_unpenalized <- function(va, vb, x, y, idx_a, idx_b, intercept = FALSE, ...) {
     p <- ncol(va)
     q <- ncol(vb)
 
-    # Check if totally empty
-    if (length(idx_a) == 0 && length(idx_b) == 0) {
-        return(list(alpha = rep(0, p), beta = rep(0, q)))
+    # 1. Prepare Data Subsets logic
+    if (intercept) {
+        # Indices > 1 refer to columns of va
+        vars_a <- idx_a[idx_a > 1] - 1
+        vars_b <- idx_b[idx_b > 1] - 1
+    } else {
+        vars_a <- idx_a
+        vars_b <- idx_b
     }
 
     # Subset
-    va_sub <- va[, idx_a, drop = FALSE]
-    vb_sub <- vb[, idx_b, drop = FALSE]
+    va_sub <- va[, vars_a, drop = FALSE]
+    vb_sub <- vb[, vars_b, drop = FALSE]
 
     # Fit with lambda = 0
     # Note: We assume standardize=FALSE because the passed va/vb are already standardized if needed
-    fit <- fit.rbrm(va_sub, vb_sub, x, y, lambda = 0, standardize = FALSE, ...)
+    fit <- fit.rbrm(va_sub, vb_sub, x, y, lambda = 0, standardize = FALSE, intercept = intercept, ...)
 
-    # Expand
-    alpha_full <- rep(0, p)
-    beta_full <- rep(0, q)
+    # Expand Results
+    if (intercept) {
+        alpha_full <- rep(0, p + 1)
+        beta_full <- rep(0, q + 1)
 
-    if (length(idx_a) > 0) alpha_full[idx_a] <- fit$alpha
-    if (length(idx_b) > 0) beta_full[idx_b] <- fit$beta
+        # Assign Intercept
+        alpha_full[1] <- fit$alpha[1]
+        beta_full[1] <- fit$beta[1]
+
+        # Assign Coefficients (map back to p+1 space)
+        # fit$alpha has Intercept at 1, coeffs at 2..k+1
+        # vars_a contains column indices (1..p)
+        # alpha_full indices are vars_a + 1
+        if (length(vars_a) > 0) alpha_full[vars_a + 1] <- fit$alpha[-1]
+        if (length(vars_b) > 0) beta_full[vars_b + 1] <- fit$beta[-1]
+
+        # Note: If idx_a contained 1 (Intercept), it was handled by alpha_full[1] assignment.
+        # If idx_a did NOT contain 1, we still assigned the new Intercept (refitted).
+        # This is generally desired behavior (refit intercept regardless of selection status, usually).
+    } else {
+        alpha_full <- rep(0, p)
+        beta_full <- rep(0, q)
+
+        if (length(vars_a) > 0) alpha_full[vars_a] <- fit$alpha
+        if (length(vars_b) > 0) beta_full[vars_b] <- fit$beta
+    }
 
     return(list(alpha = alpha_full, beta = beta_full))
 }
@@ -50,7 +74,7 @@ refit_unpenalized <- function(va, vb, x, y, idx_a, idx_b, ...) {
 #'  If TRUE, internal standardization is applied and returned coefficients are on original scale.
 #'  If FALSE, assumes data is prepared (intercepts added, scaling done).
 #' @param adjusted Logical. If TRUE, re-estimates coefficients for active variables without penalization (relaxed fit).
-#' @param optimizer Optimization method: "fista" (default), "lbfgs", "newton", or "newton_active".
+#' @param optimizer Optimization method: "fista" (default, C++), "lbfgs" (C++), "newton" (C++), "newton_active" (C++), or their R versions ("fista_R", "lbfgs_R", "newton_R", "newton_active_R").
 #' @param ... Additional arguments to fit.rbrm.
 #' @return An object of class `rbrm_path` (if multiple lambdas) or `rbrm` (if single lambda).
 #' @export
@@ -59,13 +83,12 @@ rbrm <- function(va, vb, x, y, lambda = NULL,
                  alpha_start = NULL, beta_start = NULL,
                  standardize = TRUE,
                  adjusted = FALSE,
+                 intercept = TRUE,
                  optimizer = "fista",
                  verbose = FALSE, ...) {
     if (is.null(vb)) vb <- va
     n <- length(y)
 
-    # Validate optimizer
-    optimizer <- rlang::arg_match(optimizer, c("fista", "lbfgs", "newton", "newton_active"))
 
     if (nrow(va) != n) cli::cli_abort("{.arg va} rows ({nrow(va)}) must match length of {.arg y} ({n}).")
     if (nrow(vb) != n) cli::cli_abort("{.arg vb} rows ({nrow(vb)}) must match length of {.arg y} ({n}).")
@@ -94,7 +117,8 @@ rbrm <- function(va, vb, x, y, lambda = NULL,
         }
 
         if (verbose) cli::cli_alert_info("Generating lambda sequence...")
-        l_max <- find_lambda_max(va, vb, x, y, prob_fun = getProbRR.org)
+        # Find lambda_max using standardized data (so effectively NO INTERCEPT in that matrix)
+        l_max <- find_lambda_max(va, vb, x, y, prob_fun = getProbRR.org, intercept = FALSE)
         lambda_seq <- create_lambda_grid(l_max, nlambda, lambda_min_ratio)
         if (verbose) cli::cli_alert_success("Generated {length(lambda_seq)} lambdas (Max: {round(l_max, 4)})")
     }
@@ -111,6 +135,7 @@ rbrm <- function(va, vb, x, y, lambda = NULL,
             beta_start = beta_start,
             lambda = lam,
             standardize = FALSE,
+            intercept = intercept,
             optimizer = optimizer,
             ...
         )
@@ -119,7 +144,7 @@ rbrm <- function(va, vb, x, y, lambda = NULL,
         if (adjusted) {
             idx_a <- which(abs(fit$alpha) > 1e-12)
             idx_b <- which(abs(fit$beta) > 1e-12)
-            refit <- refit_unpenalized(va, vb, x, y, idx_a, idx_b, optimizer = optimizer, ...)
+            refit <- refit_unpenalized(va, vb, x, y, idx_a, idx_b, optimizer = optimizer, intercept = intercept, ...)
 
             fit$alpha <- refit$alpha
             fit$beta <- refit$beta
@@ -159,6 +184,7 @@ rbrm <- function(va, vb, x, y, lambda = NULL,
             beta_start = curr_beta,
             lambda = lam,
             standardize = FALSE,
+            intercept = intercept,
             optimizer = optimizer,
             ...
         )
@@ -172,7 +198,7 @@ rbrm <- function(va, vb, x, y, lambda = NULL,
             idx_b <- which(abs(fit$beta) > 1e-12)
 
             # Refit unpenalized
-            refit <- refit_unpenalized(va, vb, x, y, idx_a, idx_b, optimizer = optimizer, ...)
+            refit <- refit_unpenalized(va, vb, x, y, idx_a, idx_b, optimizer = optimizer, intercept = intercept, ...)
 
             store_alpha <- refit$alpha
             store_beta <- refit$beta
@@ -206,8 +232,18 @@ rbrm <- function(va, vb, x, y, lambda = NULL,
         scaler_a = scaler_a,
         scaler_b = scaler_b,
         adjusted = adjusted,
+        intercept = intercept,
+        dimensions = list(n = length(y), p_a = ncol(va), p_b = ncol(vb)),
         optimizer = optimizer
     )
+
+    # Restore rownames
+    if (!is.null(path_fits[[1]]$alpha)) {
+        rownames(res$alphas) <- names(path_fits[[1]]$alpha)
+    }
+    if (!is.null(path_fits[[1]]$beta)) {
+        rownames(res$betas) <- names(path_fits[[1]]$beta)
+    }
 
     class(res) <- "rbrm_path"
     return(res)
@@ -233,6 +269,16 @@ print.rbrm_path <- function(x, ...) {
     }
     if (!is.null(x$optimizer)) {
         cli::cat_bullet("Optimizer: ", cli::col_cyan(x$optimizer), bullet = "info", bullet_col = "#F9C74F")
+    }
+
+    if (!is.null(x$intercept)) {
+        state <- if (x$intercept) "Included" else "Excluded"
+        cli::cat_bullet("Intercept: ", cli::col_cyan(state), bullet = "info", bullet_col = "#F9C74F")
+    }
+
+    if (!is.null(x$dimensions)) {
+        cli::cat_bullet("Features (Alpha): ", cli::col_cyan(x$dimensions$p_a), bullet = "info", bullet_col = "#F9C74F")
+        cli::cat_bullet("Features (Beta): ", cli::col_cyan(x$dimensions$p_b), bullet = "info", bullet_col = "#F9C74F")
     }
 
     cat("\n")
