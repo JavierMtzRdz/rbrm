@@ -17,7 +17,7 @@
 #' @return A list containing training and test data: v (covariates), x (treatment), y (outcome),
 #'         and true probabilities.
 #' @export
-generate_data <- function(pa, pb, n, n_test, alpha = NULL, beta = NULL, gamma = NULL, treatment_prob = 0.5,
+generate_data <- function(pa, pb, n, n_test = 100, alpha = NULL, beta = NULL, gamma = NULL, treatment_prob = 0.5,
                           target_beta_prob = 0.1) {
   if (any(is.null(alpha), is.null(beta), is.null(gamma))) {
     gen_t_vals <- true_vals(pa, pb)
@@ -25,6 +25,41 @@ generate_data <- function(pa, pb, n, n_test, alpha = NULL, beta = NULL, gamma = 
   if (is.null(alpha)) alpha <- gen_t_vals$true_alphas
   if (is.null(beta)) beta <- gen_t_vals$true_betas
   if (is.null(gamma)) gamma <- gen_t_vals$true_gammas
+
+  # Adjust Alpha (if length == pa, prepend 0 intercept)
+  if (!is.null(alpha) && length(alpha) == pa) {
+    cli::cli_alert_info("Adjusting alpha: Prepending 0 intercept.")
+    alpha <- c(0, alpha)
+  }
+
+  # Adjust Beta (if length == pb, calc intercept)
+  if (!is.null(beta) && length(beta) == pb) {
+    cli::cli_alert_info("Adjusting beta: Calculating intercept to match target probability.")
+
+    # Simulation for Intercept
+    n_sim <- 5000
+    v_sim <- matrix(stats::runif(n_sim * pa, min = -1, max = 1), nrow = n_sim)
+
+    # Theta (using full alpha which now has intercept)
+    theta_sim <- cbind(1, v_sim) %*% alpha
+
+    # LP Beta (using beta slopes)
+    if (pb == pa) {
+      lp_beta_sim <- v_sim %*% beta
+    } else {
+      v_sim_b <- matrix(stats::runif(n_sim * pb, min = -1, max = 1), nrow = n_sim)
+      lp_beta_sim <- v_sim_b %*% beta
+    }
+
+    # Link Helper
+    link_rb_p0 <- function(b, lp_b, theta) {
+      phi <- b + lp_b
+      getProbRR.org(as.vector(theta), as.vector(phi))$p0
+    }
+
+    beta_int <- compute_intercept_sim(linear_pred_main = lp_beta_sim, target_prob = target_beta_prob, link_fun = link_rb_p0, linear_pred_other = theta_sim)
+    beta <- c(beta_int, beta)
+  }
 
   if (length(alpha) != pa + 1) cli::cli_abort("Length of `alpha` ({length(alpha)}) must match `pa + 1` ({pa + 1}).")
   if (length(beta) != pb + 1) cli::cli_abort("Length of `beta` ({length(beta)}) must match `pb + 1` ({pb + 1}).")

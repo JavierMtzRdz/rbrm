@@ -40,9 +40,7 @@ p <- 5
 data <- generate_data(
   n = n,
   pa = p,
-  pb = p,
-  n_test = 100
-)
+  pb = p)
 
 # Fit regularized model (Penalized)
 fit <- rbrm(
