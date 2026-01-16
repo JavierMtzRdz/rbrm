@@ -92,18 +92,18 @@ rbrm_path <- function(va, vb, x, y, lambda_seq,
 #' Print RBRM Path
 #' @export
 print.rbrm_path <- function(x, ...) {
-    cli::cat_rule(cli::style_bold("RBRM Regularization Path"), col = "blue")
+    cli::cat_rule(cli::style_bold("RBRM Regularization Path"), col = "#277DA1")
     cat("\n")
 
     if (!is.list(x) || is.null(x$lambdas)) {
-        cli::cli_alert_danger("Invalid 'rbrm_path' object.")
+        cli::cli_alert_danger("Invalid 'rbrm_path' object.", col = "#f94144")
         return(invisible(x))
     }
 
     n_lam <- length(x$lambdas)
 
-    cli::cat_bullet("Lambdas: ", n_lam, bullet = "info")
-    cli::cat_bullet("Range: ", sprintf("%.4f - %.4f", min(x$lambdas), max(x$lambdas)), bullet = "info")
+    cli::cat_bullet("Lambdas: ", cli::col_cyan(n_lam), bullet = "info", bullet_col = "#F9C74F")
+    cli::cat_bullet("Range: ", cli::col_cyan(sprintf("%.4f - %.4f", min(x$lambdas), max(x$lambdas))), bullet = "info", bullet_col = "#F9C74F")
 
     cat("\n")
     invisible(x)

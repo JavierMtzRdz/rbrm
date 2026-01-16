@@ -163,19 +163,19 @@ cv_rbrm.formula <- function(object, data, ...) {
 #' Print CV RBRM Object
 #' @export
 print.cv_rbrm <- function(x, ...) {
-    cli::cat_rule(cli::style_bold("RBRM Cross-Validation"), col = "blue")
+    cli::cat_rule(cli::style_bold("RBRM Cross-Validation"), col = "#277DA1")
     cat("\n")
 
     n_folds <- nrow(x$nll_fold)
     n_lam <- length(x$lambdas)
 
-    cli::cat_bullet("Folds: ", n_folds, bullet = "info")
-    cli::cat_bullet("Lambda Path Length: ", n_lam, bullet = "info")
+    cli::cat_bullet("Folds: ", cli::col_cyan(n_folds), bullet = "info", bullet_col = "#F9C74F")
+    cli::cat_bullet("Lambda Path Length: ", cli::col_cyan(n_lam), bullet = "info", bullet_col = "#F9C74F")
 
     cat("\n")
-    cli::cat_rule("Optimal Lambdas", col = "green")
-    cli::cat_bullet("Min Lambda: ", sprintf("%.4f", x$lambda_min), " (NLL: ", sprintf("%.4f", min(x$nll_mean)), ")", bullet = "star")
-    cli::cat_bullet("1-SE Lambda: ", sprintf("%.4f", x$lambda_1se), bullet = "star")
+    cli::cat_rule("Optimal Lambdas", col = "#43AA8B")
+    cli::cat_bullet("Min Lambda: ", cli::col_cyan(sprintf("%.4f", x$lambda_min)), " (NLL: ", sprintf("%.4f", min(x$nll_mean)), ")", bullet = "star", bullet_col = "#F9C74F")
+    cli::cat_bullet("1-SE Lambda: ", cli::col_cyan(sprintf("%.4f", x$lambda_1se)), bullet = "star", bullet_col = "#F9C74F")
 
     cat("\n")
     invisible(x)
