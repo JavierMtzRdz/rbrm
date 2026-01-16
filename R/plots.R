@@ -1,9 +1,5 @@
 #' Plot Cross-Validation Results
 #'
-#' @return A ggplot object.
-#' @export
-#' Plot Cross-Validation Results
-#'
 #' @param x A 'cv_rbrm' object.
 #' @param measure Optional character string to plot a specific metric (e.g., "auc", "brier").
 #'                If NULL, plots the primary metric used in CV.

@@ -16,8 +16,6 @@ If NULL, plots the primary metric used in CV.}
 }
 \value{
 A ggplot object.
-
-A ggplot object.
 }
 \description{
 Plot Cross-Validation Results
