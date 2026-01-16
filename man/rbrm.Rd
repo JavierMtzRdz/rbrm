@@ -9,13 +9,14 @@ rbrm(
   vb,
   x,
   y,
-  lambda_seq = NULL,
-  nlambda = 100,
-  lambda_min_ratio = 1e-04,
+  lambda = NULL,
+  nlambda = 50,
+  lambda_min_ratio = 0.001,
   alpha_start = NULL,
   beta_start = NULL,
   standardize = TRUE,
   adjusted = FALSE,
+  optimizer = "fista",
   verbose = FALSE,
   ...
 )
@@ -29,11 +30,11 @@ rbrm(
 
 \item{y}{Outcome vector.}
 
-\item{lambda_seq}{Vector of lambda values (decreasing). If NULL, automatically generated.}
+\item{lambda}{Vector of lambda values (decreasing). If NULL, automatically generated.}
 
-\item{nlambda}{Number of lambda values if lambda_seq is NULL.}
+\item{nlambda}{Number of lambda values if lambda is NULL.}
 
-\item{lambda_min_ratio}{Ratio of smallest to largest lambda if lambda_seq is NULL.}
+\item{lambda_min_ratio}{Ratio of smallest to largest lambda if lambda is NULL.}
 
 \item{alpha_start}{Initial alpha.}
 
@@ -45,12 +46,15 @@ If FALSE, assumes data is prepared (intercepts added, scaling done).}
 
 \item{adjusted}{Logical. If TRUE, re-estimates coefficients for active variables without penalization (relaxed fit).}
 
+\item{optimizer}{Optimization method: "fista" (default), "lbfgs", "newton", or "newton_active".}
+
 \item{...}{Additional arguments to fit.rbrm.}
 }
 \value{
-An object of class \code{rbrm_path} (keeping class name for compatibility).
+An object of class \code{rbrm_path} (if multiple lambdas) or \code{rbrm} (if single lambda).
 }
 \description{
 Fits the RBRM model for a sequence of lambda values using warm starts.
 Can optionally refit unpenalized models on the active set from the penalized path.
+If a single lambda is provided, returns a single 'rbrm' fit object.
 }

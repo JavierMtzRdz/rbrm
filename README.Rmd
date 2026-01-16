@@ -50,40 +50,38 @@ data <- generate_data(
   beta_true = c(-0.2, 0.4, 0, 0, 0)
 )
 
-# Fit regularized model
-fit <- fit.rbrm(
+# Fit regularized model (Penalized)
+fit <- rbrm(
   va = data$va,
   vb = data$vb,
   x = data$x,
   y = data$y,
-  lambda = 0.01,
-  intercept = TRUE
+  adjusted = FALSE
 )
 
 print(fit)
 
-# Cross-validation for lambda selection
+# Cross-validation with custom metric and adjusted final model
 cv_fit <- cv_rbrm(
   va = data$va,
   vb = data$vb,
   x = data$x,
   y = data$y,
-  nfold = 5,
-  nlambda = 50
+  measure = "deviance", # Options: deviance, auc, brier, misclass
+  adjusted = TRUE # Returns unpenalized estimates for final model
 )
 
-plot(cv_fit)
+print(cv_fit)
+plot(cv_fit, measure = "deviance")
 
-# Fit regularization path
-path <- rbrm_path(
+# Fit relaxed regularization path (Unpenalized Refitting)
+fit_relaxed <- rbrm(
   va = data$va,
   vb = data$vb,
   x = data$x,
   y = data$y,
-  nlambda = 50
+  adjusted = TRUE
 )
-
-plot(path)
 ```
 
 ## The Model

@@ -12,15 +12,17 @@ cv_rbrm <- function(object, ...) {
 #' @describeIn cv_rbrm Default method for matrices
 #' @param measure Performance measure: "deviance" (default), "brier", "misclass", or "auc"
 #' @param adjusted Logical. If TRUE (default), the final model is refitted without penalization on the active set.
+#' @param optimizer Optimization method: "fista" (default), "lbfgs", "newton", or "newton_active".
 #' @export
 cv_rbrm.default <- function(object, vb = NULL, x, y,
                             nfold = 5,
-                            nlambda = 100,
-                            lambda_min_ratio = ifelse(nrow(object) < ncol(object), 0.01, 0.0001),
+                            nlambda = 50,
+                            lambda_min_ratio = ifelse(nrow(object) < ncol(object), 0.01, 0.001),
                             lambda_seq = NULL,
                             folds = NULL,
                             measure = "deviance",
                             adjusted = TRUE,
+                            optimizer = "fista",
                             alpha_start = NULL, beta_start = NULL,
                             seed = NULL,
                             verbose = TRUE,
@@ -34,6 +36,12 @@ cv_rbrm.default <- function(object, vb = NULL, x, y,
     if (!is.numeric(nlambda) || length(nlambda) != 1 || nlambda < 2) {
         cli::cli_abort("{.arg nlambda} must be an integer >= 2.")
     }
+
+    # Validate optimizer
+    optimizer <- rlang::arg_match(optimizer, c(
+        "fista", "lbfgs", "newton", "newton_active",
+        "fista_R", "lbfgs_R", "newton_R", "newton_active_R"
+    ))
 
     n <- length(y)
     if (nrow(va) != n) cli::cli_abort("{.arg va} must have the same number of rows as length of {.arg y}.")
@@ -101,9 +109,10 @@ cv_rbrm.default <- function(object, vb = NULL, x, y,
         # Use rbrm (renamed from rbrm_path)
         # CV always runs on UNADJUSTED (penalized) models for selection speed/consistency
         path_fit <- rbrm(va_train, vb_train, x_train, y_train,
-            lambda_seq = lambda_seq,
+            lambda = lambda_seq,
             standardize = TRUE,
             adjusted = FALSE,
+            optimizer = optimizer,
             verbose = FALSE, ...
         )
 
@@ -127,6 +136,7 @@ cv_rbrm.default <- function(object, vb = NULL, x, y,
     result$measure <- measure
     result$measure_name <- measure_name
     result$adjusted <- adjusted
+    result$optimizer <- optimizer
 
     # Store full results for all metrics
     result$cv_results <- list()
@@ -165,9 +175,10 @@ cv_rbrm.default <- function(object, vb = NULL, x, y,
     # Fit Final Model on Full Data
     # Apply adjustment if requested
     final_path <- rbrm(va, vb, x, y,
-        lambda_seq = lambda_seq,
+        lambda = lambda_seq,
         standardize = TRUE,
         adjusted = adjusted,
+        optimizer = optimizer,
         verbose = FALSE, ...
     )
 
@@ -188,33 +199,6 @@ cv_rbrm.default <- function(object, vb = NULL, x, y,
 #' @export
 cv_rbrm.formula <- function(object, data, ...) {
     # TODO: Implement formula parsing to va, vb, x, y
-    # For now, placeholder or basic model.matrix
-    # rbrm usually requires specific va, vb setup.
-    # If formula is just y ~ x1 + ... it maps to va=vb=X.
-
-    # Extract y
-    # Extract X
-    cl <- match.call()
-    mf <- match.call(expand.dots = FALSE)
-    m <- match(c("formula", "data", "subset", "weights", "na.action"), names(mf), 0L)
-    mf <- mf[c(1L, m)]
-    mf$drop.unused.levels <- TRUE
-    mf[[1L]] <- quote(stats::model.frame)
-    mf <- eval(mf, parent.frame())
-
-    mt <- attr(mf, "terms")
-    y <- model.response(mf, "numeric")
-    x_mat <- model.matrix(mt, mf, contrasts)
-    # Remove intercept if present? rbrm usually adds it or handles it.
-    # fit.rbrm logic: check for intercept col.
-
-    # Extract treatment 'x': Wait, rbrm needs x (treatment) separate from va/vb (covariates)?
-    # fit.rbrm(va, vb, x, y).
-    # Standard formula `y ~ x + covs` bundles treatment into X.
-    # We need to know which var is `x` (treatment).
-    # The formula interface needs to specify treatment variable. Or assumes first var?
-    # Let's skip simplified formula interface for now unless simple standard case.
-
     stop("Formula interface for cv_rbrm not fully implemented yet. Please use matrix interface.")
 }
 
@@ -232,6 +216,9 @@ print.cv_rbrm <- function(x, ...) {
     cli::cat_bullet("Lambda Path Length: ", cli::col_cyan(n_lam), bullet = "info", bullet_col = "#F9C74F")
     cli::cat_bullet("Measure: ", cli::col_cyan(measure_name), bullet = "info", bullet_col = "#F9C74F")
     cli::cat_bullet("Refit Unpenalized: ", cli::col_cyan(if (x$adjusted) "Yes" else "No"), bullet = "info", bullet_col = "#F9C74F")
+    if (!is.null(x$optimizer)) {
+        cli::cat_bullet("Optimizer: ", cli::col_cyan(x$optimizer), bullet = "info", bullet_col = "#F9C74F")
+    }
 
     cat("\n")
     cli::cat_rule("Optimal Lambdas", col = "#43AA8B")

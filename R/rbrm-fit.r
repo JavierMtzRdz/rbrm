@@ -14,7 +14,7 @@
 #' @param lambda_b_prop Proportion of lambda to use for beta if lambda_beta is NULL.
 #' @param intercept Logical. Does the model include an intercept term?
 #' @param prob_fun Function to calculate probabilities (e.g., `getProbRR.org`).
-#' @param opt_fun The optimization function to use (defaults to `fista_opt`).
+#' @param optimizer Optimization method: "fista" (default), "lbfgs", "newton", or "newton_active".
 #' @param save_opt Logical. If `TRUE`, include the full parameter history in results.
 #' @param standardize Logical. scaling.
 #' @param ... Additional arguments passed to the optimization function (e.g., `step_size_alpha`, `armijo_c`).
@@ -29,12 +29,29 @@ fit.rbrm <- function(va, vb = NULL, x, y,
                      lambda_b_prop = 1,
                      intercept = FALSE,
                      prob_fun = getProbRR.org,
-                     opt_fun = optim_fista,
+                     optimizer = "fista",
                      save_opt = FALSE,
                      standardize = TRUE,
                      clipping = 1e-10,
                      ...) {
   tictoc::tic("rbrm_fit time")
+
+  # Optimizer Selection
+  optimizer <- rlang::arg_match(optimizer, c(
+    "fista", "lbfgs", "newton", "newton_active",
+    "fista_R", "lbfgs_R", "newton_R", "newton_active_R"
+  ))
+
+  opt_fun <- switch(optimizer,
+    "fista" = optim_fista_cpp,
+    "lbfgs" = optim_lbfgs_cpp,
+    "newton" = optim_newton_cd_cpp,
+    "newton_active" = optim_newton_cd_active_cpp,
+    "fista_R" = optim_fista,
+    "lbfgs_R" = optim_lbfgs,
+    "newton_R" = optim_newton_cd,
+    "newton_active_R" = optim_newton_cd_active
+  )
 
   # Argument Setup
   if (is.null(lambda_beta)) lambda_beta <- lambda * lambda_b_prop

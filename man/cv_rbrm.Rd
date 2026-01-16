@@ -14,12 +14,13 @@ cv_rbrm(object, ...)
   x,
   y,
   nfold = 5,
-  nlambda = 100,
-  lambda_min_ratio = ifelse(nrow(object) < ncol(object), 0.01, 1e-04),
+  nlambda = 50,
+  lambda_min_ratio = ifelse(nrow(object) < ncol(object), 0.01, 0.001),
   lambda_seq = NULL,
   folds = NULL,
   measure = "deviance",
   adjusted = TRUE,
+  optimizer = "fista",
   alpha_start = NULL,
   beta_start = NULL,
   seed = NULL,
@@ -37,6 +38,8 @@ cv_rbrm(object, ...)
 \item{measure}{Performance measure: "deviance" (default), "brier", "misclass", or "auc"}
 
 \item{adjusted}{Logical. If TRUE (default), the final model is refitted without penalization on the active set.}
+
+\item{optimizer}{Optimization method: "fista" (default), "lbfgs", "newton", or "newton_active".}
 }
 \description{
 Performs k-fold cross-validation for the RBRM model.
